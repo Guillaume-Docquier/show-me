@@ -5,6 +5,7 @@ import { Result } from "@guillaume-docquier/tools-ts"
 import { expect, test } from "@playwright/test"
 import { analyzeProject } from "../../src/analysis/analyze-project.js"
 import { buildHtmlReport } from "../../src/report/build-html-report.js"
+import { fixtureProjectPath } from "../../src/testing/fixture-project.js"
 import { withTemporaryDirectory } from "../../src/testing/temporary-directory.js"
 
 test("supports graph hover, selection, clearing, and side-panel navigation", async ({ page }) => {
@@ -69,5 +70,39 @@ test("supports graph hover, selection, clearing, and side-panel navigation", asy
     await page.getByRole("button", { name: longPath }).click()
     await expect(page.locator("html")).toHaveAttribute("data-selected-node", longPath)
     await expect(page.getByRole("button", { name: longPath })).toHaveAttribute("aria-current", "true")
+  })
+})
+
+test("shows imported and consumer project files in the selected-node side panel", async ({ page }) => {
+  await withTemporaryDirectory(async (temporaryDirectory) => {
+    // Arrange
+    const analysis = await analyzeProject(fixtureProjectPath("static-esm"))
+    if (Result.isFailure(analysis)) {
+      throw new Error(`Fixture analysis failed: ${analysis.error._tag}`)
+    }
+    const browserBundle = await readFile(join(process.cwd(), "dist", "report", "browser.js"), "utf8")
+    const reportPath = join(temporaryDirectory, "show-me.html")
+    await writeFile(reportPath, buildHtmlReport(analysis.value, browserBundle), "utf8")
+
+    // Act
+    await page.goto(pathToFileURL(reportPath).href)
+    await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
+    await page.locator("#file-list").getByRole("button", { name: "src/main.ts", exact: true }).click()
+
+    // Assert
+    await expect(page.locator("#selected-imports")).toHaveText("7")
+    await expect(page.locator("#selected-imported-files button")).toHaveText([
+      "src/default-export.ts",
+      "src/directory/index.ts",
+      "src/lib/aliased.ts",
+      "src/mixed.ts",
+      "src/ordinary-type.ts",
+      "src/runtime.ts",
+      "src/side-effect.js",
+    ])
+
+    await page.locator("#selected-imported-files").getByRole("button", { name: "src/runtime.ts", exact: true }).click()
+    await expect(page.locator("#selected-consumers")).toHaveText("2")
+    await expect(page.locator("#selected-consumer-files button")).toHaveText(["src/main.ts", "src/reexports.ts"])
   })
 })

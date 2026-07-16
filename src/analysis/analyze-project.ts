@@ -1,6 +1,11 @@
 import { readFile, stat } from "node:fs/promises"
 import { basename, resolve } from "node:path"
 import { Result } from "@guillaume-docquier/tools-ts"
+import {
+  analyzeJavaScriptTypeScript,
+  type JavaScriptTypeScriptAnalysisError,
+  type JavaScriptTypeScriptSourceFile,
+} from "../languages/javascript-typescript/analyze-javascript-typescript.js"
 import { countNonBlankPhysicalLines } from "../project-files/count-non-blank-physical-lines.js"
 import { discoverProjectFiles, type ProjectFileDiscoveryError } from "../project-files/discover-project-files.js"
 import { PROJECT_ANALYSIS_SCHEMA_VERSION, type ProjectAnalysis, type ProjectFileAnalysis } from "./project-analysis.js"
@@ -29,6 +34,7 @@ export type AnalyzeProjectError =
     }
   | ProjectFileDiscoveryError
   | ProjectFileReadError
+  | JavaScriptTypeScriptAnalysisError
 
 /**
  * Discover project files and collect language-neutral physical line metrics.
@@ -61,6 +67,7 @@ export async function analyzeProject(projectRoot: string): Promise<Result<Projec
   }
 
   const files: ProjectFileAnalysis[] = []
+  const sourceFiles: JavaScriptTypeScriptSourceFile[] = []
   for (const discoveredFile of discoveredFiles.value) {
     const sourceText = await Result.tryCatch(readFile(discoveredFile.absolutePath, "utf8"))
     if (Result.isFailure(sourceText)) {
@@ -79,6 +86,16 @@ export async function analyzeProject(projectRoot: string): Promise<Result<Projec
       },
       coverage: undefined,
     })
+    sourceFiles.push({
+      path: discoveredFile.path,
+      absolutePath: discoveredFile.absolutePath,
+      sourceText: sourceText.value,
+    })
+  }
+
+  const languageAnalysis = analyzeJavaScriptTypeScript(resolvedProjectRoot, sourceFiles)
+  if (Result.isFailure(languageAnalysis)) {
+    return languageAnalysis
   }
 
   return Result.Success({
@@ -87,7 +104,7 @@ export async function analyzeProject(projectRoot: string): Promise<Result<Projec
       name: basename(resolvedProjectRoot),
     },
     files,
-    dependencies: [],
-    diagnostics: [],
+    dependencies: languageAnalysis.value.dependencies,
+    diagnostics: languageAnalysis.value.diagnostics,
   })
 }

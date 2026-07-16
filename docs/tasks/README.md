@@ -6,7 +6,6 @@ This directory tracks milestones, implementation progress, verification evidence
 
 | Milestone                                                             | Status      | Outcome                                                                       |
 | --------------------------------------------------------------------- | ----------- | ----------------------------------------------------------------------------- |
-| [004 Static ESM imports](./004-static-esm-imports.md)                 | Not started | Add directed runtime file dependencies through Oxc.                           |
 | [005 Coverage](./005-coverage.md)                                     | Not started | Discover or import Istanbul coverage and color project files.                 |
 | [006 CLOC line breakdown](./006-cloc-line-breakdown.md)               | Not started | Separate code, comment, and blank lines and control node sizing.              |
 | [007 External packages](./007-external-packages.md)                   | Not started | Add optional synthetic external-package nodes without analyzing dependencies. |
@@ -24,6 +23,7 @@ Completed milestone files are retained under [`done/`](./done/) as implementatio
 | [001 Foundation](./done/001-foundation.md)                         | 2026-07-15 | Established build boundaries, fixtures, and test infrastructure.    |
 | [002 File discovery and LOC](./done/002-file-discovery-and-loc.md) | 2026-07-15 | Added executable-file discovery and deterministic non-blank LOC.    |
 | [003 Static visualization](./done/003-static-visualization.md)     | 2026-07-16 | Added the self-contained interactive graph and hardened its layout. |
+| [004 Static ESM imports](./done/004-static-esm-imports.md)         | 2026-07-16 | Added static runtime ESM dependencies and relationship details.     |
 
 ## Workflow
 

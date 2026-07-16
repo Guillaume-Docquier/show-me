@@ -1,0 +1,1 @@
+globalThis.staticEsmFixtureLoaded = true

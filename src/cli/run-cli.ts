@@ -114,6 +114,12 @@ function formatAnalysisError(error: AnalyzeProjectError): string {
       return `Could not normalize project file path ${error.absolutePath}.`
     case "ProjectFileReadFailed":
       return `Could not read project file ${error.projectFile}: ${error.cause.message}`
+    case "JavaScriptTypeScriptParserFailed":
+      return `Could not parse project file ${error.file}: ${error.cause.message}`
+    case "JavaScriptTypeScriptResolverInitializationFailed":
+      return `Could not initialize dependency resolution for ${error.projectRoot}: ${error.cause.message}`
+    case "JavaScriptTypeScriptResolverFailed":
+      return `Could not resolve ${JSON.stringify(error.request)} from ${error.file}: ${error.cause.message}`
   }
 }
 

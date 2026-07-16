@@ -6,9 +6,9 @@ This document describes the target architecture. The implementation is being bui
 
 ## Current implementation
 
-Milestones 001 through 003 are complete. The CLI discovers supported project files, counts non-blank physical lines, and writes the first self-contained interactive graph report. The presentation and renderer boundaries are operational and covered through Node and real-browser tests.
+Milestones 001 through 004 are complete. The CLI discovers supported project files, counts non-blank physical lines, analyzes static runtime ESM imports and re-exports through Oxc, and writes a self-contained interactive graph report. The analysis, presentation, and renderer boundaries are operational and covered through Node and real-browser tests.
 
-Dependency arrays are intentionally empty until milestone 004 adds static runtime ESM analysis. Coverage import, CLOC-style metrics, external packages, and workspace behavior remain planned rather than partially implemented.
+Coverage import, CLOC-style metrics, external packages, and workspace behavior remain planned rather than partially implemented.
 
 ## System flow
 

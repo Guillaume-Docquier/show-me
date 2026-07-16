@@ -1,0 +1,8 @@
+{
+  // Oxc must honor root JSONC configuration when resolving and classifying aliases.
+  "compilerOptions": {
+    "paths": {
+      "@lib/*": ["./src/lib/*"]
+    }
+  }
+}

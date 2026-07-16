@@ -33,6 +33,9 @@
     "graphology": "^0.26.0",
     "graphology-layout-forceatlas2": "^0.10.1",
     "ignore": "^7.0.6",
+    "jsonc-parser": "^3.3.1",
+    "oxc-parser": "^0.140.0",
+    "oxc-resolver": "^11.24.2",
     "sigma": "^3.0.3"
   },
   "devDependencies": {

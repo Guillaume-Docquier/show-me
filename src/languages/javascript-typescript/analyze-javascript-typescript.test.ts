@@ -1,0 +1,86 @@
+import { readFile } from "node:fs/promises"
+import { fileURLToPath } from "node:url"
+import { Result } from "@guillaume-docquier/tools-ts"
+import { describe, expect, it } from "vitest"
+import { discoverProjectFiles } from "../../project-files/discover-project-files.js"
+import { analyzeJavaScriptTypeScript, type JavaScriptTypeScriptSourceFile } from "./analyze-javascript-typescript.js"
+
+describe("analyzeJavaScriptTypeScript", () => {
+  it("returns only language-neutral runtime dependencies and diagnostics for every supported static ESM form", async () => {
+    // Arrange
+    const projectRoot = fixtureProjectPath("static-esm")
+    const files = await readDiscoveredSourceFiles(projectRoot)
+
+    // Act
+    const result = analyzeJavaScriptTypeScript(projectRoot, files)
+
+    // Assert
+    expect(result).toEqual(
+      Result.Success({
+        dependencies: [
+          { source: "src/cycle-a.ts", target: "src/cycle-b.ts", kind: "runtime" },
+          { source: "src/cycle-b.ts", target: "src/cycle-a.ts", kind: "runtime" },
+          { source: "src/main.ts", target: "src/default-export.ts", kind: "runtime" },
+          { source: "src/main.ts", target: "src/directory/index.ts", kind: "runtime" },
+          { source: "src/main.ts", target: "src/lib/aliased.ts", kind: "runtime" },
+          { source: "src/main.ts", target: "src/mixed.ts", kind: "runtime" },
+          { source: "src/main.ts", target: "src/ordinary-type.ts", kind: "runtime" },
+          { source: "src/main.ts", target: "src/runtime.ts", kind: "runtime" },
+          { source: "src/main.ts", target: "src/side-effect.js", kind: "runtime" },
+          { source: "src/reexports.ts", target: "src/mixed.ts", kind: "runtime" },
+          { source: "src/reexports.ts", target: "src/runtime.ts", kind: "runtime" },
+          { source: "src/reexports.ts", target: "src/wildcard.ts", kind: "runtime" },
+          { source: "src/self.ts", target: "src/self.ts", kind: "runtime" },
+        ],
+        diagnostics: [
+          {
+            code: "UNRESOLVED_RUNTIME_DEPENDENCY",
+            message: 'Could not resolve runtime dependency "./missing.js".',
+            file: "src/main.ts",
+          },
+          {
+            code: "UNRESOLVED_RUNTIME_DEPENDENCY",
+            message: 'Could not resolve runtime dependency "@lib/missing".',
+            file: "src/main.ts",
+          },
+        ],
+      }),
+    )
+  })
+
+  it("resolves relative JavaScript dependencies without a project configuration", async () => {
+    // Arrange
+    const projectRoot = fixtureProjectPath("static-esm-no-config")
+    const files = await readDiscoveredSourceFiles(projectRoot)
+
+    // Act
+    const result = analyzeJavaScriptTypeScript(projectRoot, files)
+
+    // Assert
+    expect(result).toEqual(
+      Result.Success({
+        dependencies: [{ source: "index.js", target: "target.js", kind: "runtime" }],
+        diagnostics: [],
+      }),
+    )
+  })
+})
+
+async function readDiscoveredSourceFiles(projectRoot: string): Promise<readonly JavaScriptTypeScriptSourceFile[]> {
+  const discoveredFiles = await discoverProjectFiles(projectRoot)
+  if (Result.isFailure(discoveredFiles)) {
+    throw new Error(`Fixture discovery failed: ${discoveredFiles.error._tag}`)
+  }
+
+  return await Promise.all(
+    discoveredFiles.value.map(async (file) => ({
+      path: file.path,
+      absolutePath: file.absolutePath,
+      sourceText: await readFile(file.absolutePath, "utf8"),
+    })),
+  )
+}
+
+function fixtureProjectPath(name: "static-esm" | "static-esm-no-config"): string {
+  return fileURLToPath(new URL(`../../../fixtures/projects/${name}/`, import.meta.url))
+}

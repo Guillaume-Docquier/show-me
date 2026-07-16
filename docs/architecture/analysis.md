@@ -4,7 +4,7 @@ Analysis converts files on disk into an internal, language-neutral description t
 
 ## Current implementation
 
-Filesystem discovery, normalized project-file paths, and non-blank physical line counts are implemented. Dependency analysis, coverage enrichment, and CLOC-style line categories remain represented by the internal model but are owned by later milestones.
+Filesystem discovery, normalized project-file paths, non-blank physical line counts, and static runtime ESM dependency analysis are implemented. Coverage enrichment and CLOC-style line categories remain represented by the internal model but are owned by later milestones.
 
 ## Project discovery
 
@@ -35,13 +35,13 @@ Edges are authoritative. Import and consumer counts are derived from edges rathe
 
 ## Language modules
 
-A language module operates at project scope so it can use project configuration and resolve relationships across files. The planned JavaScript/TypeScript dependency module is internal and will use Oxc.
+A language module operates at project scope so it can use project configuration and resolve relationships across files. The internal JavaScript/TypeScript dependency module uses Oxc and exposes only language-neutral dependencies and diagnostics.
 
 Language modules are an architectural extension point, not a public plugin API. Adding another language initially means adding another module to the Show Me package. The core model and renderer must not gain language-specific AST types or resolution rules.
 
 ## Initial JavaScript and TypeScript dependency rules
 
-The first import-analysis milestone recognizes:
+The initial JavaScript and TypeScript analyzer recognizes:
 
 - static ESM imports;
 - side-effect ESM imports;

@@ -46,3 +46,33 @@ it("returns a typed failure when the project root is missing", async () => {
     expect(result.error._tag).toBe("ProjectRootReadFailed")
   }
 })
+
+it("integrates language-module dependencies and diagnostics into the project analysis", async () => {
+  // Arrange
+  const projectRoot = fixtureProjectPath("static-esm")
+
+  // Act
+  const result = await analyzeProject(projectRoot)
+
+  // Assert
+  expect(Result.isSuccess(result)).toBe(true)
+  if (Result.isSuccess(result)) {
+    expect(result.value.dependencies).toContainEqual({
+      source: "src/main.ts",
+      target: "src/runtime.ts",
+      kind: "runtime",
+    })
+    expect(result.value.diagnostics).toEqual([
+      {
+        code: "UNRESOLVED_RUNTIME_DEPENDENCY",
+        message: 'Could not resolve runtime dependency "./missing.js".',
+        file: "src/main.ts",
+      },
+      {
+        code: "UNRESOLVED_RUNTIME_DEPENDENCY",
+        message: 'Could not resolve runtime dependency "@lib/missing".',
+        file: "src/main.ts",
+      },
+    ])
+  }
+})

@@ -1,6 +1,8 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
+import { TypeGuard } from "@guillaume-docquier/tools-ts"
 import { describe, expect, it } from "vitest"
+import { fixtureProjectPath } from "../testing/fixture-project.js"
 import { withTemporaryDirectory } from "../testing/temporary-directory.js"
 import { type CliOutput, runCli } from "./run-cli.js"
 
@@ -90,6 +92,43 @@ describe("runCli report generation", () => {
       expect(exitCode).toBe(1)
       expect(captured.standardOutput).toEqual([])
       expect(captured.standardError.join("")).toContain("Could not read project root")
+    })
+  })
+
+  it("writes directed dependencies and side-panel counts into the report", async () => {
+    await withTemporaryDirectory(async (currentDirectory) => {
+      // Arrange
+      const outputPath = join(currentDirectory, "static-esm.html")
+      const captured = captureOutput()
+
+      // Act
+      const exitCode = await runCli([fixtureProjectPath("static-esm"), "--output", outputPath], captured.output, {
+        currentDirectory,
+        browserBundle: TEST_BROWSER_BUNDLE,
+      })
+
+      // Assert
+      const html = await readFile(outputPath, "utf8")
+      const serializedPresentation = html.match(/<script>window\.showMePresentation=(.+);<\/script>/u)?.[1]
+      if (serializedPresentation === undefined) {
+        throw new Error("Generated report did not embed its presentation model.")
+      }
+      const presentation: unknown = JSON.parse(serializedPresentation)
+      if (!TypeGuard.isRecord(presentation) || !TypeGuard.isArray(presentation.nodes) || !TypeGuard.isArray(presentation.edges)) {
+        throw new Error("Generated report presentation did not contain node and edge collections.")
+      }
+
+      expect(exitCode).toBe(0)
+      expect(presentation.edges).toHaveLength(13)
+      expect(presentation.nodes).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ path: "src/main.ts", imports: 7, consumers: 0 }),
+          expect.objectContaining({ path: "src/runtime.ts", imports: 0, consumers: 2 }),
+        ]),
+      )
+      expect(presentation.edges).toEqual(
+        expect.arrayContaining([expect.objectContaining({ source: "src/main.ts", target: "src/runtime.ts" })]),
+      )
     })
   })
 })
