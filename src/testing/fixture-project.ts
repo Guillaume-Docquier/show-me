@@ -3,7 +3,13 @@ import { fileURLToPath } from "node:url"
 /**
  * Names of deterministic fixture projects owned by the test suite.
  */
-export type FixtureProjectName = "discovery" | "minimal-javascript" | "minimal-typescript" | "static-esm" | "static-esm-no-config"
+export type FixtureProjectName =
+  | "coverage-project"
+  | "discovery"
+  | "minimal-javascript"
+  | "minimal-typescript"
+  | "static-esm"
+  | "static-esm-no-config"
 
 /**
  * Resolve a fixture project independently from the process working directory.

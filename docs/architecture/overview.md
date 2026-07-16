@@ -6,9 +6,9 @@ This document describes the target architecture. The implementation is being bui
 
 ## Current implementation
 
-Milestones 001 through 004 are complete. The CLI discovers supported project files, counts non-blank physical lines, analyzes static runtime ESM imports and re-exports through Oxc, and writes a self-contained interactive graph report. The analysis, presentation, and renderer boundaries are operational and covered through Node and real-browser tests.
+Milestones 001 through 005 are complete. The CLI discovers supported project files, counts non-blank physical lines, analyzes static runtime ESM imports and re-exports through Oxc, optionally imports Istanbul line coverage, and writes a self-contained interactive graph report. The analysis, presentation, and renderer boundaries are operational and covered through Node and real-browser tests.
 
-Coverage import, CLOC-style metrics, external packages, and workspace behavior remain planned rather than partially implemented.
+CLOC-style metrics, external packages, and workspace behavior remain planned rather than partially implemented.
 
 ## System flow
 
@@ -70,7 +70,7 @@ This direction keeps a future Rust analyzer feasible: a replacement analyzer can
 
 Expected filesystem, parsing, resolution, coverage, and report-writing failures are returned as typed `Result` failures. Third-party exceptions are classified at their adapter boundary. Fatal exceptions are reserved for violated internal invariants and unrecoverable defects.
 
-The CLI decides which implemented failures stop the command. Milestone 005 will make missing automatically discovered coverage informational while treating a missing explicit `--coverage` path as an error.
+The CLI decides which implemented failures stop the command. Missing automatically discovered coverage is informational, while missing, unreadable, or invalid explicit coverage is an expected command failure.
 
 ## Related documentation
 

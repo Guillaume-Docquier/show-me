@@ -9,6 +9,9 @@ const LAYOUT_ITERATIONS = 500
 const NODE_SIZE_SCALE = 3
 const NODE_LAYOUT_PADDING = 4
 const DEFAULT_NODE_COLOR = "#8fa3b8"
+const UNCOVERED_NODE_COLOR = "#dc2626"
+const PARTIALLY_COVERED_NODE_COLOR = "#eab308"
+const COVERED_NODE_COLOR = "#16a34a"
 const PATH_TRUNCATION_PREFIX = "..."
 
 /**
@@ -133,7 +136,7 @@ export function buildReportPresentation(analysis: ProjectAnalysis): ReportPresen
       importedFiles: importedFilesBySource.get(file.path) ?? [],
       consumerFiles: consumerFilesByTarget.get(file.path) ?? [],
       coverage: file.coverage?.lines,
-      color: DEFAULT_NODE_COLOR,
+      color: coverageColor(file.coverage?.lines),
       size: layout.renderedSize,
       x: layout.x,
       y: layout.y,
@@ -162,6 +165,24 @@ export function buildReportPresentation(analysis: ProjectAnalysis): ReportPresen
  */
 export function nodeSizeForLines(lines: number): number {
   return Math.sqrt(Math.max(lines, 1)) * NODE_SIZE_SCALE
+}
+
+/**
+ * Map optional line coverage onto the report's deterministic node-color scale.
+ *
+ * @param coverage - Line coverage from 0 through 100, or missing coverage.
+ * @returns Neutral gray for missing data or an interpolated red-yellow-green color.
+ */
+export function coverageColor(coverage: number | undefined): string {
+  if (coverage === undefined) {
+    return DEFAULT_NODE_COLOR
+  }
+
+  const boundedCoverage = Math.max(0, Math.min(100, coverage))
+  if (boundedCoverage <= 50) {
+    return interpolateColor(UNCOVERED_NODE_COLOR, PARTIALLY_COVERED_NODE_COLOR, boundedCoverage / 50)
+  }
+  return interpolateColor(PARTIALLY_COVERED_NODE_COLOR, COVERED_NODE_COLOR, (boundedCoverage - 50) / 50)
 }
 
 /**
@@ -196,4 +217,15 @@ function appendMapValue(valuesByKey: Map<string, string[]>, key: string, value: 
 
 function fileNameFromPath(path: string): string {
   return path.split("/").at(-1) ?? path
+}
+
+function interpolateColor(start: string, end: string, progress: number): string {
+  const channels = [1, 3, 5].map((offset) => {
+    const startChannel = Number.parseInt(start.slice(offset, offset + 2), 16)
+    const endChannel = Number.parseInt(end.slice(offset, offset + 2), 16)
+    return Math.round(startChannel + (endChannel - startChannel) * progress)
+      .toString(16)
+      .padStart(2, "0")
+  })
+  return `#${channels.join("")}`
 }

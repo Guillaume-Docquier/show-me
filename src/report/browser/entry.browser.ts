@@ -200,7 +200,11 @@ function showTooltip(node: ReportNode): void {
 
   const metrics = document.createElement("div")
   metrics.className = "tooltip-metrics"
-  metrics.append(metric("LOC", node.lines), metric("Imports", node.imports), metric("Consumers", node.consumers))
+  const metricElements = [metric("LOC", node.lines), metric("Imports", node.imports), metric("Consumers", node.consumers)]
+  if (node.coverage !== undefined) {
+    metricElements.push(metric("Coverage", `${node.coverage}%`))
+  }
+  metrics.append(...metricElements)
   tooltip.append(metrics)
   tooltip.hidden = false
 }
@@ -225,7 +229,7 @@ function positionTooltip(pointerX: number, pointerY: number): void {
   tooltip.style.top = `${Math.max(VIEWPORT_MARGIN, top)}px`
 }
 
-function metric(label: string, value: number): HTMLElement {
+function metric(label: string, value: number | string): HTMLElement {
   const container = document.createElement("div")
   const number = document.createElement("span")
   number.textContent = String(value)

@@ -44,7 +44,7 @@ dt { color: #8fa3b8; } dd { margin: 0; font-variant-numeric: tabular-nums; }
   background: rgba(17, 24, 33, 0.96); box-shadow: 0 10px 35px rgba(0,0,0,.35); font-size: 11px;
 }
 #tooltip strong { display: block; margin-bottom: 7px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; overflow-wrap: anywhere; }
-.tooltip-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; color: #8fa3b8; }
+.tooltip-metrics { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 9px; color: #8fa3b8; }
 .tooltip-metrics span { display: block; color: #e7edf4; font-variant-numeric: tabular-nums; }
 .clear-selection {
   width: 100%; margin: 0 0 22px; border: 1px solid #42556a; border-radius: 5px; padding: 7px 9px;

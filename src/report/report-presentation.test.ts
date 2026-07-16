@@ -2,7 +2,7 @@ import { Result } from "@guillaume-docquier/tools-ts"
 import { expect, it } from "vitest"
 import type { ProjectAnalysis } from "../analysis/project-analysis.js"
 import { ProjectFilePath } from "../project-files/project-file-path.js"
-import { buildReportPresentation, nodeSizeForLines, truncatePathFromStart } from "./report-presentation.js"
+import { buildReportPresentation, coverageColor, nodeSizeForLines, truncatePathFromStart } from "./report-presentation.js"
 
 it("makes node area proportional to the active line count", () => {
   // Arrange
@@ -15,6 +15,21 @@ it("makes node area proportional to the active line count", () => {
 
   // Assert
   expect((largerSize * largerSize) / (smallerSize * smallerSize)).toBe(4)
+})
+
+it.each([
+  [undefined, "#8fa3b8"],
+  [0, "#dc2626"],
+  [25, "#e36d17"],
+  [50, "#eab308"],
+  [75, "#80ab29"],
+  [100, "#16a34a"],
+] as const)("maps %s line coverage to a deterministic node color", (coverage, expectedColor) => {
+  // Act
+  const color = coverageColor(coverage)
+
+  // Assert
+  expect(color).toBe(expectedColor)
 })
 
 it("builds deterministic coordinates and dependency metrics", () => {

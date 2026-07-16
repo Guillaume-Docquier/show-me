@@ -1,7 +1,8 @@
 import { writeFile } from "node:fs/promises"
 import { resolve } from "node:path"
-import { Result, Time, Timer, UnitOfTime } from "@guillaume-docquier/tools-ts"
+import { isNodeJSError, Result, Time, Timer, UnitOfTime } from "@guillaume-docquier/tools-ts"
 import { analyzeProject, type AnalyzeProjectError } from "../analysis/analyze-project.js"
+import { importIstanbulCoverage, type IstanbulCoverageImportError } from "../coverage/import-istanbul-coverage.js"
 import { buildHtmlReport, loadBrowserBundle, type BrowserBundleReadError } from "../report/build-html-report.js"
 import { parseCliArguments } from "./parse-cli-arguments.js"
 
@@ -60,11 +61,6 @@ export async function runCli(arguments_: readonly string[], output: CliOutput, o
     return 0
   }
 
-  if (command.value.coveragePath !== undefined) {
-    output.writeStandardError("Coverage import is introduced in milestone 005 and is not available yet.\n")
-    return 1
-  }
-
   const startedAt = Timer.start()
   const currentDirectory = options.currentDirectory ?? process.cwd()
   const projectRoot = resolve(currentDirectory, command.value.projectPath)
@@ -73,6 +69,29 @@ export async function runCli(arguments_: readonly string[], output: CliOutput, o
   if (Result.isFailure(analysis)) {
     output.writeStandardError(`${formatAnalysisError(analysis.error)}\n`)
     return 1
+  }
+
+  const coveragePath = command.value.coveragePath
+  const isAutomaticCoverage = coveragePath === undefined
+  const coverageFile =
+    coveragePath === undefined ? resolve(projectRoot, "coverage", "coverage-final.json") : resolve(currentDirectory, coveragePath)
+  const coveredAnalysis = await importIstanbulCoverage(analysis.value, projectRoot, coverageFile)
+  let reportAnalysis = analysis.value
+
+  if (Result.isFailure(coveredAnalysis)) {
+    if (
+      isAutomaticCoverage &&
+      coveredAnalysis.error._tag === "CoverageFileReadFailed" &&
+      isNodeJSError(coveredAnalysis.error.cause) &&
+      coveredAnalysis.error.cause.code === "ENOENT"
+    ) {
+      output.writeStandardOutput(`No coverage file found at ${coverageFile}; continuing without coverage.\n`)
+    } else {
+      output.writeStandardError(`${formatCoverageImportError(coveredAnalysis.error)}\n`)
+      return 1
+    }
+  } else {
+    reportAnalysis = coveredAnalysis.value
   }
 
   let browserBundle = options.browserBundle
@@ -85,7 +104,7 @@ export async function runCli(arguments_: readonly string[], output: CliOutput, o
     browserBundle = loadedBrowserBundle.value
   }
 
-  const html = buildHtmlReport(analysis.value, browserBundle)
+  const html = buildHtmlReport(reportAnalysis, browserBundle)
   const outputPath = resolve(currentDirectory, command.value.outputPath ?? "show-me.html")
   const writeResult = await Result.tryCatch(writeFile(outputPath, html, "utf8"))
 
@@ -125,4 +144,13 @@ function formatAnalysisError(error: AnalyzeProjectError): string {
 
 function formatBrowserBundleError(error: BrowserBundleReadError): string {
   return `Could not read installed browser bundle ${error.browserBundlePath}: ${error.cause.message}`
+}
+
+function formatCoverageImportError(error: IstanbulCoverageImportError): string {
+  switch (error._tag) {
+    case "CoverageFileReadFailed":
+      return `Could not read coverage file ${error.coverageFile}: ${error.cause.message}`
+    case "CoverageFileInvalid":
+      return `Could not parse coverage file ${error.coverageFile}: ${error.cause.message}`
+  }
 }

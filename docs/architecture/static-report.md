@@ -2,7 +2,7 @@
 
 Show Me produces one self-contained HTML file that can be opened locally without a server or network access.
 
-The static report and core CLI behavior are implemented. Coverage-related CLI behavior remains reserved for milestone 005; an explicit `--coverage` option currently returns an unsupported-feature error.
+The static report, core CLI behavior, and optional Istanbul coverage import are implemented.
 
 ## CLI contract
 
@@ -26,11 +26,11 @@ Defaults and path rules:
 
 The first CLI surface contains only the optional project path, `--output`, `--coverage`, `--help`, and `--version`. There is no Show Me configuration file initially.
 
-## Planned coverage discovery
+## Coverage discovery
 
-Milestone 005 will make the CLI look for `<project-root>/coverage/coverage-final.json` when `--coverage` is absent. Missing automatically discovered coverage will be informational and analysis will continue without it.
+When `--coverage` is absent, the CLI looks for `<project-root>/coverage/coverage-final.json`. Missing automatically discovered coverage is informational and analysis continues without it. A present but unreadable or invalid automatic coverage file is an expected fatal command error.
 
-When coverage support is implemented and `--coverage` is supplied, a missing, unreadable, or invalid file will be an expected fatal command error with a useful message.
+When `--coverage` is supplied, its path is resolved from the invocation directory. A missing, unreadable, or invalid explicit file is an expected fatal command error with a useful message.
 
 ## Report contents
 
@@ -52,6 +52,7 @@ The initial graph is flat:
 - directories do not create group nodes or visual containers;
 - nodes have no persistent labels;
 - project file node area is proportional to the active line metric;
+- project files with coverage use a red-yellow-green scale while missing coverage remains neutral gray;
 - collision radii include spacing without changing rendered node area;
 - edges point from an importing file to the imported file;
 - pan, zoom, hover, and selection are supported.

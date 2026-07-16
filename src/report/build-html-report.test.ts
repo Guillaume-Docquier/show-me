@@ -1,6 +1,7 @@
-import { Result } from "@guillaume-docquier/tools-ts"
+import { Result, TypeGuard } from "@guillaume-docquier/tools-ts"
 import { expect, it } from "vitest"
 import { analyzeProject } from "../analysis/analyze-project.js"
+import { importIstanbulCoverage } from "../coverage/import-istanbul-coverage.js"
 import { fixtureProjectPath } from "../testing/fixture-project.js"
 import { buildHtmlReport } from "./build-html-report.js"
 
@@ -43,3 +44,40 @@ it("escapes script-closing project data before embedding it", async () => {
   expect(html).not.toContain("</script><script>unsafe()")
   expect(html).toContain("\\u003c/script\\u003e")
 })
+
+it("keeps missing coverage neutral instead of treating it as zero coverage", async () => {
+  // Arrange
+  const projectRoot = fixtureProjectPath("coverage-project")
+  const analysis = await analyzeProject(projectRoot)
+  if (Result.isFailure(analysis)) {
+    throw new Error(`Fixture analysis failed: ${analysis.error._tag}`)
+  }
+  const coveredAnalysis = await importIstanbulCoverage(analysis.value, projectRoot, `${projectRoot}/coverage/coverage-final.json`)
+  if (Result.isFailure(coveredAnalysis)) {
+    throw new Error(`Fixture coverage import failed: ${coveredAnalysis.error._tag}`)
+  }
+
+  // Act
+  const html = buildHtmlReport(coveredAnalysis.value, "window.bundleLoaded=true")
+  const nodes = embeddedReportNodes(html)
+
+  // Assert
+  const absentNode = nodes.find((node) => TypeGuard.isRecord(node) && node.path === "src/absent.ts")
+  const uncoveredNode = nodes.find((node) => TypeGuard.isRecord(node) && node.path === "src/uncovered.ts")
+  expect(absentNode).toMatchObject({ path: "src/absent.ts", color: "#8fa3b8" })
+  expect(absentNode).not.toHaveProperty("coverage")
+  expect(uncoveredNode).toMatchObject({ path: "src/uncovered.ts", coverage: 0, color: "#dc2626" })
+})
+
+function embeddedReportNodes(html: string): readonly unknown[] {
+  const serializedPresentation = html.match(/<script>window\.showMePresentation=(.+);<\/script>/u)?.[1]
+  if (serializedPresentation === undefined) {
+    throw new Error("Generated report did not embed its presentation model.")
+  }
+
+  const presentation: unknown = JSON.parse(serializedPresentation)
+  if (!TypeGuard.isRecord(presentation) || !TypeGuard.isArray(presentation.nodes)) {
+    throw new Error("Generated report presentation did not contain nodes.")
+  }
+  return presentation.nodes
+}

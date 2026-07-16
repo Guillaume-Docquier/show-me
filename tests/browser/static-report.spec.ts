@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url"
 import { Result } from "@guillaume-docquier/tools-ts"
 import { expect, test } from "@playwright/test"
 import { analyzeProject } from "../../src/analysis/analyze-project.js"
+import { importIstanbulCoverage } from "../../src/coverage/import-istanbul-coverage.js"
 import { buildHtmlReport } from "../../src/report/build-html-report.js"
 import { fixtureProjectPath } from "../../src/testing/fixture-project.js"
 import { withTemporaryDirectory } from "../../src/testing/temporary-directory.js"
@@ -104,5 +105,70 @@ test("shows imported and consumer project files in the selected-node side panel"
     await page.locator("#selected-imported-files").getByRole("button", { name: "src/runtime.ts", exact: true }).click()
     await expect(page.locator("#selected-consumers")).toHaveText("2")
     await expect(page.locator("#selected-consumer-files button")).toHaveText(["src/main.ts", "src/reexports.ts"])
+  })
+})
+
+test("shows numeric line coverage in the tooltip and selected-file side panel", async ({ page }) => {
+  await withTemporaryDirectory(async (temporaryDirectory) => {
+    // Arrange
+    const projectDirectory = join(temporaryDirectory, "project")
+    await mkdir(projectDirectory)
+    await writeFile(join(projectDirectory, "index.ts"), "export const value = true\n", "utf8")
+    const coverageFile = join(temporaryDirectory, "coverage-final.json")
+    await writeFile(
+      coverageFile,
+      JSON.stringify({
+        "index.ts": {
+          path: "index.ts",
+          statementMap: { 0: { start: { line: 1, column: 0 }, end: { line: 1, column: 25 } } },
+          s: { 0: 1 },
+          fnMap: {},
+          f: {},
+          branchMap: {},
+          b: {},
+        },
+      }),
+      "utf8",
+    )
+    const analysis = await analyzeProject(projectDirectory)
+    if (Result.isFailure(analysis)) {
+      throw new Error(`Fixture analysis failed: ${analysis.error._tag}`)
+    }
+    const coveredAnalysis = await importIstanbulCoverage(analysis.value, projectDirectory, coverageFile)
+    if (Result.isFailure(coveredAnalysis)) {
+      throw new Error(`Fixture coverage import failed: ${coveredAnalysis.error._tag}`)
+    }
+    const browserBundle = await readFile(join(process.cwd(), "dist", "report", "browser.js"), "utf8")
+    const reportPath = join(temporaryDirectory, "show-me.html")
+    await writeFile(reportPath, buildHtmlReport(coveredAnalysis.value, browserBundle), "utf8")
+
+    // Act
+    await page.goto(pathToFileURL(reportPath).href)
+    await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
+    await page.evaluate(async () => {
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            resolve()
+          })
+        })
+      })
+    })
+    const graphBounds = await page.locator("#graph").boundingBox()
+    if (graphBounds === null) {
+      throw new Error("Graph did not have browser bounds.")
+    }
+    const centerX = graphBounds.x + graphBounds.width / 2
+    const centerY = graphBounds.y + graphBounds.height / 2
+    await page.mouse.move(centerX, centerY)
+
+    // Assert
+    const tooltip = page.locator("#tooltip")
+    await expect(tooltip).toBeVisible()
+    await expect(tooltip.locator(".tooltip-metrics")).toContainText("100%")
+    await expect(tooltip.locator(".tooltip-metrics")).toContainText("Coverage")
+
+    await page.mouse.click(centerX, centerY)
+    await expect(page.locator("#selected-coverage")).toHaveText("100%")
   })
 })

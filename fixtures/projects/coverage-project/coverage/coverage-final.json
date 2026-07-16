@@ -1,0 +1,93 @@
+{
+  "src/covered.ts": {
+    "path": "src/covered.ts",
+    "statementMap": {
+      "0": { "start": { "line": 4, "column": 0 }, "end": { "line": 4, "column": 42 } }
+    },
+    "s": { "0": 1 },
+    "fnMap": {},
+    "f": {},
+    "branchMap": {},
+    "b": {}
+  },
+  "src/empty.ts": {
+    "path": "src/empty.ts",
+    "statementMap": {},
+    "s": {},
+    "fnMap": {},
+    "f": {},
+    "branchMap": {},
+    "b": {}
+  },
+  "src/multiline.ts": {
+    "path": "src/multiline.ts",
+    "statementMap": {
+      "0": { "start": { "line": 1, "column": 0 }, "end": { "line": 4, "column": 1 } }
+    },
+    "s": { "0": 1 },
+    "fnMap": {},
+    "f": {},
+    "branchMap": {},
+    "b": {}
+  },
+  "src/one-third.ts": {
+    "path": "src/one-third.ts",
+    "statementMap": {
+      "0": { "start": { "line": 1, "column": 0 }, "end": { "line": 1, "column": 20 } },
+      "1": { "start": { "line": 2, "column": 0 }, "end": { "line": 2, "column": 20 } },
+      "2": { "start": { "line": 3, "column": 0 }, "end": { "line": 3, "column": 22 } }
+    },
+    "s": { "0": 1, "1": 0, "2": 0 },
+    "fnMap": {},
+    "f": {},
+    "branchMap": {},
+    "b": {}
+  },
+  "src/partial.ts": {
+    "path": "src/partial.ts",
+    "statementMap": {
+      "0": { "start": { "line": 1, "column": 0 }, "end": { "line": 1, "column": 27 } },
+      "1": { "start": { "line": 2, "column": 0 }, "end": { "line": 2, "column": 32 } }
+    },
+    "s": { "0": 4, "1": 0 },
+    "fnMap": {},
+    "f": {},
+    "branchMap": {},
+    "b": {}
+  },
+  "src/same-line-mixed.ts": {
+    "path": "src/same-line-mixed.ts",
+    "statementMap": {
+      "0": { "start": { "line": 1, "column": 0 }, "end": { "line": 1, "column": 20 } },
+      "1": { "start": { "line": 1, "column": 21 }, "end": { "line": 1, "column": 40 } }
+    },
+    "s": { "0": 0, "1": 1 },
+    "fnMap": {},
+    "f": {},
+    "branchMap": {},
+    "b": {}
+  },
+  "src/same-line-uncovered.ts": {
+    "path": "src/same-line-uncovered.ts",
+    "statementMap": {
+      "0": { "start": { "line": 1, "column": 0 }, "end": { "line": 1, "column": 20 } },
+      "1": { "start": { "line": 1, "column": 21 }, "end": { "line": 1, "column": 40 } }
+    },
+    "s": { "0": 0, "1": 0 },
+    "fnMap": {},
+    "f": {},
+    "branchMap": {},
+    "b": {}
+  },
+  "src/uncovered.ts": {
+    "path": "src/uncovered.ts",
+    "statementMap": {
+      "0": { "start": { "line": 1, "column": 0 }, "end": { "line": 1, "column": 29 } }
+    },
+    "s": { "0": 0 },
+    "fnMap": {},
+    "f": {},
+    "branchMap": {},
+    "b": {}
+  }
+}

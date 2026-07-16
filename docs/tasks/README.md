@@ -6,7 +6,6 @@ This directory tracks milestones, implementation progress, verification evidence
 
 | Milestone                                                             | Status      | Outcome                                                                       |
 | --------------------------------------------------------------------- | ----------- | ----------------------------------------------------------------------------- |
-| [005 Coverage](./005-coverage.md)                                     | Not started | Discover or import Istanbul coverage and color project files.                 |
 | [006 CLOC line breakdown](./006-cloc-line-breakdown.md)               | Not started | Separate code, comment, and blank lines and control node sizing.              |
 | [007 External packages](./007-external-packages.md)                   | Not started | Add optional synthetic external-package nodes without analyzing dependencies. |
 | [008 pnpm workspaces](./008-pnpm-workspaces.md)                       | Not started | Analyze and filter all packages in one pnpm workspace.                        |
@@ -24,6 +23,7 @@ Completed milestone files are retained under [`done/`](./done/) as implementatio
 | [002 File discovery and LOC](./done/002-file-discovery-and-loc.md) | 2026-07-15 | Added executable-file discovery and deterministic non-blank LOC.    |
 | [003 Static visualization](./done/003-static-visualization.md)     | 2026-07-16 | Added the self-contained interactive graph and hardened its layout. |
 | [004 Static ESM imports](./done/004-static-esm-imports.md)         | 2026-07-16 | Added static runtime ESM dependencies and relationship details.     |
+| [005 Coverage](./done/005-coverage.md)                             | 2026-07-16 | Added optional Istanbul line coverage and coverage-colored nodes.   |
 
 ## Workflow
 

@@ -4,7 +4,7 @@ Analysis converts files on disk into an internal, language-neutral description t
 
 ## Current implementation
 
-Filesystem discovery, normalized project-file paths, non-blank physical line counts, and static runtime ESM dependency analysis are implemented. Coverage enrichment and CLOC-style line categories remain represented by the internal model but are owned by later milestones.
+Filesystem discovery, normalized project-file paths, non-blank physical line counts, static runtime ESM dependency analysis, and Istanbul line-coverage enrichment are implemented. CLOC-style line categories remain represented by the internal model but are owned by a later milestone.
 
 ## Project discovery
 
@@ -68,6 +68,8 @@ Node area is proportional to the selected line count. Render radius therefore gr
 
 ## Coverage
 
-The planned initial coverage importer will read Istanbul `coverage-final.json` and derive line coverage for project files. Coverage paths are normalized against the project root before matching project files.
+The coverage importer reads Istanbul `coverage-final.json` and derives executable-line coverage from statement start lines. Multiple statements on one line use their maximum hit count, a statement spanning multiple lines belongs to its start line, percentages are truncated to two decimals, and a file with no executable lines is 100% covered.
+
+Coverage paths are normalized against the project root before matching discovered project files. Absolute and relative paths and Windows and POSIX separators are supported; outside-root and non-project entries are ignored.
 
 A project file absent from a coverage report has unknown coverage, not zero coverage. Missing coverage is represented explicitly so the renderer can use a neutral color instead of red.
