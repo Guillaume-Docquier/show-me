@@ -26,6 +26,12 @@ Defaults and path rules:
 
 The first CLI surface contains only the optional project path, `--output`, `--coverage`, `--help`, and `--version`. There is no Show Me configuration file initially.
 
+## Published repository report
+
+The [live report](https://guillaume-docquier.github.io/show-me/show-me.html) is a public visualization of this repository's latest validated `main` revision. A GitHub Actions workflow checks formatting, linting, and types, runs Vitest in coverage mode to produce Istanbul-format coverage, builds the package, runs the Chromium browser suite, and then invokes the built CLI with the generated coverage file.
+
+The Pages artifact contains only the generated self-contained report as `show-me.html` and an identical `index.html` for the Pages root. Report construction stays in the CLI defined above; the workflow only supplies inputs, packages the static output, and deploys it. See [ADR 005](../adr/005-publish-dogfood-report-with-github-pages.md) for the delivery decision.
+
 ## Coverage discovery
 
 When `--coverage` is absent, the CLI looks for `<project-root>/coverage/coverage-final.json`. Missing automatically discovered coverage is informational and analysis continues without it. A present but unreadable or invalid automatic coverage file is an expected fatal command error.

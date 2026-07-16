@@ -147,4 +147,5 @@ vite.config.ts.timestamp-*
 .vite/
 
 show-me.html
+_site/
 test-results/
