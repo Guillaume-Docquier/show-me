@@ -39,11 +39,11 @@ dt { color: #8fa3b8; } dd { margin: 0; font-variant-numeric: tabular-nums; }
 .relationship-empty { padding: 5px 8px; color: #6f8295; font-size: 11px; }
 .file-list button[aria-current="true"] { border-color: #79b8ff; color: #f5f9ff; background: #172638; }
 #tooltip {
-  position: fixed; z-index: 10; pointer-events: none; width: min(300px, calc(100vw - 24px));
+  position: fixed; z-index: 10; pointer-events: none; width: min(360px, calc(100vw - 24px));
   padding: 10px 12px; border: 1px solid #42556a; border-radius: 5px;
   background: rgba(17, 24, 33, 0.96); box-shadow: 0 10px 35px rgba(0,0,0,.35); font-size: 11px;
 }
-#tooltip strong { display: block; margin-bottom: 7px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#tooltip strong { display: block; margin-bottom: 7px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; overflow-wrap: anywhere; }
 .tooltip-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; color: #8fa3b8; }
 .tooltip-metrics span { display: block; color: #e7edf4; font-variant-numeric: tabular-nums; }
 .clear-selection {

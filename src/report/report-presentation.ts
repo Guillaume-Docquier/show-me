@@ -7,6 +7,7 @@ import type { ProjectAnalysis } from "../analysis/project-analysis.js"
 const LAYOUT_SEED = 1_984_091
 const NODE_SIZE_SCALE = 3
 const DEFAULT_NODE_COLOR = "#8fa3b8"
+const PATH_TRUNCATION_PREFIX = "..."
 
 /**
  * Renderer-neutral data for one project-file node.
@@ -164,18 +165,18 @@ export function nodeSizeForLines(lines: number): number {
  * @param maximumLength - Preferred maximum character count.
  * @returns The original path or a tail-preserving truncated path.
  */
-export function truncatePathFromStart(path: string, maximumLength = 52): string {
+export function truncatePathFromStart(path: string, maximumLength = 48): string {
   if (path.length <= maximumLength) {
     return path
   }
 
   const fileName = fileNameFromPath(path)
-  const minimumTail = `…/${fileName}`
+  const minimumTail = `${PATH_TRUNCATION_PREFIX}/${fileName}`
   if (minimumTail.length >= maximumLength) {
     return minimumTail
   }
 
-  return `…${path.slice(-(maximumLength - 1))}`
+  return `${PATH_TRUNCATION_PREFIX}${path.slice(-(maximumLength - PATH_TRUNCATION_PREFIX.length))}`
 }
 
 function appendMapValue(valuesByKey: Map<string, string[]>, key: string, value: string): void {

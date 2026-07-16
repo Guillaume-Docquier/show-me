@@ -69,8 +69,19 @@ it("truncates leading directories while preserving the complete filename", () =>
   const truncated = truncatePathFromStart(longPath, 38)
 
   // Assert
-  expect(truncated.startsWith("…")).toBe(true)
+  expect(truncated.startsWith("...")).toBe(true)
   expect(truncated.endsWith("account-configuration-panel.tsx")).toBe(true)
+})
+
+it("truncates the displayed path from the start", () => {
+  // Arrange
+  const longPath = "fixtures/projects/minimal-typescript/src/index.ts"
+
+  // Act
+  const truncated = truncatePathFromStart(longPath)
+
+  // Assert
+  expect(truncated).toBe("...ures/projects/minimal-typescript/src/index.ts")
 })
 
 function parseProjectFilePath(input: string): ProjectFilePath {
