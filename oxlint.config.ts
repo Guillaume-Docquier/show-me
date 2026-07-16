@@ -135,6 +135,7 @@ export default defineConfig({
         "no-template-curly-in-string": ["error"],
         "no-this-before-super": ["error"],
         "no-unmodified-loop-condition": ["error"],
+        "no-underscore-dangle": ["error", { allow: ["_tag"] }],
         "no-unneeded-ternary": [
           "error",
           {

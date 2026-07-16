@@ -25,3 +25,11 @@ A multi-file or hosted report mode is not planned until a concrete limitation re
 Installed use remains the short `show-me` command, while npm publication avoids the occupied unscoped name. Reports work offline and are easy to move or share.
 
 Browser assets and analysis data increase the size of every generated file. Bundling workers or other browser features into one file may require special build handling. If report size or browser restrictions become a measured problem, changing the packaging mode will require a new decision and migration path.
+
+### 2026-07-15 build amendment
+
+Node-facing TypeScript is compiled with `tsc`. The browser renderer is bundled with esbuild into an IIFE during package build, and report generation embeds that prebuilt asset. The CLI never compiles browser code while analyzing a project.
+
+This keeps runtime report generation deterministic and avoids shipping a development server or runtime compiler. It introduces two explicit build targets and requires their outputs to be tested together through the packaged CLI workflow.
+
+The choice belongs to this ADR because it implements the accepted self-contained report boundary; it does not change the report format or add another deployment mode.

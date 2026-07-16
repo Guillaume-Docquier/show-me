@@ -1,12 +1,26 @@
 {
-  "name": "show-me",
+  "name": "@guillaume-docquier/show-me",
   "version": "0.0.1",
+  "bin": {
+    "show-me": "./dist/cli/entry.cli.js"
+  },
+  "files": [
+    "dist"
+  ],
   "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
+    "build": "pnpm build:node && pnpm build:browser",
+    "build:browser": "esbuild src/report/browser/entry.browser.ts --bundle --format=iife --target=es2022 --outfile=dist/report/browser.js",
+    "build:node": "tsc --project tsconfig.build.json",
+    "checks": "pnpm format:fix && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
     "format": "oxfmt --check",
     "format:fix": "oxfmt",
     "lint": "oxlint --max-warnings 0",
     "lint:fix": "pnpm lint --fix",
+    "prepack": "pnpm build",
     "prepare": "husky",
     "test": "vitest run --silent",
     "test:coverage": "pnpm test --coverage",
@@ -48,7 +62,7 @@
     },
     "runtime": {
       "name": "node",
-      "version": "26.4.0",
+      "version": "26.5.0",
       "onFail": "download"
     }
   }
