@@ -36,5 +36,5 @@
     "skipLibCheck": true,
     "allowImportingTsExtensions": true
   },
-  "include": ["src"]
+  "include": ["src", "tests", "playwright.config.ts", "vitest.config.ts"]
 }

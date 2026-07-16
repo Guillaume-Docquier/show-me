@@ -15,7 +15,7 @@
     "build": "pnpm build:node && pnpm build:browser",
     "build:browser": "esbuild src/report/browser/entry.browser.ts --bundle --format=iife --target=es2022 --outfile=dist/report/browser.js",
     "build:node": "tsc --project tsconfig.build.json",
-    "checks": "pnpm format:fix && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "checks": "pnpm format:fix && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm test:browser",
     "format": "oxfmt --check",
     "format:fix": "oxfmt",
     "lint": "oxlint --max-warnings 0",
@@ -23,6 +23,7 @@
     "prepack": "pnpm build",
     "prepare": "husky",
     "test": "vitest run --silent",
+    "test:browser": "playwright test",
     "test:coverage": "pnpm test --coverage",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
