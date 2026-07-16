@@ -10,6 +10,7 @@ export type FixtureProjectName =
   | "minimal-typescript"
   | "static-esm"
   | "static-esm-no-config"
+  | "test-file-exclusions"
 
 /**
  * Resolve a fixture project independently from the process working directory.

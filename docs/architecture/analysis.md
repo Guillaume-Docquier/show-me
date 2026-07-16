@@ -19,6 +19,8 @@ Initial executable extensions are:
 
 TypeScript declaration files such as `.d.ts`, `.d.mts`, and `.d.cts` are excluded. CSS, JSON, SVG, images, and other non-code assets do not become project files or dependency targets.
 
+Supported JavaScript and TypeScript files are also excluded by default when their basename contains `.test.` or `.spec.`, matched case-insensitively and anywhere in the basename. The rule is basename-only: marker-like directory names do not exclude their contents, and bare names such as `test.ts` and `spec.ts` remain project files. Excluded test files are filtered during discovery, before source reading, parsing, line metrics, dependency analysis, coverage matching, and report construction. An included file may resolve an import to an existing excluded test file without creating an edge or unresolved-dependency diagnostic.
+
 ## Internal analysis model
 
 The internal model is versioned even though it is not initially a public CLI format. Its concepts are language-neutral:

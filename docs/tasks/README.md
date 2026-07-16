@@ -12,19 +12,22 @@ This directory tracks milestones, implementation progress, verification evidence
 | [009 Import compatibility](./009-import-compatibility.md)             | Not started | Add CommonJS, dynamic imports, and broader resolution behavior.               |
 | [010 Visualization and UX](./010-visualization-and-ux.md)             | Not started | Improve navigation, focus, clustering, and accessibility.                     |
 | [011 Large-codebase performance](./011-large-codebase-performance.md) | Not started | Profile and optimize analysis and rendering for large projects.               |
+| [014 CLI file selection](./014-cli-file-selection.md)                 | Not started | Include default-excluded tests and add one-invocation ignore patterns.        |
+| [015 Project configuration](./015-project-configuration.md)           | Not started | Persist file-selection settings with explicit CLI precedence.                 |
 
 ## Done
 
 Completed milestone files are retained under [`done/`](./done/) as implementation history and verification evidence.
 
-| Milestone                                                          | Completed  | Outcome                                                             |
-| ------------------------------------------------------------------ | ---------- | ------------------------------------------------------------------- |
-| [001 Foundation](./done/001-foundation.md)                         | 2026-07-15 | Established build boundaries, fixtures, and test infrastructure.    |
-| [002 File discovery and LOC](./done/002-file-discovery-and-loc.md) | 2026-07-15 | Added executable-file discovery and deterministic non-blank LOC.    |
-| [003 Static visualization](./done/003-static-visualization.md)     | 2026-07-16 | Added the self-contained interactive graph and hardened its layout. |
-| [004 Static ESM imports](./done/004-static-esm-imports.md)         | 2026-07-16 | Added static runtime ESM dependencies and relationship details.     |
-| [005 Coverage](./done/005-coverage.md)                             | 2026-07-16 | Added optional Istanbul line coverage and coverage-colored nodes.   |
-| [012 GitHub Pages report](./done/012-github-pages-report.md)       | 2026-07-16 | Publishes a validated live visualization of the repository.         |
+| Milestone                                                                      | Completed  | Outcome                                                             |
+| ------------------------------------------------------------------------------ | ---------- | ------------------------------------------------------------------- |
+| [001 Foundation](./done/001-foundation.md)                                     | 2026-07-15 | Established build boundaries, fixtures, and test infrastructure.    |
+| [002 File discovery and LOC](./done/002-file-discovery-and-loc.md)             | 2026-07-15 | Added executable-file discovery and deterministic non-blank LOC.    |
+| [003 Static visualization](./done/003-static-visualization.md)                 | 2026-07-16 | Added the self-contained interactive graph and hardened its layout. |
+| [004 Static ESM imports](./done/004-static-esm-imports.md)                     | 2026-07-16 | Added static runtime ESM dependencies and relationship details.     |
+| [005 Coverage](./done/005-coverage.md)                                         | 2026-07-16 | Added optional Istanbul line coverage and coverage-colored nodes.   |
+| [012 GitHub Pages report](./done/012-github-pages-report.md)                   | 2026-07-16 | Publishes a validated live visualization of the repository.         |
+| [013 Default test-file exclusions](./done/013-default-test-file-exclusions.md) | 2026-07-16 | Removes conventionally named test files from default analysis.      |
 
 ## Workflow
 

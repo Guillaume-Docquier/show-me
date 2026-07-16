@@ -50,6 +50,36 @@ describe("importIstanbulCoverage", () => {
     }
   })
 
+  it("ignores coverage entries for default-excluded test files", async () => {
+    // Arrange
+    const projectRoot = fixtureProjectPath("test-file-exclusions")
+    const analysis = await analyzeProject(projectRoot)
+    if (Result.isFailure(analysis)) {
+      throw new Error("Fixture analysis failed: " + analysis.error._tag)
+    }
+
+    // Act
+    const result = await importIstanbulCoverage(analysis.value, projectRoot, join(projectRoot, "coverage", "coverage-final.json"))
+
+    // Assert
+    expect(Result.isSuccess(result)).toBe(true)
+    if (Result.isSuccess(result)) {
+      expect(result.value.files.map(({ path, coverage }) => ({ path, coverage: coverage?.lines }))).toEqual([
+        { path: "src/__tests__/helper.ts", coverage: undefined },
+        { path: "src/app.ts", coverage: 100 },
+        { path: "src/aspect.ts", coverage: undefined },
+        { path: "src/contest.ts", coverage: undefined },
+        { path: "src/runtime.ts", coverage: 0 },
+        { path: "src/spec.ts", coverage: undefined },
+        { path: "src/suite.spec/helper.ts", coverage: undefined },
+        { path: "src/suite.test/helper.ts", coverage: undefined },
+        { path: "src/test.ts", coverage: undefined },
+        { path: "src/test/helper.ts", coverage: undefined },
+        { path: "src/tests/helper.ts", coverage: undefined },
+      ])
+    }
+  })
+
   it.each([
     ["invalid JSON", "{"],
     ["a non-object root", "[]"],

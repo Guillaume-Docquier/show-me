@@ -33,6 +33,32 @@ it("discovers supported files while honoring declarations, ignore rules, and sta
   }
 })
 
+it("excludes conventional test and spec basenames across supported extensions", async () => {
+  // Arrange
+  const projectRoot = fixtureProjectPath("test-file-exclusions")
+
+  // Act
+  const result = await discoverProjectFiles(projectRoot)
+
+  // Assert
+  expect(Result.isSuccess(result)).toBe(true)
+  if (Result.isSuccess(result)) {
+    expect(result.value.map(({ path }) => path)).toEqual([
+      "src/__tests__/helper.ts",
+      "src/app.ts",
+      "src/aspect.ts",
+      "src/contest.ts",
+      "src/runtime.ts",
+      "src/spec.ts",
+      "src/suite.spec/helper.ts",
+      "src/suite.test/helper.ts",
+      "src/test.ts",
+      "src/test/helper.ts",
+      "src/tests/helper.ts",
+    ])
+  }
+})
+
 it("reports explicit, deterministic non-blank line counts for the discovery fixture", async () => {
   // Arrange
   const projectRoot = fixtureProjectPath("discovery")

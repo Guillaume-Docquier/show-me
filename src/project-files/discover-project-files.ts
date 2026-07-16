@@ -119,7 +119,7 @@ async function walkDirectory(
       continue
     }
 
-    if (!entry.isFile() || isIgnored(relativePath, "file", ignoreContexts)) {
+    if (!entry.isFile() || isIgnored(relativePath, "file", ignoreContexts) || isDefaultExcludedTestFile(entry.name)) {
       continue
     }
 
@@ -205,6 +205,11 @@ function languageForProjectPath(projectPath: string): LanguageId | undefined {
   }
 
   return undefined
+}
+
+function isDefaultExcludedTestFile(fileName: string): boolean {
+  const lowerFileName = fileName.toLowerCase()
+  return lowerFileName.includes(".test.") || lowerFileName.includes(".spec.")
 }
 
 function appendProjectPath(parent: string, child: string): string {

@@ -25,6 +25,8 @@ coverage
 !src/coverage/**
 !fixtures/projects/coverage-project/coverage/
 !fixtures/projects/coverage-project/coverage/coverage-final.json
+!fixtures/projects/test-file-exclusions/coverage/
+!fixtures/projects/test-file-exclusions/coverage/coverage-final.json
 
 # nyc test coverage
 .nyc_output

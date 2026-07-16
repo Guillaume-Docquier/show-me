@@ -38,7 +38,7 @@ The initial product:
 
 - analyzes one JavaScript or TypeScript project with one root `tsconfig.json` or `jsconfig.json`;
 - discovers executable `.js`, `.jsx`, `.mjs`, `.cjs`, `.ts`, `.tsx`, `.mts`, and `.cts` files;
-- excludes TypeScript declaration files and non-code assets;
+- excludes TypeScript declaration files, non-code assets, and supported files whose basename contains `.test.` or `.spec.` case-insensitively, while marker-like directories and bare `test.ts` or `spec.ts` names remain included;
 - counts non-blank physical lines, including comments;
 - recognizes syntax-level runtime static ESM imports and re-exports;
 - excludes explicitly type-only imports and re-exports;
