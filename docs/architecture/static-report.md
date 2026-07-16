@@ -57,7 +57,7 @@ The initial graph is flat:
 
 - directories do not create group nodes or visual containers;
 - nodes have no persistent labels;
-- project file node area is proportional to the active line metric;
+- project file node size grows logarithmically with the active line metric;
 - project files with coverage use a red-yellow-green scale while missing coverage remains neutral gray;
 - collision radii include spacing without changing rendered node area;
 - edges point from an importing file to the imported file;

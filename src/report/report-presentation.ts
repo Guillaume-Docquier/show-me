@@ -71,8 +71,8 @@ type LayoutNodeAttributes = {
 /**
  * Convert internal analysis into deterministic, renderer-neutral graph data.
  *
- * Node size is a radius-like renderer value. Squaring it yields an area that is
- * proportional to the file's non-blank line count.
+ * Node size is a radius-like renderer value that grows logarithmically with the
+ * file's non-blank line count.
  *
  * @param analysis - Language-neutral project analysis.
  * @returns Presentation data with deterministic node coordinates.
@@ -158,13 +158,13 @@ export function buildReportPresentation(analysis: ProjectAnalysis): ReportPresen
 }
 
 /**
- * Calculate the renderer size whose squared value is proportional to LOC.
+ * Calculate a renderer size that grows logarithmically with LOC.
  *
  * @param lines - Active non-blank line count.
  * @returns A positive renderer size.
  */
 export function nodeSizeForLines(lines: number): number {
-  return Math.sqrt(Math.max(lines, 1)) * NODE_SIZE_SCALE
+  return Math.log2(Math.max(lines, 1) + 1) * NODE_SIZE_SCALE
 }
 
 /**

@@ -4,17 +4,20 @@ import type { ProjectAnalysis } from "../analysis/project-analysis.js"
 import { ProjectFilePath } from "../project-files/project-file-path.js"
 import { buildReportPresentation, coverageColor, nodeSizeForLines, truncatePathFromStart } from "./report-presentation.js"
 
-it("makes node area proportional to the active line count", () => {
-  // Arrange
-  const smallerLines = 4
-  const largerLines = 16
-
+it.each([
+  [0, 3],
+  [1, 3],
+  [20, 13.18],
+  [300, 24.7],
+  [500, 26.91],
+  [1_000, 29.9],
+  [10_000, 39.86],
+] as const)("maps %i active lines to the restrained node size %f", (lines, expectedSize) => {
   // Act
-  const smallerSize = nodeSizeForLines(smallerLines)
-  const largerSize = nodeSizeForLines(largerLines)
+  const size = nodeSizeForLines(lines)
 
   // Assert
-  expect((largerSize * largerSize) / (smallerSize * smallerSize)).toBe(4)
+  expect(size).toBeCloseTo(expectedSize, 2)
 })
 
 it.each([

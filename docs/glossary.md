@@ -14,7 +14,7 @@ These are terms and their meaning in the context of this app.
 | Language module    | An internal project-level analyzer that understands the source files and dependency rules of one language family.                                                                      |
 | Layout             | The deterministic placement of graph nodes in two dimensions, including collision spacing derived from their visual sizes.                                                             |
 | Line metric        | A line count attached to a project file and available for display or node sizing. Non-blank physical lines are the initial metric; code, comment, and blank counts are planned.        |
-| Node size          | A renderer-neutral radius-like value whose squared value determines node area. Node area is proportional to the active line metric.                                                    |
+| Node size          | A renderer-neutral radius-like value that grows logarithmically with the active line metric so ordinary files remain visually comparable while very large files stand out.             |
 | Presentation model | Renderer-neutral graph data derived from analysis, including visual sizes, layout coordinates, display paths, and interaction metrics.                                                 |
 | Project file       | A source file owned by the analyzed project, supported by a language module, and not excluded by discovery rules. Executable JavaScript and TypeScript files are the initial examples. |
 | Project root       | The directory selected for analysis. It defaults to the directory where `show-me` is invoked.                                                                                          |

@@ -15,7 +15,7 @@ Running `show-me` generates one offline HTML report containing an automatically 
 - [x] Render project files with Sigma.js over a directed Graphology graph.
 - [x] Apply deterministic ForceAtlas2 layout with node-size-aware spacing.
 - [x] Keep large project-file nodes from overlapping smaller nodes.
-- [x] Make node area proportional to the active line count.
+- [x] Scale node size logarithmically with the active line count so ordinary files remain visually comparable.
 - [x] Add pan, zoom, constrained hover tooltips, selection, and the file detail side panel.
 - [x] Position hover tooltips near the pointer and keep them inside the viewport.
 - [x] Preserve filenames when truncating long tooltip paths.
@@ -27,7 +27,7 @@ Running `show-me` generates one offline HTML report containing an automatically 
 
 - [x] Report-builder tests prove the output is self-contained and source file contents are not embedded.
 - [x] CLI integration tests cover default and explicit project paths, explicit output paths, overwrite behavior, and failure reporting.
-- [x] Presentation tests prove node area scaling, deterministic initial data, tail-preserving path truncation, and collision-free placement beyond the former 100-node optimization threshold.
+- [x] Presentation tests prove representative node sizes, deterministic initial data, tail-preserving path truncation, and collision-free placement beyond the former 100-node optimization threshold.
 - [x] A real-browser interaction test covers hover, pointer-relative tooltip placement, unclipped tail-preserving paths, selection, side-panel navigation, and clearing selection.
 - [x] Visual fixtures use fixed layout seeds and viewport dimensions.
 

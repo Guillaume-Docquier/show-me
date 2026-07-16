@@ -64,7 +64,7 @@ Package subpaths collapse to their package name. For example, `drizzle-orm/pg-co
 
 The initial line metric counts non-blank physical lines and includes comments. A later CLOC-style milestone classifies blank, comment, and code lines separately. At that point, code lines become the default node-sizing metric and the UI may combine any of the three categories.
 
-Node area is proportional to the selected line count. Render radius therefore grows with the square root of that count so large files do not dominate the graph disproportionately.
+Node size grows with the base-2 logarithm of the selected line count. This keeps ordinary files in the broad 20-to-500-line range visually comparable, while files around 1,000 lines and above stand out without dominating the graph.
 
 ## Coverage
 
