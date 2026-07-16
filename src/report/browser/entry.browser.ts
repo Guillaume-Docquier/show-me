@@ -1,7 +1,7 @@
 import { DirectedGraph } from "graphology"
 import Sigma from "sigma"
 import { createEdgeArrowProgram } from "sigma/rendering"
-import type { NodeDisplayData } from "sigma/types"
+import type { Extent, NodeDisplayData } from "sigma/types"
 import type { ReportNode, ReportPresentation } from "../report-presentation.js"
 
 declare global {
@@ -12,6 +12,7 @@ declare global {
 
 const TOOLTIP_OFFSET = 14
 const VIEWPORT_MARGIN = 10
+const MINIMUM_LAYOUT_SPAN = 600
 
 type BrowserNodeAttributes = {
   readonly x: number
@@ -64,6 +65,7 @@ const renderer = new Sigma<BrowserNodeAttributes>(graph, graphContainer, {
     arrow: createEdgeArrowProgram<BrowserNodeAttributes>(),
   },
   labelRenderedSizeThreshold: Number.POSITIVE_INFINITY,
+  itemSizesReference: "positions",
   nodeReducer(node, attributes): Partial<NodeDisplayData> {
     if (node !== selectedNodeId) {
       return attributes
@@ -77,6 +79,7 @@ const renderer = new Sigma<BrowserNodeAttributes>(graph, graphContainer, {
   },
   zIndex: true,
 })
+renderer.setCustomBBox(layoutBounds(presentation.nodes))
 
 renderer.on("enterNode", ({ node, event }) => {
   const reportNode = nodeById.get(node)
@@ -236,4 +239,27 @@ function requiredElement(id: string): HTMLElement {
     throw new Error(`Static report is missing #${id}.`)
   }
   return element
+}
+
+function layoutBounds(nodes: readonly ReportNode[]): { readonly x: Extent; readonly y: Extent } {
+  if (nodes.length === 0) {
+    const halfSpan = MINIMUM_LAYOUT_SPAN / 2
+    return { x: [-halfSpan, halfSpan], y: [-halfSpan, halfSpan] }
+  }
+
+  const minimumX = Math.min(...nodes.map((node) => node.x - node.size))
+  const maximumX = Math.max(...nodes.map((node) => node.x + node.size))
+  const minimumY = Math.min(...nodes.map((node) => node.y - node.size))
+  const maximumY = Math.max(...nodes.map((node) => node.y + node.size))
+
+  return {
+    x: centeredExtent(minimumX, maximumX),
+    y: centeredExtent(minimumY, maximumY),
+  }
+}
+
+function centeredExtent(minimum: number, maximum: number): Extent {
+  const center = (minimum + maximum) / 2
+  const halfSpan = Math.max(maximum - minimum, MINIMUM_LAYOUT_SPAN) / 2
+  return [center - halfSpan, center + halfSpan]
 }

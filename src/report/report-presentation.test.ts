@@ -61,6 +61,46 @@ it("builds deterministic coordinates and dependency metrics", () => {
   ])
 })
 
+it("keeps large nodes from overlapping other nodes in large graphs", () => {
+  // Arrange
+  const files = Array.from({ length: 101 }, (_, index) => ({
+    path: parseProjectFilePath(`src/file-${String(index).padStart(3, "0")}.ts`),
+    language: "typescript" as const,
+    lines: { nonBlank: index === 0 ? 500 : 1 },
+    coverage: undefined,
+  }))
+  const analysis: ProjectAnalysis = {
+    schemaVersion: 1,
+    project: { name: "large-nodes" },
+    files,
+    dependencies: [],
+    diagnostics: [],
+  }
+
+  // Act
+  const presentation = buildReportPresentation(analysis)
+
+  // Assert
+  const overlaps: string[] = []
+  for (let leftIndex = 0; leftIndex < presentation.nodes.length; leftIndex += 1) {
+    const left = presentation.nodes[leftIndex]
+    if (left === undefined) {
+      continue
+    }
+    for (let rightIndex = leftIndex + 1; rightIndex < presentation.nodes.length; rightIndex += 1) {
+      const right = presentation.nodes[rightIndex]
+      if (right === undefined) {
+        continue
+      }
+      const centerDistance = Math.hypot(left.x - right.x, left.y - right.y)
+      if (centerDistance < left.size + right.size) {
+        overlaps.push(`${left.path} overlaps ${right.path}`)
+      }
+    }
+  }
+  expect(overlaps).toEqual([])
+})
+
 it("truncates leading directories while preserving the complete filename", () => {
   // Arrange
   const longPath = "packages/application/src/features/accounts/components/account-configuration-panel.tsx"

@@ -5,7 +5,9 @@ import type { ForceAtlas2SynchronousLayoutParameters } from "graphology-layout-f
 import type { ProjectAnalysis } from "../analysis/project-analysis.js"
 
 const LAYOUT_SEED = 1_984_091
+const LAYOUT_ITERATIONS = 500
 const NODE_SIZE_SCALE = 3
+const NODE_LAYOUT_PADDING = 4
 const DEFAULT_NODE_COLOR = "#8fa3b8"
 const PATH_TRUNCATION_PREFIX = "..."
 
@@ -58,6 +60,7 @@ export type ReportPresentation = {
 
 type LayoutNodeAttributes = {
   readonly size: number
+  readonly renderedSize: number
   x: number
   y: number
 }
@@ -84,8 +87,10 @@ export function buildReportPresentation(analysis: ProjectAnalysis): ReportPresen
   const random = createRng(mulberry32Prng(LAYOUT_SEED))
 
   for (const file of analysis.files) {
+    const renderedSize = nodeSizeForLines(file.lines.nonBlank)
     graph.addNode(file.path, {
-      size: nodeSizeForLines(file.lines.nonBlank),
+      size: renderedSize + NODE_LAYOUT_PADDING,
+      renderedSize,
       x: random.float() * 2 - 1,
       y: random.float() * 2 - 1,
     })
@@ -103,13 +108,14 @@ export function buildReportPresentation(analysis: ProjectAnalysis): ReportPresen
     }
   } else if (graph.order > 1) {
     forceAtlas2Layout.assign(graph, {
-      iterations: 100,
+      iterations: LAYOUT_ITERATIONS,
       settings: {
         adjustSizes: true,
-        barnesHutOptimize: graph.order >= 100,
+        // ForceAtlas2's Barnes-Hut branch does not include node radii in its repulsion calculation.
+        barnesHutOptimize: false,
         gravity: 1,
         scalingRatio: 4,
-        slowDown: 2,
+        slowDown: 1,
       },
     })
   }
@@ -128,7 +134,7 @@ export function buildReportPresentation(analysis: ProjectAnalysis): ReportPresen
       consumerFiles: consumerFilesByTarget.get(file.path) ?? [],
       coverage: file.coverage?.lines,
       color: DEFAULT_NODE_COLOR,
-      size: layout.size,
+      size: layout.renderedSize,
       x: layout.x,
       y: layout.y,
     }
