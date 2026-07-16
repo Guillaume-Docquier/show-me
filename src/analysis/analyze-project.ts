@@ -1,10 +1,21 @@
-import { stat } from "node:fs/promises"
+import { readFile, stat } from "node:fs/promises"
 import { basename, resolve } from "node:path"
 import { Result } from "@guillaume-docquier/tools-ts"
-import { createEmptyProjectAnalysis, type ProjectAnalysis } from "./project-analysis.js"
+import { countNonBlankPhysicalLines } from "../project-files/count-non-blank-physical-lines.js"
+import { discoverProjectFiles, type ProjectFileDiscoveryError } from "../project-files/discover-project-files.js"
+import { PROJECT_ANALYSIS_SCHEMA_VERSION, type ProjectAnalysis, type ProjectFileAnalysis } from "./project-analysis.js"
 
 /**
- * An expected failure while opening a project for analysis.
+ * A failure while reading the contents of a discovered project file.
+ */
+export type ProjectFileReadError = {
+  readonly _tag: "ProjectFileReadFailed"
+  readonly projectFile: string
+  readonly cause: Error
+}
+
+/**
+ * An expected failure while analyzing a project.
  */
 export type AnalyzeProjectError =
   | {
@@ -16,15 +27,14 @@ export type AnalyzeProjectError =
       readonly _tag: "ProjectRootNotDirectory"
       readonly projectRoot: string
     }
+  | ProjectFileDiscoveryError
+  | ProjectFileReadError
 
 /**
- * Open a project and establish its language-neutral analysis.
- *
- * File discovery and metrics are added by the next milestone. This seam already
- * performs real project-root I/O so callers and tests do not depend on a fake analyzer.
+ * Discover project files and collect language-neutral physical line metrics.
  *
  * @param projectRoot - Directory to analyze.
- * @returns An empty project analysis, or a typed project-root failure.
+ * @returns A deterministic project analysis, or a typed filesystem failure.
  */
 export async function analyzeProject(projectRoot: string): Promise<Result<ProjectAnalysis, AnalyzeProjectError>> {
   const resolvedProjectRoot = resolve(projectRoot)
@@ -45,5 +55,39 @@ export async function analyzeProject(projectRoot: string): Promise<Result<Projec
     })
   }
 
-  return Result.Success(createEmptyProjectAnalysis(basename(resolvedProjectRoot)))
+  const discoveredFiles = await discoverProjectFiles(resolvedProjectRoot)
+  if (Result.isFailure(discoveredFiles)) {
+    return discoveredFiles
+  }
+
+  const files: ProjectFileAnalysis[] = []
+  for (const discoveredFile of discoveredFiles.value) {
+    const sourceText = await Result.tryCatch(readFile(discoveredFile.absolutePath, "utf8"))
+    if (Result.isFailure(sourceText)) {
+      return Result.Failure({
+        _tag: "ProjectFileReadFailed",
+        projectFile: discoveredFile.path,
+        cause: sourceText.error,
+      })
+    }
+
+    files.push({
+      path: discoveredFile.path,
+      language: discoveredFile.language,
+      lines: {
+        nonBlank: countNonBlankPhysicalLines(sourceText.value),
+      },
+      coverage: undefined,
+    })
+  }
+
+  return Result.Success({
+    schemaVersion: PROJECT_ANALYSIS_SCHEMA_VERSION,
+    project: {
+      name: basename(resolvedProjectRoot),
+    },
+    files,
+    dependencies: [],
+    diagnostics: [],
+  })
 }

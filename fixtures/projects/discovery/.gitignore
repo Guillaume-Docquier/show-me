@@ -1,0 +1,3 @@
+ignored-root.ts
+*.generated.ts
+!keep.generated.ts

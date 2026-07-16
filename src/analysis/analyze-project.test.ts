@@ -17,7 +17,16 @@ it("opens a real fixture through the analysis application seam", async () => {
       project: {
         name: "minimal-javascript",
       },
-      files: [],
+      files: [
+        {
+          path: "index.js",
+          language: "javascript",
+          lines: {
+            nonBlank: 1,
+          },
+          coverage: undefined,
+        },
+      ],
       dependencies: [],
       diagnostics: [],
     }),

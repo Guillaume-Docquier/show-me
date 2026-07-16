@@ -1,0 +1,3 @@
+ignored.ts
+*.js
+!kept.js

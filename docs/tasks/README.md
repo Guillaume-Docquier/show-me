@@ -7,7 +7,7 @@ This directory tracks milestones, implementation progress, verification evidence
 | Milestone                                                             | Status      | Outcome                                                                  |
 | --------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------ |
 | [001 Foundation](./001-foundation.md)                                 | Complete    | Establish build boundaries, fixtures, and test infrastructure.           |
-| [002 File discovery and LOC](./002-file-discovery-and-loc.md)         | Not started | Discover executable project files and count non-blank lines.             |
+| [002 File discovery and LOC](./002-file-discovery-and-loc.md)         | Complete    | Discover executable project files and count non-blank lines.             |
 | [003 Static visualization](./003-static-visualization.md)             | Not started | Generate and interact with the initial self-contained graph report.      |
 | [004 Static ESM imports](./004-static-esm-imports.md)                 | Not started | Add directed runtime file dependencies through Oxc.                      |
 | [005 Coverage](./005-coverage.md)                                     | Not started | Discover or import Istanbul coverage and color project files.            |
