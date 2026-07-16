@@ -1,0 +1,48 @@
+{
+  "name": "show-me",
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "format": "oxfmt --check",
+    "format:fix": "oxfmt",
+    "lint": "oxlint --max-warnings 0",
+    "lint:fix": "pnpm lint --fix",
+    "prepare": "husky",
+    "test": "vitest run --silent",
+    "test:coverage": "pnpm test --coverage",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@guillaume-docquier/tools-ts": "^6.3.1"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^4.1.10",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.8",
+    "oxfmt": "^0.57.0",
+    "oxlint": "^1.71.0",
+    "oxlint-tsgolint": "^0.24.0",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  },
+  "lint-staged": {
+    "*.{md,json,yml,yaml,css,scss}": "oxfmt --no-error-on-unmatched-pattern",
+    "*.{js,jsx,ts,tsx}": [
+      "oxlint --fix",
+      "oxfmt --no-error-on-unmatched-pattern"
+    ]
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "11.11.0",
+      "onFail": "download"
+    },
+    "runtime": {
+      "name": "node",
+      "version": "26.4.0",
+      "onFail": "download"
+    }
+  }
+}

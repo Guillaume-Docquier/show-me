@@ -1,0 +1,4 @@
+minimumReleaseAgeExclude:
+  - "@guillaume-docquier/tools-ts"
+
+strictPeerDependencies: true
