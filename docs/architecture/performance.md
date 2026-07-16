@@ -36,6 +36,14 @@ Every benchmark result records:
 
 Absolute regression budgets should be chosen from measured baselines on documented hardware rather than invented during architecture planning. The final optimization milestone establishes those budgets and a smaller automated sentinel benchmark where full-scale execution is unsuitable for every test run.
 
+## Current layout baseline
+
+Milestone 003 deliberately favors collision correctness over asymptotic layout speed. ForceAtlas2 currently runs 500 synchronous exact-repulsion iterations because its Barnes-Hut path ignores individual node radii. This makes the current layout quadratic per iteration.
+
+On the development machine, the 182-file `text-based-browser-game-1` report completed in 114.5 ms with no node intersections. A separate 1,000-node synthetic layout took approximately 1.96 seconds. These measurements are diagnostic observations, not accepted budgets: they did not include the final import graph, large source contents, coverage data, or browser-load profiling.
+
+Milestone 011 must include collision correctness in every optimized-layout comparison. A faster layout is not an improvement if viewport fitting or approximate repulsion lets large nodes hide other nodes.
+
 ## Optimization rule
 
 Profile before optimizing, change one meaningful bottleneck at a time, and rerun the semantic regression suite after every optimization. An optimization is not accepted if it makes analysis nondeterministic, weakens expected-error handling, or changes the language contract without an explicit product decision.

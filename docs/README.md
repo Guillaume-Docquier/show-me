@@ -24,7 +24,7 @@ Use this map to find the smallest useful documentation set for a change. Do not 
 
 - The code is the source of truth for current behavior.
 - Accepted ADRs are the source of truth for durable architecture decisions.
-- `tasks/` is the source of truth for milestone scope and implementation progress.
+- `tasks/` is the source of truth for active milestone scope and implementation progress; `tasks/done/` retains completed milestone history and verification evidence.
 - `AGENTS.md` is the source of truth for agent workflow, verification, commands, and project-specific gotchas.
 
 ## Before Changing Docs

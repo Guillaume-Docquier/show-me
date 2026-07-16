@@ -4,6 +4,12 @@ Show Me is a command-line tool that analyzes a JavaScript or TypeScript project 
 
 This document describes the target architecture. The implementation is being built incrementally according to the [task roadmap](../tasks/README.md).
 
+## Current implementation
+
+Milestones 001 through 003 are complete. The CLI discovers supported project files, counts non-blank physical lines, and writes the first self-contained interactive graph report. The presentation and renderer boundaries are operational and covered through Node and real-browser tests.
+
+Dependency arrays are intentionally empty until milestone 004 adds static runtime ESM analysis. Coverage import, CLOC-style metrics, external packages, and workspace behavior remain planned rather than partially implemented.
+
 ## System flow
 
 ```mermaid
@@ -26,7 +32,7 @@ The boundaries have different responsibilities:
 - The report builder converts the analysis into a browser presentation model and embeds it with the browser assets.
 - The renderer consumes only the embedded presentation model. It does not parse source code, read the filesystem, or understand coverage formats.
 
-## Initial product scope
+## Planned initial product scope
 
 The initial product:
 
@@ -64,7 +70,7 @@ This direction keeps a future Rust analyzer feasible: a replacement analyzer can
 
 Expected filesystem, parsing, resolution, coverage, and report-writing failures are returned as typed `Result` failures. Third-party exceptions are classified at their adapter boundary. Fatal exceptions are reserved for violated internal invariants and unrecoverable defects.
 
-The CLI decides which failures stop the command. For example, missing automatically discovered coverage is informational, while a missing explicit `--coverage` path is an error.
+The CLI decides which implemented failures stop the command. Milestone 005 will make missing automatically discovered coverage informational while treating a missing explicit `--coverage` path as an error.
 
 ## Related documentation
 

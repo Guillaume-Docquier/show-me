@@ -4,19 +4,26 @@ This directory tracks milestones, implementation progress, verification evidence
 
 ## Roadmap
 
-| Milestone                                                             | Status      | Outcome                                                                  |
-| --------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------ |
-| [001 Foundation](./001-foundation.md)                                 | Complete    | Establish build boundaries, fixtures, and test infrastructure.           |
-| [002 File discovery and LOC](./002-file-discovery-and-loc.md)         | Complete    | Discover executable project files and count non-blank lines.             |
-| [003 Static visualization](./003-static-visualization.md)             | Complete    | Generate and interact with the initial self-contained graph report.      |
-| [004 Static ESM imports](./004-static-esm-imports.md)                 | Not started | Add directed runtime file dependencies through Oxc.                      |
-| [005 Coverage](./005-coverage.md)                                     | Not started | Discover or import Istanbul coverage and color project files.            |
-| [006 CLOC line breakdown](./006-cloc-line-breakdown.md)               | Not started | Separate code, comment, and blank lines and control node sizing.         |
-| [007 External packages](./007-external-packages.md)                   | Not started | Add optional synthetic npm package nodes without analyzing dependencies. |
-| [008 pnpm workspaces](./008-pnpm-workspaces.md)                       | Not started | Analyze and filter all packages in one pnpm workspace.                   |
-| [009 Import compatibility](./009-import-compatibility.md)             | Not started | Add CommonJS, dynamic imports, and broader resolution behavior.          |
-| [010 Visualization and UX](./010-visualization-and-ux.md)             | Not started | Improve navigation, focus, clustering, and accessibility.                |
-| [011 Large-codebase performance](./011-large-codebase-performance.md) | Not started | Profile and optimize analysis and rendering for large projects.          |
+| Milestone                                                             | Status      | Outcome                                                                       |
+| --------------------------------------------------------------------- | ----------- | ----------------------------------------------------------------------------- |
+| [004 Static ESM imports](./004-static-esm-imports.md)                 | Not started | Add directed runtime file dependencies through Oxc.                           |
+| [005 Coverage](./005-coverage.md)                                     | Not started | Discover or import Istanbul coverage and color project files.                 |
+| [006 CLOC line breakdown](./006-cloc-line-breakdown.md)               | Not started | Separate code, comment, and blank lines and control node sizing.              |
+| [007 External packages](./007-external-packages.md)                   | Not started | Add optional synthetic external-package nodes without analyzing dependencies. |
+| [008 pnpm workspaces](./008-pnpm-workspaces.md)                       | Not started | Analyze and filter all packages in one pnpm workspace.                        |
+| [009 Import compatibility](./009-import-compatibility.md)             | Not started | Add CommonJS, dynamic imports, and broader resolution behavior.               |
+| [010 Visualization and UX](./010-visualization-and-ux.md)             | Not started | Improve navigation, focus, clustering, and accessibility.                     |
+| [011 Large-codebase performance](./011-large-codebase-performance.md) | Not started | Profile and optimize analysis and rendering for large projects.               |
+
+## Done
+
+Completed milestone files are retained under [`done/`](./done/) as implementation history and verification evidence.
+
+| Milestone                                                          | Completed  | Outcome                                                             |
+| ------------------------------------------------------------------ | ---------- | ------------------------------------------------------------------- |
+| [001 Foundation](./done/001-foundation.md)                         | 2026-07-15 | Established build boundaries, fixtures, and test infrastructure.    |
+| [002 File discovery and LOC](./done/002-file-discovery-and-loc.md) | 2026-07-15 | Added executable-file discovery and deterministic non-blank LOC.    |
+| [003 Static visualization](./done/003-static-visualization.md)     | 2026-07-16 | Added the self-contained interactive graph and hardened its layout. |
 
 ## Workflow
 
@@ -26,6 +33,7 @@ This directory tracks milestones, implementation progress, verification evidence
 4. Record newly discovered gaps immediately under the active milestone. Move deferred gaps to the appropriate future milestone instead of losing them.
 5. Record exact verification commands and results before marking a milestone complete.
 6. Mark the milestone `Complete` only when its outcome, required tests, documentation, and verification criteria are satisfied.
+7. Move the completed milestone file into `done/` and add it to the dedicated table above.
 
 ## Testing rule
 

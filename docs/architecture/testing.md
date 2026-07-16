@@ -36,6 +36,8 @@ Assertions should optimize failure output:
 
 Tests must control path normalization, line endings, initial graph positions, and any randomness used by layout. Rendering fixtures should use a fixed seed and stable viewport dimensions where visual or browser assertions require them.
 
+Canvas regressions should be split across observable seams: presentation tests assert geometry such as node-area scaling and circle intersections, while real-browser tests assert hover, tooltip placement, path visibility, selection, and navigation. Screenshots are reserved for failures that cannot be identified more precisely.
+
 ## Performance verification
 
 Correctness tests remain the first gate. Performance work uses separate deterministic benchmark projects, records the environment and phase-level measurements, and verifies that optimization does not change semantic analysis results. See the [performance guidance](./performance.md).

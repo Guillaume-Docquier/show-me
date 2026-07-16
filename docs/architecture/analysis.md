@@ -2,6 +2,10 @@
 
 Analysis converts files on disk into an internal, language-neutral description that report generation can consume.
 
+## Current implementation
+
+Filesystem discovery, normalized project-file paths, and non-blank physical line counts are implemented. Dependency analysis, coverage enrichment, and CLOC-style line categories remain represented by the internal model but are owned by later milestones.
+
 ## Project discovery
 
 The project root defaults to the current working directory and may be supplied as the optional positional CLI argument.
@@ -31,7 +35,7 @@ Edges are authoritative. Import and consumer counts are derived from edges rathe
 
 ## Language modules
 
-A language module operates at project scope so it can use project configuration and resolve relationships across files. The initial JavaScript/TypeScript module is internal and uses Oxc.
+A language module operates at project scope so it can use project configuration and resolve relationships across files. The planned JavaScript/TypeScript dependency module is internal and will use Oxc.
 
 Language modules are an architectural extension point, not a public plugin API. Adding another language initially means adding another module to the Show Me package. The core model and renderer must not gain language-specific AST types or resolution rules.
 
@@ -64,6 +68,6 @@ Node area is proportional to the selected line count. Render radius therefore gr
 
 ## Coverage
 
-The initial coverage importer reads Istanbul `coverage-final.json` and derives line coverage for project files. Coverage paths are normalized against the project root before matching project files.
+The planned initial coverage importer will read Istanbul `coverage-final.json` and derive line coverage for project files. Coverage paths are normalized against the project root before matching project files.
 
 A project file absent from a coverage report has unknown coverage, not zero coverage. Missing coverage is represented explicitly so the renderer can use a neutral color instead of red.
