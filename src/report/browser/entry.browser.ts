@@ -10,6 +10,9 @@ declare global {
   }
 }
 
+const TOOLTIP_OFFSET = 14
+const VIEWPORT_MARGIN = 10
+
 type BrowserNodeAttributes = {
   readonly x: number
   readonly y: number
@@ -53,6 +56,7 @@ for (const edge of presentation.edges) {
 }
 
 let selectedNodeId: string | undefined
+let hoveredNodeId: string | undefined
 const renderer = new Sigma<BrowserNodeAttributes>(graph, graphContainer, {
   allowInvalidContainer: false,
   defaultEdgeType: "arrow",
@@ -74,15 +78,23 @@ const renderer = new Sigma<BrowserNodeAttributes>(graph, graphContainer, {
   zIndex: true,
 })
 
-renderer.on("enterNode", ({ node }) => {
+renderer.on("enterNode", ({ node, event }) => {
   const reportNode = nodeById.get(node)
   if (reportNode === undefined) {
     return
   }
+  hoveredNodeId = node
   showTooltip(reportNode)
+  positionTooltip(event.x, event.y)
   document.documentElement.dataset.hoveredNode = node
 })
+renderer.on("moveBody", ({ event }) => {
+  if (hoveredNodeId !== undefined) {
+    positionTooltip(event.x, event.y)
+  }
+})
 renderer.on("leaveNode", () => {
+  hoveredNodeId = undefined
   tooltip.hidden = true
   delete document.documentElement.dataset.hoveredNode
 })
@@ -188,6 +200,26 @@ function showTooltip(node: ReportNode): void {
   metrics.append(metric("LOC", node.lines), metric("Imports", node.imports), metric("Consumers", node.consumers))
   tooltip.append(metrics)
   tooltip.hidden = false
+}
+
+function positionTooltip(pointerX: number, pointerY: number): void {
+  const graphBounds = graphContainer.getBoundingClientRect()
+  const tooltipBounds = tooltip.getBoundingClientRect()
+  const pointerViewportX = graphBounds.left + pointerX
+  const pointerViewportY = graphBounds.top + pointerY
+
+  let left = pointerViewportX + TOOLTIP_OFFSET
+  if (left + tooltipBounds.width > window.innerWidth - VIEWPORT_MARGIN) {
+    left = pointerViewportX - tooltipBounds.width - TOOLTIP_OFFSET
+  }
+
+  let top = pointerViewportY + TOOLTIP_OFFSET
+  if (top + tooltipBounds.height > window.innerHeight - VIEWPORT_MARGIN) {
+    top = pointerViewportY - tooltipBounds.height - TOOLTIP_OFFSET
+  }
+
+  tooltip.style.left = `${Math.max(VIEWPORT_MARGIN, left)}px`
+  tooltip.style.top = `${Math.max(VIEWPORT_MARGIN, top)}px`
 }
 
 function metric(label: string, value: number): HTMLElement {

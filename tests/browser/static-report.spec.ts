@@ -33,7 +33,14 @@ test("supports graph hover, selection, clearing, and side-panel navigation", asy
 
     // Assert
     await expect(page.locator("html")).toHaveAttribute("data-hovered-node", "index.js")
-    await expect(page.locator("#tooltip")).toBeVisible()
+    const tooltip = page.locator("#tooltip")
+    await expect(tooltip).toBeVisible()
+    const tooltipBounds = await tooltip.boundingBox()
+    if (tooltipBounds === null) {
+      throw new Error("Tooltip did not have browser bounds.")
+    }
+    expect(Math.abs(tooltipBounds.x - (centerX + 14))).toBeLessThanOrEqual(1)
+    expect(Math.abs(tooltipBounds.y - (centerY + 14))).toBeLessThanOrEqual(1)
 
     await page.mouse.click(centerX, centerY)
     await expect(page.locator("html")).toHaveAttribute("data-selected-node", "index.js")
