@@ -4,21 +4,27 @@ Use this map to find the smallest useful documentation set for a change. Do not 
 
 ## Overview
 
-| Need                          | Read                                                               |
-| ----------------------------- | ------------------------------------------------------------------ |
-| Project/product summary       | [../README.md](../README.md)                                       |
-| Human contribution policy     | [../CONTRIBUTING.md](../CONTRIBUTING.md)                           |
-| Agent workflow and commands   | [../AGENTS.md](../AGENTS.md)                                       |
-| Common domain vocabulary      | [glossary.md](./glossary.md)                                       |
-| TypeScript coding standards   | [typescript-coding-standards.md](./typescript-coding-standards.md) |
-| Architecture decisions index  | [adr/README.md](./adr/README.md)                                   |
-| New or changed ADR workflow   | [adr/how-to.md](./adr/how-to.md)                                   |
-| Current architecture overview | [architecture/overview.md](./architecture/overview.md)             |
+| Need                         | Read                                                               |
+| ---------------------------- | ------------------------------------------------------------------ |
+| Project/product summary      | [../README.md](../README.md)                                       |
+| Human contribution policy    | [../CONTRIBUTING.md](../CONTRIBUTING.md)                           |
+| Agent workflow and commands  | [../AGENTS.md](../AGENTS.md)                                       |
+| Common domain vocabulary     | [glossary.md](./glossary.md)                                       |
+| TypeScript coding standards  | [typescript-coding-standards.md](./typescript-coding-standards.md) |
+| Architecture overview        | [architecture/overview.md](./architecture/overview.md)             |
+| Analysis architecture        | [architecture/analysis.md](./architecture/analysis.md)             |
+| Static report and CLI        | [architecture/static-report.md](./architecture/static-report.md)   |
+| Testing strategy             | [architecture/testing.md](./architecture/testing.md)               |
+| Performance guidance         | [architecture/performance.md](./architecture/performance.md)       |
+| Implementation progress      | [tasks/README.md](./tasks/README.md)                               |
+| Architecture decisions index | [adr/README.md](./adr/README.md)                                   |
+| New or changed ADR workflow  | [adr/how-to.md](./adr/how-to.md)                                   |
 
 ## Source Of Truth
 
 - The code is the source of truth for current behavior.
 - Accepted ADRs are the source of truth for durable architecture decisions.
+- `tasks/` is the source of truth for milestone scope and implementation progress.
 - `AGENTS.md` is the source of truth for agent workflow, verification, commands, and project-specific gotchas.
 
 ## Before Changing Docs
@@ -26,4 +32,5 @@ Use this map to find the smallest useful documentation set for a change. Do not 
 - Keep docs concise and chunked. Prefer adding a routing pointer over duplicating a rule.
 - Update [glossary.md](./glossary.md) when adding project vocabulary with a specific meaning.
 - Update [adr/README.md](./adr/README.md) when an ADR is accepted, deprecated, superseded, or becomes relevant to a new task category.
+- Update [tasks/README.md](./tasks/README.md) and the active milestone whenever scope, progress, test evidence, or a newly discovered gap changes.
 - If code and docs disagree, inspect the live code and call out the mismatch before rewriting behavior or policy.
