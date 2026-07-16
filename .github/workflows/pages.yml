@@ -62,8 +62,7 @@ jobs:
       - name: Generate repository report
         run: |
           mkdir -p _site
-          node dist/cli/entry.cli.js . --coverage coverage/coverage-final.json --output _site/show-me.html
-          cp _site/show-me.html _site/index.html
+          node dist/cli/entry.cli.js . --coverage coverage/coverage-final.json --output _site/index.html
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0

@@ -4,4 +4,4 @@ Show Me turns a JavaScript or TypeScript project into a self-contained HTML visu
 
 The CLI discovers executable project files, measures non-blank lines, analyzes static runtime ESM dependencies, optionally imports Istanbul line coverage, and generates an interactive static graph report. CLOC-style line classification is the next implementation milestone. Start with the [documentation map](./docs/README.md) and the [implementation roadmap](./docs/tasks/README.md).
 
-Explore the latest validated `main` revision in the [live Show Me report](https://guillaume-docquier.github.io/show-me/show-me.html).
+Explore the latest validated `main` revision in the [live Show Me report](https://guillaume-docquier.github.io/show-me/).

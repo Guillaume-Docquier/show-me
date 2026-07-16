@@ -17,7 +17,7 @@ Each push to `main` validates the repository and publishes a coverage-enriched S
 - [x] Build the package and run the Chromium browser suite.
 - [x] Invoke the built CLI against this repository with an explicit coverage file.
 - [x] Upload only the generated Pages site and deploy it with least-privilege permissions.
-- [x] Publish `show-me.html` and an identical `index.html` root entry.
+- [x] Generate the report directly as the `index.html` root entry.
 - [x] Link the public report from the project README.
 
 ## Required tests
@@ -26,7 +26,7 @@ Each push to `main` validates the repository and publishes a coverage-enriched S
 - [x] The Node and browser builds pass.
 - [x] The complete Playwright browser suite passes in Chromium.
 - [x] The built CLI generates a report containing imported coverage.
-- [x] The local `show-me.html` and `index.html` artifact files are byte-identical.
+- [x] The built CLI generates `_site/index.html` directly.
 
 ## Verification evidence
 
@@ -36,8 +36,8 @@ Each push to `main` validates the repository and publishes a coverage-enriched S
 - `pnpm test:coverage`: all 12 Vitest files and 66 tests passed, generated `coverage/coverage-final.json`, and reported 85.61% aggregate line coverage.
 - `pnpm build`: the Node and browser builds passed; the browser bundle is 357.3 kB.
 - `pnpm test:browser`: all 3 Playwright tests passed in Chromium.
-- `node dist/cli/entry.cli.js . --coverage coverage/coverage-final.json --output _site/show-me.html`: generated a report with 69 nodes, including 13 nodes with imported coverage.
-- Local artifact inspection found only `show-me.html` and `index.html` in `_site`; their SHA-256 hashes were identical.
+- `node dist/cli/entry.cli.js . --coverage coverage/coverage-final.json --output _site/index.html`: generated a report with 69 nodes, including 13 nodes with imported coverage.
+- Local artifact inspection found only `index.html` in `_site`.
 
 ## Discovered gaps
 
