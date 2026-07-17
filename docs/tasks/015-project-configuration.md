@@ -10,7 +10,7 @@ A project can persist Show Me file-selection settings in one typed configuration
 
 ## Dependencies
 
-- Milestone 014 establishes reusable file-selection inputs, matching semantics, and CLI behavior.
+- Milestone 016 establishes the typed file-selection input and built-in defaults. Milestone 014 establishes the CLI override and additional-pattern semantics this milestone reuses.
 
 ## Tasks
 

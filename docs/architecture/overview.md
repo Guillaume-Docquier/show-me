@@ -6,9 +6,9 @@ This document describes the target architecture. The implementation is being bui
 
 ## Current implementation
 
-Milestones 001 through 005 are complete. The CLI discovers supported project files, counts non-blank physical lines, analyzes static runtime ESM imports and re-exports through Oxc, optionally imports Istanbul line coverage, and writes a self-contained interactive graph report. The analysis, presentation, and renderer boundaries are operational and covered through Node and real-browser tests.
+The initial end-to-end product is operational. The CLI discovers supported project files, excludes conventional test files by default, counts non-blank physical lines, analyzes static runtime ESM imports and re-exports through Oxc, optionally imports Istanbul line coverage, and writes a self-contained interactive graph report. The repository publishes its latest validated report through GitHub Pages.
 
-CLOC-style metrics, external packages, and workspace behavior remain planned rather than partially implemented.
+Analysis, presentation, CLI, build, and package boundaries have been consolidated and are covered through Node and real-browser tests. CLOC-style metrics, external packages, workspace behavior, and user-facing file-selection controls remain planned rather than partially implemented.
 
 ## System flow
 
@@ -32,9 +32,9 @@ The boundaries have different responsibilities:
 - The report builder converts the analysis into a browser presentation model and embeds it with the browser assets.
 - The renderer consumes only the embedded presentation model. It does not parse source code, read the filesystem, or understand coverage formats.
 
-## Planned initial product scope
+## Current product scope
 
-The initial product:
+The current product:
 
 - analyzes one JavaScript or TypeScript project with one root `tsconfig.json` or `jsconfig.json`;
 - discovers executable `.js`, `.jsx`, `.mjs`, `.cjs`, `.ts`, `.tsx`, `.mts`, and `.cts` files;
@@ -45,6 +45,8 @@ The initial product:
 - renders a flat, force-directed file graph without persistent node labels;
 - optionally colors project file nodes using Istanbul line coverage; and
 - writes one offline HTML file.
+
+Analysis has a typed internal file-selection policy that can restore default-excluded tests without bypassing permanent discovery exclusions. CLI selection options and persistent configuration remain milestones 014 and 015.
 
 CommonJS, dynamic imports, external package nodes, CLOC-style line classification, pnpm workspaces, and richer visualization controls are planned as later milestones rather than partially supported in the first implementation.
 

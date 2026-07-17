@@ -40,3 +40,4 @@ Record commands, environment, baselines, profiles, optimizations, and final resu
 
 - The collision-safe milestone-003 layout uses 500 synchronous exact-repulsion iterations and is quadratic per iteration. Graphology ForceAtlas2's Barnes-Hut path cannot be enabled directly because it ignores individual node radii.
 - A 1,000-node synthetic layout took approximately 1.96 seconds on the development machine. This is an early diagnostic, not a complete target-workload baseline or accepted budget.
+- The application shell currently retains every discovered source text until project-level language analysis completes. Measure its memory impact on the target corpus before introducing streaming or bounded concurrency.

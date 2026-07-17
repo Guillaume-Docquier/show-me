@@ -21,6 +21,8 @@ TypeScript declaration files such as `.d.ts`, `.d.mts`, and `.d.cts` are exclude
 
 Supported JavaScript and TypeScript files are also excluded by default when their basename contains `.test.` or `.spec.`, matched case-insensitively and anywhere in the basename. The rule is basename-only: marker-like directory names do not exclude their contents, and bare names such as `test.ts` and `spec.ts` remain project files. Excluded test files are filtered during discovery, before source reading, parsing, line metrics, dependency analysis, coverage matching, and report construction. An included file may resolve an import to an existing excluded test file without creating an edge or unresolved-dependency diagnostic.
 
+Internal analysis callers can restore only this default test-file exclusion through the typed selection policy. User-facing CLI selection and additional ignore-pattern semantics remain milestone 014; configuration-file loading remains milestone 015.
+
 ## Internal analysis model
 
 The internal model is versioned even though it is not initially a public CLI format. Its concepts are language-neutral:
@@ -31,7 +33,7 @@ The internal model is versioned even though it is not initially a public CLI for
 - optional per-file coverage;
 - diagnostics that did not prevent useful analysis.
 
-Project-relative paths use forward slashes on every platform. A normalized relative path identifies a file within one analysis.
+Project-relative paths use forward slashes on every platform. Construction normalizes duplicate separators and lexical dot segments, rejects absolute, project-root-only, and outside-root paths, and compares paths with locale-independent ordinal ordering. One canonical relative path identifies a file within an analysis.
 
 Edges are authoritative. Import and consumer counts are derived from edges rather than duplicated as independently maintained data.
 

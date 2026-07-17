@@ -28,6 +28,7 @@ Completed milestone files are retained under [`done/`](./done/) as implementatio
 | [005 Coverage](./done/005-coverage.md)                                         | 2026-07-16 | Added optional Istanbul line coverage and coverage-colored nodes.   |
 | [012 GitHub Pages report](./done/012-github-pages-report.md)                   | 2026-07-16 | Publishes a validated live visualization of the repository.         |
 | [013 Default test-file exclusions](./done/013-default-test-file-exclusions.md) | 2026-07-16 | Removes conventionally named test files from default analysis.      |
+| [016 Codebase consolidation](./done/016-codebase-consolidation.md)             | 2026-07-16 | Hardened analysis, report, CLI, build, and package boundaries.      |
 
 ## Workflow
 

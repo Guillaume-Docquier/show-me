@@ -11,6 +11,7 @@ One CLI invocation can restore conventionally named test files and apply additio
 ## Dependencies
 
 - Milestone 013 establishes the default test-file exclusion and basename semantics this milestone makes configurable.
+- Milestone 016 establishes the typed test include/exclude input and proves that permanent discovery exclusions take precedence. This milestone exposes that seam through the CLI and adds project-relative ignore patterns.
 
 ## Tasks
 

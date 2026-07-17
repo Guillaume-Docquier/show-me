@@ -33,4 +33,4 @@ Record commands and results here before completion.
 
 ## Discovered gaps
 
-None yet.
+- Analysis retains recoverable parser and unresolved-dependency diagnostics, but the current CLI and report do not surface them. Choose warning/report presentation and accessibility behavior before implementation.

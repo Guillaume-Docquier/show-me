@@ -4,7 +4,7 @@ Show me is a codebase visualization tool.
 
 ## Current status
 
-We have the concept, but everything has yet to be built.
+The initial JavaScript and TypeScript analysis pipeline and self-contained interactive report are operational. The CLI discovers project files, analyzes static runtime ESM dependencies, optionally imports Istanbul coverage, and publishes the latest validated report through GitHub Pages. See `docs/tasks/README.md` for implemented and planned milestones.
 
 ## Project Structure
 
@@ -12,14 +12,16 @@ This is a TypeScript repository managed via pnpm.
 
 ### Key Directories
 
-| Directory | Description                                                                                |
-| --------- | ------------------------------------------------------------------------------------------ |
-| docs/     | All the documentation for the project. There is no documentation in the other directories. |
-| src/      | The source code.                                                                           |
+| Directory | Description                                                                       |
+| --------- | --------------------------------------------------------------------------------- |
+| docs/     | Architecture, ADRs, vocabulary, testing guidance, and the implementation roadmap. |
+| fixtures/ | Deterministic example projects used for analysis and regression tests.            |
+| src/      | Production source code and colocated Node tests.                                  |
+| tests/    | Real-browser report tests.                                                        |
 
 ### CI/CD
 
-As we're super early, we merge straight to the main branch.
+Changes land directly on `main`. Pushes to `main` run formatting, linting, type checking, coverage tests, package builds, and browser tests before the built CLI generates and deploys the public GitHub Pages report.
 
 ## Tech Stack
 
@@ -58,6 +60,16 @@ To propose or create a new ADR, follow `docs/adr/how-to.md`
 Always use pnpm, never use npm.
 
 When formatting the code, always run oxfmt with write. oxfmt is deterministic, there's no point in checking before applying formatting.
+
+Use these project commands:
+
+- `pnpm format:fix` formats with write.
+- `pnpm lint` runs oxlint without fixing.
+- `pnpm typecheck` checks TypeScript without emitting.
+- `pnpm test` runs the Node Vitest suite.
+- `pnpm build` removes stale `dist` output, then builds the Node CLI and browser bundle.
+- `pnpm test:browser` runs the real-browser Playwright suite against built report assets.
+- `pnpm checks` runs the complete local gate. It is mutating because it starts with `format:fix`.
 
 ## Testing
 
