@@ -191,15 +191,35 @@ Options:
       }
 
       expect(exitCode).toBe(0)
-      expect(presentation.edges).toHaveLength(13)
+      expect(presentation.edges).toHaveLength(14)
       expect(presentation.nodes).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ path: "src/main.ts", imports: 7, consumers: 0 }),
-          expect.objectContaining({ path: "src/runtime.ts", imports: 0, consumers: 2 }),
+          expect.objectContaining({
+            id: "project-file:src/main.ts",
+            path: "src/main.ts",
+            importedNodeIds: expect.arrayContaining(["external-package:external-package"]),
+            consumerNodeIds: [],
+          }),
+          expect.objectContaining({
+            id: "project-file:src/runtime.ts",
+            path: "src/runtime.ts",
+            importedNodeIds: [],
+            consumerNodeIds: ["project-file:src/main.ts", "project-file:src/reexports.ts"],
+          }),
+          expect.objectContaining({
+            id: "external-package:external-package",
+            kind: "external-package",
+            packageName: "external-package",
+          }),
         ]),
       )
       expect(presentation.edges).toEqual(
-        expect.arrayContaining([expect.objectContaining({ source: "src/main.ts", target: "src/runtime.ts" })]),
+        expect.arrayContaining([
+          expect.objectContaining({
+            source: "project-file:src/main.ts",
+            target: "project-file:src/runtime.ts",
+          }),
+        ]),
       )
     })
   })

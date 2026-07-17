@@ -35,6 +35,7 @@ export function buildHtmlReport(analysis: ProjectAnalysis, browserBundle: string
 export function createHtmlReport(presentation: ReportPresentation, browserBundle: string): string {
   const serializedPresentation = serializeForInlineScript(presentation)
   const title = escapeHtml(presentation.projectName)
+  const projectFileCount = presentation.nodes.filter((node) => node.kind === "project-file").length
 
   return `<!doctype html>
 <html lang="en" data-show-me-ready="false">
@@ -46,28 +47,35 @@ export function createHtmlReport(presentation: ReportPresentation, browserBundle
 </head>
 <body>
 <header>
-  <div class="report-heading"><h1>${title}</h1><p>${presentation.nodes.length} project files</p></div>
-  <fieldset id="line-category-controls">
-    <legend>Size nodes by</legend>
-    <label><input id="line-category-code" type="checkbox" value="code" checked>Code</label>
-    <label><input id="line-category-comment" type="checkbox" value="comment">Comments</label>
-    <label><input id="line-category-blank" type="checkbox" value="blank">Blank</label>
-  </fieldset>
+  <div class="report-heading"><h1>${title}</h1><p>${projectFileCount} project files</p></div>
+  <div class="report-controls">
+    <fieldset id="line-category-controls">
+      <legend>Size nodes by</legend>
+      <label><input id="line-category-code" type="checkbox" value="code" checked>Code</label>
+      <label><input id="line-category-comment" type="checkbox" value="comment">Comments</label>
+      <label><input id="line-category-blank" type="checkbox" value="blank">Blank</label>
+    </fieldset>
+    <fieldset id="graph-content-controls">
+      <legend>Show</legend>
+      <label><input id="external-packages-toggle" type="checkbox">External packages</label>
+    </fieldset>
+  </div>
 </header>
 <main>
-  <section id="graph" aria-label="Project file dependency graph"></section>
-  <aside id="details" aria-label="File details">
-    <h2>Selected file</h2>
-    <p id="selected-empty">Select a node or file to inspect it.</p>
+  <section id="graph" aria-label="Project file and external package dependency graph"></section>
+  <aside id="details" aria-label="Graph node details">
+    <h2 id="selected-heading">Selected node</h2>
+    <p id="selected-empty">Select a node to inspect it.</p>
     <section id="selected-details" hidden>
+      <div class="node-type" id="selected-node-type"></div>
       <div class="detail-path" id="selected-path"></div>
       <dl>
-        <dt>Code lines</dt><dd id="selected-code-lines"></dd>
-        <dt>Comment lines</dt><dd id="selected-comment-lines"></dd>
-        <dt>Blank lines</dt><dd id="selected-blank-lines"></dd>
+        <dt data-project-file-detail>Code lines</dt><dd id="selected-code-lines" data-project-file-detail></dd>
+        <dt data-project-file-detail>Comment lines</dt><dd id="selected-comment-lines" data-project-file-detail></dd>
+        <dt data-project-file-detail>Blank lines</dt><dd id="selected-blank-lines" data-project-file-detail></dd>
         <dt>Imports</dt><dd id="selected-imports"></dd>
         <dt>Consumers</dt><dd id="selected-consumers"></dd>
-        <dt>Coverage</dt><dd id="selected-coverage"></dd>
+        <dt data-project-file-detail>Coverage</dt><dd id="selected-coverage" data-project-file-detail></dd>
       </dl>
       <button id="clear-selection" class="clear-selection" type="button" hidden>Clear selection</button>
       <h3>Imports</h3>
@@ -76,7 +84,11 @@ export function createHtmlReport(presentation: ReportPresentation, browserBundle
       <ol id="selected-consumer-files" class="file-list relationship-list"></ol>
     </section>
     <h2>Project files</h2>
-    <ol id="file-list" class="file-list"></ol>
+    <ol id="file-list" class="file-list node-list"></ol>
+    <section id="external-package-section" hidden>
+      <h2><span class="package-swatch" aria-hidden="true"></span>External packages</h2>
+      <ol id="external-package-list" class="file-list node-list"></ol>
+    </section>
   </aside>
 </main>
 <div id="tooltip" role="tooltip" hidden></div>

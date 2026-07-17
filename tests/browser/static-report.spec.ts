@@ -18,6 +18,7 @@ test("supports graph hover, selection, clearing, and side-panel navigation", asy
     // Arrange
     const projectDirectory = join(temporaryDirectory, "project")
     const longPath = "fixtures/projects/minimal-typescript/src/index.ts"
+    const longPathNodeId = "project-file:" + longPath
     const sourceDirectory = join(projectDirectory, "fixtures", "projects", "minimal-typescript", "src")
     await mkdir(sourceDirectory, { recursive: true })
     await writeFile(join(sourceDirectory, "index.ts"), "// comment\n\nexport const message = 'hello'\n\n", "utf8")
@@ -52,7 +53,7 @@ test("supports graph hover, selection, clearing, and side-panel navigation", asy
     await page.mouse.move(centerX, centerY)
 
     // Assert
-    await expect(page.locator("html")).toHaveAttribute("data-hovered-node", longPath)
+    await expect(page.locator("html")).toHaveAttribute("data-hovered-node", longPathNodeId)
     const tooltip = page.locator("#tooltip")
     await expect(tooltip).toBeVisible()
     const tooltipPath = tooltip.locator("strong")
@@ -69,7 +70,7 @@ test("supports graph hover, selection, clearing, and side-panel navigation", asy
     expect(Math.abs(tooltipBounds.y - (centerY + 14))).toBeLessThanOrEqual(1)
 
     await page.mouse.click(centerX, centerY)
-    await expect(page.locator("html")).toHaveAttribute("data-selected-node", longPath)
+    await expect(page.locator("html")).toHaveAttribute("data-selected-node", longPathNodeId)
     await expect(page.locator("#selected-path")).toHaveText(longPath)
     await expect(page.locator("#selected-details dt").first()).toHaveText("Code lines")
     await expect(page.locator("#selected-code-lines")).toHaveText("1")
@@ -87,7 +88,7 @@ test("supports graph hover, selection, clearing, and side-panel navigation", asy
     const seenStates = new Set<string>()
     const recordState = async (state: string): Promise<void> => {
       await expect(page.locator("html")).toHaveAttribute("data-active-line-categories", state)
-      await expect(page.locator("html")).toHaveAttribute("data-selected-node", longPath)
+      await expect(page.locator("html")).toHaveAttribute("data-selected-node", longPathNodeId)
       seenStates.add(state)
     }
     await recordState("code")
@@ -125,8 +126,81 @@ test("supports graph hover, selection, clearing, and side-panel navigation", asy
     await expect(page.locator("html")).not.toHaveAttribute("data-selected-node", /.+/u)
 
     await page.getByRole("button", { name: longPath }).click()
-    await expect(page.locator("html")).toHaveAttribute("data-selected-node", longPath)
+    await expect(page.locator("html")).toHaveAttribute("data-selected-node", longPathNodeId)
     await expect(page.getByRole("button", { name: longPath })).toHaveAttribute("aria-current", "true")
+  })
+})
+
+test("keeps packages hidden by default and rebuilds one combined metric and package view", async ({ page }) => {
+  await withTemporaryDirectory(async (temporaryDirectory) => {
+    // Arrange
+    const analysis = await analyzeProject({ projectRoot: fixtureProjectPath("external-packages") })
+    if (Result.isFailure(analysis)) {
+      throw new Error(`Fixture analysis failed: ${analysis.error._tag}`)
+    }
+    const browserBundle = await readFile(join(process.cwd(), "dist", "report", "browser.js"), "utf8")
+    const reportPath = join(temporaryDirectory, "external-packages.html")
+    const fileOnlyReportPath = join(temporaryDirectory, "file-only.html")
+    await writeFile(reportPath, buildHtmlReport(analysis.value, browserBundle), "utf8")
+    await writeFile(
+      fileOnlyReportPath,
+      buildHtmlReport({ ...analysis.value, externalPackages: [], externalPackageDependencies: [] }, browserBundle),
+      "utf8",
+    )
+
+    // Act
+    await page.goto(pathToFileURL(reportPath).href)
+    await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
+
+    // Assert default-hidden state and file-only geometry
+    const graph = page.locator("#graph")
+    const externalPackages = page.getByRole("checkbox", { name: "External packages" })
+    await expect(externalPackages).not.toBeChecked()
+    await expect(page.locator("html")).toHaveAttribute("data-external-packages", "hidden")
+    await expect(graph).toHaveAttribute("data-visible-node-count", "4")
+    await expect(page.locator("#external-package-section")).toBeHidden()
+    await expect(page.locator("#external-package-list button")).toHaveCount(0)
+    const defaultLayoutSignature = await graph.getAttribute("data-layout-signature")
+    await page.locator("#file-list").getByRole("button", { name: "src/entry.ts", exact: true }).click()
+    await expect(page.locator("#selected-imports")).toHaveText("2")
+    await expect(page.locator("#selected-imported-files button")).toHaveText(["src/alias/value.ts", "src/aliased.ts"])
+
+    // Enable packages and combine that visibility with a line-metric transition.
+    await externalPackages.check()
+    await expect(page.locator("html")).toHaveAttribute("data-external-packages", "visible")
+    await expect(graph).toHaveAttribute("data-visible-node-count", "6")
+    await expect(page.locator("#external-package-section")).toBeVisible()
+    await expect(page.locator("#external-package-list button")).toHaveCount(2)
+    await expect(page.locator("#selected-imports")).toHaveText("4")
+    await expect(page.locator("#selected-imported-files button")).toHaveCount(4)
+    await expect(page.locator("#selected-imported-files")).toContainText("External package")
+    expect(await graph.getAttribute("data-layout-signature")).not.toBe(defaultLayoutSignature)
+
+    const reactPackage = page.locator("#external-package-list button").filter({ hasText: "react" })
+    await reactPackage.click()
+    await expect(page.locator("html")).toHaveAttribute("data-selected-node", "external-package:react")
+    await expect(page.locator("#selected-heading")).toHaveText("Selected external package")
+    await expect(page.locator("#selected-node-type")).toHaveText("External package")
+    await expect(page.locator("#selected-path")).toHaveText("react")
+    await expect(page.locator("#selected-consumers")).toHaveText("2")
+    await expect(page.locator("#selected-code-lines")).toBeHidden()
+
+    const commentControl = page.getByRole("checkbox", { name: "Comments" })
+    await commentControl.check()
+    await expect(page.locator("html")).toHaveAttribute("data-active-line-categories", "code,comment")
+    await expect(page.locator("html")).toHaveAttribute("data-external-packages", "visible")
+    await expect(page.locator("html")).toHaveAttribute("data-selected-node", "external-package:react")
+    await commentControl.uncheck()
+
+    // Hiding a selected package clears it and restores exact file-only geometry.
+    await externalPackages.uncheck()
+    await expect(page.locator("html")).toHaveAttribute("data-external-packages", "hidden")
+    await expect(page.locator("html")).not.toHaveAttribute("data-selected-node", /.+/u)
+    await expect(graph).toHaveAttribute("data-layout-signature", defaultLayoutSignature ?? "")
+
+    await page.goto(pathToFileURL(fileOnlyReportPath).href)
+    await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
+    await expect(page.locator("#graph")).toHaveAttribute("data-layout-signature", defaultLayoutSignature ?? "")
   })
 })
 

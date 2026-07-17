@@ -1,9 +1,10 @@
 import type { ProjectFilePath } from "../project-files/project-file-path.js"
+import type { ExternalPackageName } from "./external-package-name.js"
 
 /**
  * The schema version of the internal project analysis model.
  */
-export const PROJECT_ANALYSIS_SCHEMA_VERSION = 2
+export const PROJECT_ANALYSIS_SCHEMA_VERSION = 3
 
 /**
  * A language family understood by a language module.
@@ -58,6 +59,22 @@ export type ProjectDependency = {
 }
 
 /**
+ * One external package referenced by project code without analyzing package files.
+ */
+export type ExternalPackageAnalysis = {
+  readonly name: ExternalPackageName
+}
+
+/**
+ * A directed runtime dependency from a project file to an external package.
+ */
+export type ExternalPackageDependency = {
+  readonly source: ProjectFilePath
+  readonly target: ExternalPackageName
+  readonly kind: "runtime"
+}
+
+/**
  * A non-fatal issue discovered during analysis.
  */
 export type AnalysisDiagnostic = {
@@ -76,5 +93,7 @@ export type ProjectAnalysis = {
   }
   readonly files: readonly ProjectFileAnalysis[]
   readonly dependencies: readonly ProjectDependency[]
+  readonly externalPackages: readonly ExternalPackageAnalysis[]
+  readonly externalPackageDependencies: readonly ExternalPackageDependency[]
   readonly diagnostics: readonly AnalysisDiagnostic[]
 }

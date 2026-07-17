@@ -46,6 +46,8 @@ describe("analyzeJavaScriptTypeScript", () => {
           { source: "src/reexports.ts", target: "src/wildcard.ts", kind: "runtime" },
           { source: "src/self.ts", target: "src/self.ts", kind: "runtime" },
         ],
+        externalPackages: [{ name: "external-package" }],
+        externalPackageDependencies: [{ source: "src/main.ts", target: "external-package", kind: "runtime" }],
         diagnostics: [
           {
             code: "UNRESOLVED_RUNTIME_DEPENDENCY",
@@ -88,9 +90,43 @@ describe("analyzeJavaScriptTypeScript", () => {
           },
         ],
         dependencies: [{ source: "index.js", target: "target.js", kind: "runtime" }],
+        externalPackages: [],
+        externalPackageDependencies: [],
         diagnostics: [],
       }),
     )
+  })
+
+  it("normalizes external packages while configured aliases keep project-resolution precedence", async () => {
+    // Arrange
+    const projectRoot = fixtureProjectPath("external-packages")
+    const files = await readDiscoveredSourceFiles(projectRoot)
+
+    // Act
+    const result = analyzeJavaScriptTypeScript(projectRoot, files)
+
+    // Assert
+    expect(Result.isSuccess(result)).toBe(true)
+    if (Result.isSuccess(result)) {
+      expect(result.value.dependencies).toEqual([
+        { source: "src/entry.ts", target: "src/alias/value.ts", kind: "runtime" },
+        { source: "src/entry.ts", target: "src/aliased.ts", kind: "runtime" },
+      ])
+      expect(result.value.externalPackages).toEqual([{ name: "@scope/package" }, { name: "react" }])
+      expect(result.value.externalPackageDependencies).toEqual([
+        { source: "src/consumer.ts", target: "@scope/package", kind: "runtime" },
+        { source: "src/consumer.ts", target: "react", kind: "runtime" },
+        { source: "src/entry.ts", target: "@scope/package", kind: "runtime" },
+        { source: "src/entry.ts", target: "react", kind: "runtime" },
+      ])
+      expect(result.value.diagnostics).toEqual([
+        {
+          code: "UNRESOLVED_RUNTIME_DEPENDENCY",
+          message: 'Could not resolve runtime dependency "missing-package-alias".',
+          file: "src/entry.ts",
+        },
+      ])
+    }
   })
 })
 

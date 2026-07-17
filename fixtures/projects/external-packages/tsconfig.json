@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "paths": {
+      "package-alias": ["./src/aliased.ts"],
+      "@alias/*": ["./src/alias/*"],
+      "missing-package-alias": ["./src/missing.ts"]
+    }
+  }
+}

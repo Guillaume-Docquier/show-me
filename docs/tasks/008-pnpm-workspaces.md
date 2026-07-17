@@ -13,6 +13,7 @@ One analysis and report contain every package in a pnpm workspace, including cro
 - [ ] Discover workspace packages from `pnpm-workspace.yaml`.
 - [ ] Assign every project file to its nearest owning workspace package.
 - [ ] Support package-specific project configuration and cross-package resolution.
+- [ ] Classify workspace-owned package requests before the external-package fallback introduced in milestone 007.
 - [ ] Preserve all workspace packages and cross-package edges in one internal analysis.
 - [ ] Show all workspace packages by default.
 - [ ] Add report controls to enable or disable individual workspace packages.

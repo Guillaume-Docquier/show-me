@@ -1,8 +1,12 @@
 import { Result } from "@guillaume-docquier/tools-ts"
 import { expect, it } from "vitest"
+import { analyzeProject } from "../analysis/analyze-project.js"
 import type { ProjectAnalysis } from "../analysis/project-analysis.js"
 import { ProjectFilePath } from "../project-files/project-file-path.js"
+import { fixtureProjectPath } from "../testing/fixture-project.js"
 import {
+  EXTERNAL_PACKAGE_NODE_COLOR,
+  EXTERNAL_PACKAGE_NODE_SIZE,
   buildReportPresentation,
   activeLineCount,
   coverageColor,
@@ -11,9 +15,9 @@ import {
   truncatePathFromStart,
 } from "./report-presentation.js"
 
-it("uses presentation schema version 3 for the CLOC-style line-metric contract", () => {
+it("uses presentation schema version 4 for the typed package-node contract", () => {
   // Assert
-  expect(REPORT_PRESENTATION_SCHEMA_VERSION).toBe(3)
+  expect(REPORT_PRESENTATION_SCHEMA_VERSION).toBe(4)
 })
 
 it.each([
@@ -68,7 +72,7 @@ it("builds deterministic coordinates and dependency metrics", () => {
   const sourcePath = parseProjectFilePath("src/source.ts")
   const targetPath = parseProjectFilePath("src/deep/target.ts")
   const analysis: ProjectAnalysis = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     project: { name: "deterministic" },
     files: [
       {
@@ -85,6 +89,8 @@ it("builds deterministic coordinates and dependency metrics", () => {
       },
     ],
     dependencies: [{ source: sourcePath, target: targetPath, kind: "runtime" }],
+    externalPackages: [],
+    externalPackageDependencies: [],
     diagnostics: [],
   }
 
@@ -95,15 +101,89 @@ it("builds deterministic coordinates and dependency metrics", () => {
   // Assert
   expect(firstPresentation).toEqual(secondPresentation)
   expect(firstPresentation.schemaVersion).toBe(REPORT_PRESENTATION_SCHEMA_VERSION)
-  expect(firstPresentation.nodes.map(({ path, lineMetrics, imports, consumers }) => ({ path, lineMetrics, imports, consumers }))).toEqual([
-    { path: "src/source.ts", lineMetrics: { code: 4, comment: 2, blank: 1 }, imports: 1, consumers: 0 },
-    { path: "src/deep/target.ts", lineMetrics: { code: 16, comment: 4, blank: 2 }, imports: 0, consumers: 1 },
+  expect(firstPresentation.nodes).toMatchObject([
+    {
+      id: "project-file:src/source.ts",
+      kind: "project-file",
+      path: "src/source.ts",
+      lineMetrics: { code: 4, comment: 2, blank: 1 },
+      importedNodeIds: ["project-file:src/deep/target.ts"],
+      consumerNodeIds: [],
+    },
+    {
+      id: "project-file:src/deep/target.ts",
+      kind: "project-file",
+      path: "src/deep/target.ts",
+      lineMetrics: { code: 16, comment: 4, blank: 2 },
+      importedNodeIds: [],
+      consumerNodeIds: ["project-file:src/source.ts"],
+    },
   ])
   expect(firstPresentation.edges).toEqual([
     {
-      id: "dependency-0",
-      source: "src/source.ts",
-      target: "src/deep/target.ts",
+      id: "project-dependency-0",
+      kind: "project-file",
+      source: "project-file:src/source.ts",
+      target: "project-file:src/deep/target.ts",
+    },
+  ])
+})
+
+it("creates deterministic fixed-size package nodes and package relationship IDs", async () => {
+  // Arrange
+  const analysis = await analyzeProject({ projectRoot: fixtureProjectPath("external-packages") })
+  if (Result.isFailure(analysis)) {
+    throw new Error("Fixture analysis failed: " + analysis.error._tag)
+  }
+
+  // Act
+  const presentation = buildReportPresentation(analysis.value)
+
+  // Assert
+  expect(
+    presentation.nodes
+      .filter((node) => node.kind === "external-package")
+      .map(({ id, packageName, size, color, consumerNodeIds }) => ({ id, packageName, size, color, consumerNodeIds })),
+  ).toEqual([
+    {
+      id: "external-package:@scope/package",
+      packageName: "@scope/package",
+      size: EXTERNAL_PACKAGE_NODE_SIZE,
+      color: EXTERNAL_PACKAGE_NODE_COLOR,
+      consumerNodeIds: ["project-file:src/consumer.ts", "project-file:src/entry.ts"],
+    },
+    {
+      id: "external-package:react",
+      packageName: "react",
+      size: EXTERNAL_PACKAGE_NODE_SIZE,
+      color: EXTERNAL_PACKAGE_NODE_COLOR,
+      consumerNodeIds: ["project-file:src/consumer.ts", "project-file:src/entry.ts"],
+    },
+  ])
+  expect(presentation.edges.filter((edge) => edge.kind === "external-package")).toEqual([
+    {
+      id: "external-package-dependency-0",
+      kind: "external-package",
+      source: "project-file:src/consumer.ts",
+      target: "external-package:@scope/package",
+    },
+    {
+      id: "external-package-dependency-1",
+      kind: "external-package",
+      source: "project-file:src/consumer.ts",
+      target: "external-package:react",
+    },
+    {
+      id: "external-package-dependency-2",
+      kind: "external-package",
+      source: "project-file:src/entry.ts",
+      target: "external-package:@scope/package",
+    },
+    {
+      id: "external-package-dependency-3",
+      kind: "external-package",
+      source: "project-file:src/entry.ts",
+      target: "external-package:react",
     },
   ])
 })
@@ -117,10 +197,12 @@ it("keeps large nodes from overlapping other nodes in large graphs", () => {
     coverage: undefined,
   }))
   const analysis: ProjectAnalysis = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     project: { name: "large-nodes" },
     files,
     dependencies: [],
+    externalPackages: [],
+    externalPackageDependencies: [],
     diagnostics: [],
   }
 
@@ -141,7 +223,7 @@ it("keeps large nodes from overlapping other nodes in large graphs", () => {
       }
       const centerDistance = Math.hypot(left.x - right.x, left.y - right.y)
       if (centerDistance < left.size + right.size) {
-        overlaps.push(`${left.path} overlaps ${right.path}`)
+        overlaps.push(`${left.displayName} overlaps ${right.displayName}`)
       }
     }
   }

@@ -109,6 +109,8 @@ export async function analyzeProject(input: AnalyzeProjectInput): Promise<Result
     },
     files: languageAnalysis.value.files,
     dependencies: languageAnalysis.value.dependencies,
+    externalPackages: languageAnalysis.value.externalPackages,
+    externalPackageDependencies: languageAnalysis.value.externalPackageDependencies,
     diagnostics: languageAnalysis.value.diagnostics,
   })
 }

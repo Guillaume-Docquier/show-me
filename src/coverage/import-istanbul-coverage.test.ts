@@ -281,10 +281,12 @@ function analysisWithOneFile(path: string): ProjectAnalysis {
 
 function emptyProjectAnalysis(projectName: string): ProjectAnalysis {
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     project: { name: projectName },
     files: [],
     dependencies: [],
+    externalPackages: [],
+    externalPackageDependencies: [],
     diagnostics: [],
   }
 }

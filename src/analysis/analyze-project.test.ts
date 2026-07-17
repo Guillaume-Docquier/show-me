@@ -1,4 +1,4 @@
-import { writeFile } from "node:fs/promises"
+import { mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { Result } from "@guillaume-docquier/tools-ts"
 import { expect, it } from "vitest"
@@ -16,7 +16,7 @@ it("opens a real fixture through the analysis application seam", async () => {
   // Assert
   expect(result).toEqual(
     Result.Success({
-      schemaVersion: 2,
+      schemaVersion: 3,
       project: {
         name: "minimal-javascript",
       },
@@ -29,6 +29,8 @@ it("opens a real fixture through the analysis application seam", async () => {
         },
       ],
       dependencies: [],
+      externalPackages: [],
+      externalPackageDependencies: [],
       diagnostics: [],
     }),
   )
@@ -166,6 +168,30 @@ it("returns a typed resolver initialization failure for invalid project configur
     expect(Result.isFailure(result)).toBe(true)
     if (Result.isFailure(result)) {
       expect(result.error._tag).toBe("JavaScriptTypeScriptResolverInitializationFailed")
+    }
+  })
+})
+
+it("creates an uninstalled package fact without reading or analyzing node_modules", async () => {
+  await withTemporaryDirectory(async (projectRoot) => {
+    // Arrange
+    await writeFile(join(projectRoot, "index.ts"), 'import "uninstalled-package/subpath"\nexport const value = true\n', "utf8")
+    const dependencyRoot = join(projectRoot, "node_modules", "uninstalled-package")
+    await mkdir(join(dependencyRoot, "nested"), { recursive: true })
+    await writeFile(join(dependencyRoot, "package.json"), "{ this is deliberately invalid", "utf8")
+    await writeFile(join(dependencyRoot, "index.js"), "export const = deliberately invalid", "utf8")
+    await writeFile(join(dependencyRoot, "nested", "also-invalid.ts"), "const = invalid", "utf8")
+
+    // Act
+    const result = await analyzeProject({ projectRoot })
+
+    // Assert
+    expect(Result.isSuccess(result)).toBe(true)
+    if (Result.isSuccess(result)) {
+      expect(result.value.files.map((file) => file.path)).toEqual(["index.ts"])
+      expect(result.value.externalPackages).toEqual([{ name: "uninstalled-package" }])
+      expect(result.value.externalPackageDependencies).toEqual([{ source: "index.ts", target: "uninstalled-package", kind: "runtime" }])
+      expect(result.value.diagnostics).toEqual([])
     }
   })
 })

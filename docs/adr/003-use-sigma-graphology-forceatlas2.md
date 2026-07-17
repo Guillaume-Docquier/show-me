@@ -41,3 +41,9 @@ This is a correctness-first refinement of the accepted library choice, not a new
 The deterministic collision-safe ForceAtlas2 operation is shared by initial presentation construction and browser report-view transitions. Selecting a different non-empty combination of code, comment, and blank line metrics changes rendered radii, so the browser recomputes coordinates and its radius-aware bounding box instead of retaining geometry created for stale sizes.
 
 This keeps layout and interaction state in the presentation and renderer layers as originally decided. The shared fixed seed makes returning to an earlier visible graph and size selection reproduce identical geometry. Future visibility controls, beginning with external packages, reuse the same report-view transition rather than introducing independent graph mutation paths.
+
+### 2026-07-16 visible-subgraph amendment
+
+External packages are embedded in the presentation but hidden initially. The browser report-view transition rebuilds one Graphology graph from only the currently visible typed nodes and edges before running the shared layout. Hidden package facts therefore cannot influence default project-file geometry, while enabling packages and changing line categories remain composable dimensions of the same deterministic state transition.
+
+Synthetic package nodes use a fixed collision and rendered size. The renderer clears package hover or selection when packages become hidden and exposes package identity through DOM text in addition to color. This extends the existing flat graph and application-control responsibility without changing the chosen rendering or layout libraries.

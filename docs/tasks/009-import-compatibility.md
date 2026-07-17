@@ -14,6 +14,7 @@ JavaScript and TypeScript analysis recognizes additional runtime dependency form
 - [ ] Add string-literal dynamic `import()` dependencies.
 - [ ] Define diagnostics for non-literal dynamic dependency expressions.
 - [ ] Support multiple project configurations and TypeScript project references outside pnpm-specific behavior.
+- [ ] Resolve `baseUrl` and other unaliased project-owned bare requests before the external-package fallback.
 - [ ] Classify dependency kinds so later UI work can filter or style them.
 - [ ] Preserve syntax-only runtime analysis unless a separate ADR changes that boundary.
 

@@ -7,6 +7,7 @@ export type FixtureProjectName =
   | "cloc-line-breakdown"
   | "coverage-project"
   | "discovery"
+  | "external-packages"
   | "minimal-javascript"
   | "minimal-typescript"
   | "static-esm"

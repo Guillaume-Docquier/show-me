@@ -24,9 +24,10 @@ it("builds one offline document without embedding source contents", async () => 
   expect(html).toContain(browserBundle)
   expect(html).toContain('<fieldset id="line-category-controls">')
   expect(html).toContain('<input id="line-category-code" type="checkbox" value="code" checked>')
-  expect(html).toContain('<dt>Code lines</dt><dd id="selected-code-lines"></dd>')
-  expect(html).toContain('<dt>Comment lines</dt><dd id="selected-comment-lines"></dd>')
-  expect(html).toContain('<dt>Blank lines</dt><dd id="selected-blank-lines"></dd>')
+  expect(html).toContain('<input id="external-packages-toggle" type="checkbox">External packages')
+  expect(html).toContain("<dt data-project-file-detail>Code lines</dt>")
+  expect(html).toContain("<dt data-project-file-detail>Comment lines</dt>")
+  expect(html).toContain("<dt data-project-file-detail>Blank lines</dt>")
   expect(html).not.toContain('src="')
   expect(html).not.toMatch(/https?:\/\//u)
   expect(html).not.toContain('export const message = "hello"')
@@ -60,16 +61,14 @@ it("escapes hostile report data and browser bundle script closings", () => {
     nodes: [
       {
         id: unsafeText,
-        path: unsafeText,
-        tooltipPath: unsafeText,
-        lineMetrics: { code: 1, comment: 0, blank: 0 },
-        imports: 0,
-        consumers: 0,
-        importedFiles: [],
-        consumerFiles: [],
-        coverage: undefined,
-        color: "#8fa3b8",
-        size: 3,
+        kind: "external-package",
+        displayName: unsafeText,
+        tooltipName: unsafeText,
+        packageName: unsafeText,
+        importedNodeIds: [],
+        consumerNodeIds: [],
+        color: "#c084fc",
+        size: 15,
         x: 0,
         y: 0,
       },
@@ -155,8 +154,8 @@ it("omits default-excluded test files and their relationships from the report", 
   ])
   expect(presentation.edges).toEqual([
     expect.objectContaining({
-      source: "src/app.ts",
-      target: "src/runtime.ts",
+      source: "project-file:src/app.ts",
+      target: "project-file:src/runtime.ts",
     }),
   ])
 })

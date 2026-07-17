@@ -58,6 +58,7 @@ The initial graph is flat:
 - directories do not create group nodes or visual containers;
 - nodes have no persistent labels;
 - project file node size grows logarithmically with code lines by default;
+- external-package nodes have one fixed size and a distinct non-coverage color and type label;
 - project files with coverage use a red-yellow-green scale while missing coverage remains neutral gray;
 - collision radii include spacing without changing rendered node area;
 - edges point from an importing file to the imported file;
@@ -71,18 +72,24 @@ An accessible checkbox group combines code, comment, and blank physical lines fo
 
 Changing the active categories recomputes node sizes, deterministic collision-safe layout, and the custom viewport bounding box through one browser report-view state transition. Selection remains active across relayout. Returning to an earlier category combination reproduces the same geometry exactly. Tooltips and the selected-file panel always show the complete three-category breakdown regardless of the sizing selection.
 
+## External-package control
+
+External-package nodes and their edges are hidden by default, so package facts do not perturb the initial file-only geometry or relationship counts. An accessible unchecked control reveals all canonical package roots. The same report-view transition rebuilds the visible Graphology subgraph, recomputes deterministic collision-safe layout, updates the bounding box, and combines package visibility with the active line categories.
+
+Package nodes use a fixed size and a distinct purple appearance. Color is not their only cue: the package list, tooltip, and selected-node panel all identify them as external packages. Package details show the project files that import the package and never fabricate line metrics, coverage, or installed-package contents. Hiding packages clears package hover or selection while preserving a selected project file.
+
 ## Hover and selection
 
-A hover tooltip follows the pointer with a small offset and flips or clamps at viewport edges. It shows a width-constrained, tail-preserving file path plus the complete code, comment, and blank line breakdown, import count, consumer count, and coverage when available. A long path truncates its beginning so the filename and nearest directories remain visible; CSS may wrap exceptionally long filenames but must not apply a second end-truncating ellipsis.
+A hover tooltip follows the pointer with a small offset and flips or clamps at viewport edges. Project-file tooltips show a width-constrained, tail-preserving path plus the complete code, comment, and blank line breakdown, visible import count, consumer count, and coverage when available. Package tooltips show the canonical package root, explicit entity type, and visible relationships. A long file path truncates its beginning so the filename and nearest directories remain visible; CSS may wrap exceptionally long filenames but must not apply a second end-truncating ellipsis.
 
 Clicking a project file node selects and visually highlights only that node. Selection opens a side panel containing:
 
 - the complete path;
 - line metrics;
 - coverage when available;
-- imported project files;
+- visible imported project files and external packages;
 - consumer project files.
 
-File entries in the side panel select their corresponding nodes. Clicking empty graph space or the clear-selection control clears selection.
+Visible file and package entries in the side panel select their corresponding nodes. Clicking empty graph space or the clear-selection control clears selection.
 
 Dependency-neighborhood highlighting, direction-specific emphasis, directory clustering, and focus modes belong to a later visualization and UX milestone.

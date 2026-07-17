@@ -38,6 +38,8 @@ Tests must control path normalization, line endings, initial graph positions, an
 
 Line-classification fixtures use hand-written code, comment, and blank expectations. Algorithm tests cover LF, CRLF, lone CR, final separators, parser offsets, and syntax ambiguities, and assert that the three exclusive categories sum to the documented physical-line total. Browser sizing tests exercise every non-empty category combination, selection persistence, changed intermediate geometry, and exact deterministic geometry when toggling back.
 
+External-package fixtures hand-write bare, subpath, scoped, repeated, and alias-lookalike requests. Filesystem integration proves package facts are available when uninstalled and that hostile `node_modules` contents never become project files, parser inputs, metrics, or diagnostics. Browser tests compare default geometry with an equivalent package-free presentation, then cover visibility, relationship filtering, selection clearing, accessible type cues, and combined line-metric transitions.
+
 Canvas regressions should be split across observable seams: presentation tests assert geometry such as representative node sizes and circle intersections, while real-browser tests assert hover, tooltip placement, path visibility, selection, and navigation. Screenshots are reserved for failures that cannot be identified more precisely.
 
 ## Performance verification

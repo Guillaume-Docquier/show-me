@@ -4,7 +4,7 @@ Analysis converts files on disk into an internal, language-neutral description t
 
 ## Current implementation
 
-Filesystem discovery, normalized project-file paths, CLOC-style physical-line categories, static runtime ESM dependency analysis, and Istanbul line-coverage enrichment are implemented.
+Filesystem discovery, normalized project-file paths, CLOC-style physical-line categories, static runtime ESM project and external-package dependency analysis, and Istanbul line-coverage enrichment are implemented.
 
 ## Project discovery
 
@@ -30,6 +30,7 @@ The internal model is versioned even though it is not initially a public CLI for
 - project metadata;
 - project files with normalized project-relative paths and metrics;
 - directed dependencies;
+- canonical external-package facts and distinct file-to-package dependencies;
 - optional per-file coverage;
 - diagnostics that did not prevent useful analysis.
 
@@ -60,9 +61,11 @@ Imports that resolve to unsupported asset types are ignored. An import that shou
 
 ## External packages
 
-External npm dependencies are excluded initially. A later milestone will create one synthetic node for each imported package without reading or analyzing installed package files.
+Unaliased bare npm requests create canonical external-package facts and distinct file-to-package runtime dependencies. Package classification is syntactic and does not require a package to be installed. External packages never enter project discovery, source reading, parsing, line metrics, or coverage matching, and files beneath `node_modules` remain permanently excluded.
 
 Package subpaths collapse to their package name. For example, `drizzle-orm/pg-core` belongs to `drizzle-orm`, and `@scope/package/subpath` belongs to `@scope/package`.
+
+Relative paths, absolute paths, package-import specifiers beginning with `#`, protocol requests, malformed package roots, and Node built-ins are not external packages. A request matching a configured `tsconfig.json` or `jsconfig.json` path alias retains project-resolution precedence: a resolved alias creates a project-file dependency, while a missing alias produces the existing unresolved-runtime diagnostic rather than a package fact. Milestone 008 will insert workspace-package ownership before external-package classification.
 
 ## Line metrics
 

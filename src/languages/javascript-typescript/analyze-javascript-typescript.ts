@@ -1,10 +1,17 @@
 import { extname, resolve } from "node:path"
 import { Result } from "@guillaume-docquier/tools-ts"
-import type { AnalysisDiagnostic, ProjectDependency, ProjectFileAnalysis } from "../../analysis/project-analysis.js"
+import { ExternalPackageName } from "../../analysis/external-package-name.js"
+import type {
+  AnalysisDiagnostic,
+  ExternalPackageDependency,
+  ProjectDependency,
+  ProjectFileAnalysis,
+} from "../../analysis/project-analysis.js"
 import { ProjectFilePath } from "../../project-files/project-file-path.js"
 import { compareText } from "../../text/compare-text.js"
 import { classifyJavaScriptTypeScriptLines } from "./classify-javascript-typescript-lines.js"
 import { collectStaticRuntimeRequests, type StaticRuntimeRequestSource } from "./collect-static-runtime-requests.js"
+import { externalPackageNameFromRequest } from "./external-package-name.js"
 import { hasJavaScriptTypeScriptExecutableExtension, type JavaScriptTypeScriptLanguageId } from "./javascript-typescript-file-support.js"
 import { createJavaScriptTypeScriptResolver, type JavaScriptTypeScriptResolver } from "./javascript-typescript-resolver.js"
 
@@ -21,6 +28,8 @@ export type JavaScriptTypeScriptSourceFile = StaticRuntimeRequestSource & {
 export type JavaScriptTypeScriptAnalysis = {
   readonly files: readonly ProjectFileAnalysis[]
   readonly dependencies: readonly ProjectDependency[]
+  readonly externalPackages: ReadonlyArray<{ readonly name: ExternalPackageName }>
+  readonly externalPackageDependencies: readonly ExternalPackageDependency[]
   readonly diagnostics: readonly AnalysisDiagnostic[]
 }
 
@@ -67,6 +76,8 @@ export function analyzeJavaScriptTypeScript(
 
   const discoveredPathByAbsolutePath = new Map(files.map((file) => [resolve(file.absolutePath), file.path]))
   const dependencyByKey = new Map<string, ProjectDependency>()
+  const externalPackageNames = new Set<ExternalPackageName>()
+  const externalPackageDependencyByKey = new Map<string, ExternalPackageDependency>()
   const diagnostics: AnalysisDiagnostic[] = []
   const analyzedFiles: ProjectFileAnalysis[] = []
 
@@ -88,6 +99,20 @@ export function analyzeJavaScriptTypeScript(
       coverage: undefined,
     })
     for (const request of requests.value.requests) {
+      if (!resolverResult.value.matchesConfiguredAlias(request)) {
+        const externalPackageName = externalPackageNameFromRequest(request)
+        if (externalPackageName !== undefined) {
+          externalPackageNames.add(externalPackageName)
+          const externalDependency: ExternalPackageDependency = {
+            source: file.path,
+            target: externalPackageName,
+            kind: "runtime",
+          }
+          externalPackageDependencyByKey.set(`${externalDependency.source}\u0000${externalDependency.target}`, externalDependency)
+          continue
+        }
+      }
+
       const dependency = resolveProjectDependency(file, request, resolverResult.value, discoveredPathByAbsolutePath)
       if (Result.isFailure(dependency)) {
         return dependency
@@ -108,6 +133,8 @@ export function analyzeJavaScriptTypeScript(
   return Result.Success({
     files: analyzedFiles,
     dependencies: [...dependencyByKey.values()].sort(compareDependencies),
+    externalPackages: [...externalPackageNames].sort((left, right) => ExternalPackageName.compare(left, right)).map((name) => ({ name })),
+    externalPackageDependencies: [...externalPackageDependencyByKey.values()].sort(compareExternalPackageDependencies),
     diagnostics: diagnostics.sort(compareDiagnostics),
   })
 }
@@ -164,6 +191,11 @@ function shouldDiagnoseUnresolvedRequest(request: string, resolver: JavaScriptTy
 function compareDependencies(left: ProjectDependency, right: ProjectDependency): number {
   const sourceComparison = ProjectFilePath.compare(left.source, right.source)
   return sourceComparison === 0 ? ProjectFilePath.compare(left.target, right.target) : sourceComparison
+}
+
+function compareExternalPackageDependencies(left: ExternalPackageDependency, right: ExternalPackageDependency): number {
+  const sourceComparison = ProjectFilePath.compare(left.source, right.source)
+  return sourceComparison === 0 ? ExternalPackageName.compare(left.target, right.target) : sourceComparison
 }
 
 function compareDiagnostics(left: AnalysisDiagnostic, right: AnalysisDiagnostic): number {
