@@ -71,6 +71,34 @@ Use these project commands:
 - `pnpm test:browser` runs the real-browser Playwright suite against built report assets.
 - `pnpm checks` runs the complete local gate. It is mutating because it starts with `format:fix`.
 
+## Windows gotchas
+
+On Windows, Codex's session `apply_patch` helper can create new files, but it currently fails before reading or modifying existing files with sandbox-helper refresh errors. Do not retry it for existing-file edits; normal `apply_patch` remains appropriate when creating a file.
+
+For existing files, keep apply-patch semantics by running the pnpm-installed Codex PowerShell shim outside the sandbox with the required escalation. Do not use the WindowsApps execution alias or the session `apply_patch.bat`. Locate and validate the active pnpm shim without hardcoding installation details:
+
+```powershell
+$codexShim = (Get-Command codex.ps1 -CommandType ExternalScript -ErrorAction Stop).Source
+if ($codexShim -notmatch '\\pnpm\\bin\\codex\.ps1$') { throw "Expected pnpm Codex shim, got: $codexShim" }
+```
+
+Pass the complete patch as one command-line argument, not through stdin:
+
+```powershell
+$patch = @'
+*** Begin Patch
+*** Update File: path/to/existing-file
+@@
+-old text
++new text
+*** End Patch
+'@
+& $codexShim --codex-run-as-apply-patch $patch
+if ($LASTEXITCODE -ne 0) { throw "Codex shim apply-patch failed" }
+```
+
+Existing-file edits must still use apply-patch mode. Never substitute `Set-Content`, `Out-File`, Python, `git apply`, or another shell writer.
+
 ## Testing
 
 We use the Arrange/Act/Assert style.
