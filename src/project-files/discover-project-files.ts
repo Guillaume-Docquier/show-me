@@ -1,15 +1,16 @@
 import { readFile, readdir } from "node:fs/promises"
-import { extname, join } from "node:path"
+import { join, resolve } from "node:path"
 import { Result } from "@guillaume-docquier/tools-ts"
 import ignore, { type Ignore } from "ignore"
-import type { LanguageId } from "../analysis/project-analysis.js"
+import {
+  javaScriptTypeScriptLanguageForProjectPath,
+  type JavaScriptTypeScriptLanguageId,
+} from "../languages/javascript-typescript/javascript-typescript-file-support.js"
+import { compareText } from "../text/compare-text.js"
 import { ProjectFilePath, type InvalidProjectFilePath } from "./project-file-path.js"
+import { DEFAULT_PROJECT_FILE_SELECTION, isProjectFileSelected, type ProjectFileSelection } from "./project-file-selection.js"
 
 const STANDARD_EXCLUDED_DIRECTORIES = new Set([".git", ".nyc_output", "build", "coverage", "dist", "node_modules", "out"])
-
-const JAVASCRIPT_EXTENSIONS = new Set([".cjs", ".js", ".jsx", ".mjs"])
-const TYPESCRIPT_EXTENSIONS = new Set([".cts", ".mts", ".ts", ".tsx"])
-const TYPESCRIPT_DECLARATION_SUFFIXES = [".d.cts", ".d.mts", ".d.ts"]
 
 type IgnoreContext = {
   readonly basePath: string
@@ -22,7 +23,15 @@ type IgnoreContext = {
 export type DiscoveredProjectFile = {
   readonly path: ProjectFilePath
   readonly absolutePath: string
-  readonly language: LanguageId
+  readonly language: JavaScriptTypeScriptLanguageId
+}
+
+/**
+ * Input for deterministic project-file discovery.
+ */
+export type DiscoverProjectFilesInput = {
+  readonly projectRoot: string
+  readonly fileSelection?: ProjectFileSelection
 }
 
 /**
@@ -52,20 +61,22 @@ export type ProjectFileDiscoveryError =
  * descendant. Standard generated and dependency directories are always excluded.
  * Symbolic links are not followed during the initial single-repository implementation.
  *
- * @param projectRoot - Absolute or relative project directory to scan.
+ * @param input - Project root and optional overrideable file-selection policy.
  * @returns Supported files, or a typed filesystem/path failure.
  */
 export async function discoverProjectFiles(
-  projectRoot: string,
+  input: DiscoverProjectFilesInput,
 ): Promise<Result<readonly DiscoveredProjectFile[], ProjectFileDiscoveryError>> {
+  const projectRoot = resolve(input.projectRoot)
+  const fileSelection = input.fileSelection ?? DEFAULT_PROJECT_FILE_SELECTION
   const discoveredFiles: DiscoveredProjectFile[] = []
-  const walkResult = await walkDirectory(projectRoot, "", [], discoveredFiles)
+  const walkResult = await walkDirectory(projectRoot, "", [], fileSelection, discoveredFiles)
 
   if (Result.isFailure(walkResult)) {
     return walkResult
   }
 
-  discoveredFiles.sort((left, right) => compareText(left.path, right.path))
+  discoveredFiles.sort((left, right) => ProjectFilePath.compare(left.path, right.path))
   return Result.Success(discoveredFiles)
 }
 
@@ -73,6 +84,7 @@ async function walkDirectory(
   projectRoot: string,
   relativeDirectory: string,
   parentIgnoreContexts: readonly IgnoreContext[],
+  fileSelection: ProjectFileSelection,
   discoveredFiles: DiscoveredProjectFile[],
 ): Promise<Result<void, ProjectFileDiscoveryError>> {
   const absoluteDirectory = join(projectRoot, ...splitProjectPath(relativeDirectory))
@@ -112,19 +124,23 @@ async function walkDirectory(
         continue
       }
 
-      const childResult = await walkDirectory(projectRoot, relativePath, ignoreContexts, discoveredFiles)
+      const childResult = await walkDirectory(projectRoot, relativePath, ignoreContexts, fileSelection, discoveredFiles)
       if (Result.isFailure(childResult)) {
         return childResult
       }
       continue
     }
 
-    if (!entry.isFile() || isIgnored(relativePath, "file", ignoreContexts) || isDefaultExcludedTestFile(entry.name)) {
+    if (!entry.isFile() || isIgnored(relativePath, "file", ignoreContexts)) {
       continue
     }
 
-    const language = languageForProjectPath(relativePath)
+    const language = javaScriptTypeScriptLanguageForProjectPath(relativePath)
     if (language === undefined) {
+      continue
+    }
+
+    if (!isProjectFileSelected(entry.name, fileSelection)) {
       continue
     }
 
@@ -190,28 +206,6 @@ function isIgnored(relativePath: string, kind: "directory" | "file", ignoreConte
   return ignored
 }
 
-function languageForProjectPath(projectPath: string): LanguageId | undefined {
-  const lowerPath = projectPath.toLowerCase()
-  if (TYPESCRIPT_DECLARATION_SUFFIXES.some((suffix) => lowerPath.endsWith(suffix))) {
-    return undefined
-  }
-
-  const extension = extname(lowerPath)
-  if (JAVASCRIPT_EXTENSIONS.has(extension)) {
-    return "javascript"
-  }
-  if (TYPESCRIPT_EXTENSIONS.has(extension)) {
-    return "typescript"
-  }
-
-  return undefined
-}
-
-function isDefaultExcludedTestFile(fileName: string): boolean {
-  const lowerFileName = fileName.toLowerCase()
-  return lowerFileName.includes(".test.") || lowerFileName.includes(".spec.")
-}
-
 function appendProjectPath(parent: string, child: string): string {
   return parent.length === 0 ? child : `${parent}/${child}`
 }
@@ -222,14 +216,4 @@ function removeProjectPathPrefix(projectPath: string, prefix: string): string {
 
 function splitProjectPath(projectPath: string): string[] {
   return projectPath.length === 0 ? [] : projectPath.split("/")
-}
-
-function compareText(left: string, right: string): number {
-  if (left < right) {
-    return -1
-  }
-  if (left > right) {
-    return 1
-  }
-  return 0
 }

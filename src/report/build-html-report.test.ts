@@ -7,7 +7,7 @@ import { buildHtmlReport } from "./build-html-report.js"
 
 it("builds one offline document without embedding source contents", async () => {
   // Arrange
-  const analysis = await analyzeProject(fixtureProjectPath("minimal-javascript"))
+  const analysis = await analyzeProject({ projectRoot: fixtureProjectPath("minimal-javascript") })
   const browserBundle = "document.documentElement.dataset.bundleMarker='embedded'"
 
   if (Result.isFailure(analysis)) {
@@ -28,7 +28,7 @@ it("builds one offline document without embedding source contents", async () => 
 
 it("escapes script-closing project data before embedding it", async () => {
   // Arrange
-  const analysis = await analyzeProject(fixtureProjectPath("minimal-javascript"))
+  const analysis = await analyzeProject({ projectRoot: fixtureProjectPath("minimal-javascript") })
   if (Result.isFailure(analysis)) {
     throw new Error(`Fixture analysis failed: ${analysis.error._tag}`)
   }
@@ -48,7 +48,7 @@ it("escapes script-closing project data before embedding it", async () => {
 it("keeps missing coverage neutral instead of treating it as zero coverage", async () => {
   // Arrange
   const projectRoot = fixtureProjectPath("coverage-project")
-  const analysis = await analyzeProject(projectRoot)
+  const analysis = await analyzeProject({ projectRoot })
   if (Result.isFailure(analysis)) {
     throw new Error(`Fixture analysis failed: ${analysis.error._tag}`)
   }
@@ -72,7 +72,7 @@ it("keeps missing coverage neutral instead of treating it as zero coverage", asy
 it("omits default-excluded test files and their relationships from the report", async () => {
   // Arrange
   const projectRoot = fixtureProjectPath("test-file-exclusions")
-  const analysis = await analyzeProject(projectRoot)
+  const analysis = await analyzeProject({ projectRoot })
   if (Result.isFailure(analysis)) {
     throw new Error("Fixture analysis failed: " + analysis.error._tag)
   }

@@ -1,5 +1,6 @@
-import { isAbsolute, relative, resolve, sep } from "node:path"
+import { isAbsolute, posix, relative, resolve, sep } from "node:path"
 import { Result, branded, type Branded } from "@guillaume-docquier/tools-ts"
+import { compareText } from "../text/compare-text.js"
 
 /**
  * A normalized project-relative path using forward slashes.
@@ -12,7 +13,7 @@ export type ProjectFilePath = Branded<string, "ProjectFilePath">
 export type InvalidProjectFilePath = {
   readonly _tag: "InvalidProjectFilePath"
   readonly input: string
-  readonly reason: "empty" | "absolute" | "outside-project-root"
+  readonly reason: "empty" | "project-root" | "absolute" | "outside-project-root"
 }
 
 /**
@@ -26,9 +27,7 @@ export const ProjectFilePath = {
    * @returns A normalized path, or an error when the path cannot identify a project file.
    */
   parse(input: string): Result<ProjectFilePath, InvalidProjectFilePath> {
-    const normalized = input.replaceAll("\\", "/")
-
-    if (normalized.length === 0) {
+    if (input.length === 0) {
       return Result.Failure({
         _tag: "InvalidProjectFilePath",
         input,
@@ -36,11 +35,21 @@ export const ProjectFilePath = {
       })
     }
 
-    if (normalized.startsWith("/") || /^[a-zA-Z]:\//u.test(normalized)) {
+    const slashedPath = input.replaceAll("\\", "/")
+    if (slashedPath.startsWith("/") || /^[a-zA-Z]:/u.test(slashedPath)) {
       return Result.Failure({
         _tag: "InvalidProjectFilePath",
         input,
         reason: "absolute",
+      })
+    }
+
+    const normalized = posix.normalize(slashedPath).replace(/\/+$/u, "")
+    if (normalized === ".") {
+      return Result.Failure({
+        _tag: "InvalidProjectFilePath",
+        input,
+        reason: "project-root",
       })
     }
 
@@ -53,6 +62,17 @@ export const ProjectFilePath = {
     }
 
     return Result.Success(branded<ProjectFilePath>(normalized))
+  },
+
+  /**
+   * Compare canonical project file paths without consulting the host locale.
+   *
+   * @param left - Project path on the left side of the comparison.
+   * @param right - Project path on the right side of the comparison.
+   * @returns A negative number, zero, or a positive number for ascending order.
+   */
+  compare(left: ProjectFilePath, right: ProjectFilePath): number {
+    return compareText(left, right)
   },
 
   /**
@@ -71,7 +91,7 @@ export const ProjectFilePath = {
       return Result.Failure({
         _tag: "InvalidProjectFilePath",
         input: absoluteFilePath,
-        reason: relativePath.length === 0 ? "empty" : "outside-project-root",
+        reason: relativePath.length === 0 ? "project-root" : "outside-project-root",
       })
     }
 

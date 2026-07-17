@@ -6,17 +6,26 @@ import {
   type JavaScriptTypeScriptAnalysisError,
   type JavaScriptTypeScriptSourceFile,
 } from "../languages/javascript-typescript/analyze-javascript-typescript.js"
-import { countNonBlankPhysicalLines } from "../project-files/count-non-blank-physical-lines.js"
 import { discoverProjectFiles, type ProjectFileDiscoveryError } from "../project-files/discover-project-files.js"
-import { PROJECT_ANALYSIS_SCHEMA_VERSION, type ProjectAnalysis, type ProjectFileAnalysis } from "./project-analysis.js"
+import type { ProjectFilePath } from "../project-files/project-file-path.js"
+import type { ProjectFileSelection } from "../project-files/project-file-selection.js"
+import { PROJECT_ANALYSIS_SCHEMA_VERSION, type ProjectAnalysis } from "./project-analysis.js"
 
 /**
  * A failure while reading the contents of a discovered project file.
  */
 export type ProjectFileReadError = {
   readonly _tag: "ProjectFileReadFailed"
-  readonly projectFile: string
+  readonly projectFile: ProjectFilePath
   readonly cause: Error
+}
+
+/**
+ * Input for one project analysis.
+ */
+export type AnalyzeProjectInput = {
+  readonly projectRoot: string
+  readonly fileSelection?: ProjectFileSelection
 }
 
 /**
@@ -39,11 +48,11 @@ export type AnalyzeProjectError =
 /**
  * Discover project files and collect language-neutral physical line metrics.
  *
- * @param projectRoot - Directory to analyze.
+ * @param input - Project root and optional overrideable file-selection policy.
  * @returns A deterministic project analysis, or a typed filesystem failure.
  */
-export async function analyzeProject(projectRoot: string): Promise<Result<ProjectAnalysis, AnalyzeProjectError>> {
-  const resolvedProjectRoot = resolve(projectRoot)
+export async function analyzeProject(input: AnalyzeProjectInput): Promise<Result<ProjectAnalysis, AnalyzeProjectError>> {
+  const resolvedProjectRoot = resolve(input.projectRoot)
   const projectRootStats = await Result.tryCatch(stat(resolvedProjectRoot))
 
   if (Result.isFailure(projectRootStats)) {
@@ -61,12 +70,14 @@ export async function analyzeProject(projectRoot: string): Promise<Result<Projec
     })
   }
 
-  const discoveredFiles = await discoverProjectFiles(resolvedProjectRoot)
+  const discoveredFiles = await discoverProjectFiles({
+    projectRoot: resolvedProjectRoot,
+    ...(input.fileSelection === undefined ? {} : { fileSelection: input.fileSelection }),
+  })
   if (Result.isFailure(discoveredFiles)) {
     return discoveredFiles
   }
 
-  const files: ProjectFileAnalysis[] = []
   const sourceFiles: JavaScriptTypeScriptSourceFile[] = []
   for (const discoveredFile of discoveredFiles.value) {
     const sourceText = await Result.tryCatch(readFile(discoveredFile.absolutePath, "utf8"))
@@ -78,18 +89,11 @@ export async function analyzeProject(projectRoot: string): Promise<Result<Projec
       })
     }
 
-    files.push({
-      path: discoveredFile.path,
-      language: discoveredFile.language,
-      lines: {
-        nonBlank: countNonBlankPhysicalLines(sourceText.value),
-      },
-      coverage: undefined,
-    })
     sourceFiles.push({
       path: discoveredFile.path,
       absolutePath: discoveredFile.absolutePath,
       sourceText: sourceText.value,
+      language: discoveredFile.language,
     })
   }
 
@@ -103,7 +107,7 @@ export async function analyzeProject(projectRoot: string): Promise<Result<Projec
     project: {
       name: basename(resolvedProjectRoot),
     },
-    files,
+    files: languageAnalysis.value.files,
     dependencies: languageAnalysis.value.dependencies,
     diagnostics: languageAnalysis.value.diagnostics,
   })

@@ -1,5 +1,5 @@
 import { mkdir, writeFile } from "node:fs/promises"
-import { join } from "node:path"
+import { isAbsolute, join, relative } from "node:path"
 import { Result } from "@guillaume-docquier/tools-ts"
 import { expect, it } from "vitest"
 import { analyzeProject } from "../analysis/analyze-project.js"
@@ -12,7 +12,7 @@ it("discovers supported files while honoring declarations, ignore rules, and sta
   const projectRoot = fixtureProjectPath("discovery")
 
   // Act
-  const result = await discoverProjectFiles(projectRoot)
+  const result = await discoverProjectFiles({ projectRoot })
 
   // Assert
   expect(Result.isSuccess(result)).toBe(true)
@@ -38,7 +38,7 @@ it("excludes conventional test and spec basenames across supported extensions", 
   const projectRoot = fixtureProjectPath("test-file-exclusions")
 
   // Act
-  const result = await discoverProjectFiles(projectRoot)
+  const result = await discoverProjectFiles({ projectRoot })
 
   // Assert
   expect(Result.isSuccess(result)).toBe(true)
@@ -59,12 +59,54 @@ it("excludes conventional test and spec basenames across supported extensions", 
   }
 })
 
+it("can include conventionally named test files without bypassing permanent exclusions", async () => {
+  await withTemporaryDirectory(async (projectRoot) => {
+    // Arrange
+    await mkdir(join(projectRoot, "node_modules"), { recursive: true })
+    await writeFile(join(projectRoot, ".gitignore"), "ignored.test.ts\n", "utf8")
+    await writeFile(join(projectRoot, "ignored.test.ts"), "export const ignored = true", "utf8")
+    await writeFile(join(projectRoot, "node_modules", "dependency.test.ts"), "export const dependency = true", "utf8")
+    await writeFile(join(projectRoot, "types.test.d.ts"), "declare const types: true", "utf8")
+    await writeFile(join(projectRoot, "asset.test.css"), "body {}", "utf8")
+    await writeFile(join(projectRoot, "included.test.ts"), "export const included = true", "utf8")
+
+    // Act
+    const result = await discoverProjectFiles({ projectRoot, fileSelection: { testFiles: "include" } })
+
+    // Assert
+    expect(result).toEqual(
+      Result.Success([
+        expect.objectContaining({
+          path: "included.test.ts",
+          language: "typescript",
+        }),
+      ]),
+    )
+  })
+})
+
+it("resolves a relative discovery root before returning absolute file paths", async () => {
+  // Arrange
+  const projectRoot = relative(process.cwd(), fixtureProjectPath("minimal-javascript"))
+
+  // Act
+  const result = await discoverProjectFiles({ projectRoot })
+
+  // Assert
+  expect(Result.isSuccess(result)).toBe(true)
+  if (Result.isSuccess(result)) {
+    expect(result.value).toHaveLength(1)
+    expect(isAbsolute(result.value[0]?.absolutePath ?? "")).toBe(true)
+    expect(result.value[0]?.path).toBe("index.js")
+  }
+})
+
 it("reports explicit, deterministic non-blank line counts for the discovery fixture", async () => {
   // Arrange
   const projectRoot = fixtureProjectPath("discovery")
 
   // Act
-  const result = await analyzeProject(projectRoot)
+  const result = await analyzeProject({ projectRoot })
 
   // Assert
   expect(Result.isSuccess(result)).toBe(true)
@@ -90,7 +132,7 @@ it("returns a typed discovery failure for a missing root", async () => {
   const missingRoot = `${fixtureProjectPath("discovery")}-missing`
 
   // Act
-  const result = await discoverProjectFiles(missingRoot)
+  const result = await discoverProjectFiles({ projectRoot: missingRoot })
 
   // Assert
   expect(Result.isFailure(result)).toBe(true)
@@ -111,7 +153,7 @@ it("always excludes generated, dependency, coverage, and version-control directo
     await writeFile(join(projectRoot, "included.ts"), "export const included = true")
 
     // Act
-    const result = await discoverProjectFiles(projectRoot)
+    const result = await discoverProjectFiles({ projectRoot })
 
     // Assert
     expect(Result.isSuccess(result)).toBe(true)

@@ -70,21 +70,3 @@ export type ProjectAnalysis = {
   readonly dependencies: readonly ProjectDependency[]
   readonly diagnostics: readonly AnalysisDiagnostic[]
 }
-
-/**
- * Create an analysis before language-specific file data has been added.
- *
- * @param projectName - Display name of the analyzed project.
- * @returns An empty, versioned project analysis.
- */
-export function createEmptyProjectAnalysis(projectName: string): ProjectAnalysis {
-  return {
-    schemaVersion: PROJECT_ANALYSIS_SCHEMA_VERSION,
-    project: {
-      name: projectName,
-    },
-    files: [],
-    dependencies: [],
-    diagnostics: [],
-  }
-}

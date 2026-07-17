@@ -4,13 +4,13 @@ Analysis converts files on disk into an internal, language-neutral description t
 
 ## Current implementation
 
-Filesystem discovery, normalized project-file paths, non-blank physical line counts, static runtime ESM dependency analysis, and Istanbul line-coverage enrichment are implemented. CLOC-style line categories remain represented by the internal model but are owned by a later milestone.
+Filesystem discovery, normalized project-file paths, non-blank physical line counts, static runtime ESM dependency analysis, and Istanbul line-coverage enrichment are implemented. CLOC-style line categories are not represented yet and remain owned by a later milestone.
 
 ## Project discovery
 
 The project root defaults to the current working directory and may be supplied as the optional positional CLI argument.
 
-Discovery scans beneath the project root, honors `.gitignore`, and applies narrowly defined standard exclusions such as dependency, version-control, coverage, and generated-output directories. It does not use `tsconfig.json` as the authoritative file list. Project configuration guides dependency resolution, while filesystem discovery determines which project files exist.
+Discovery scans beneath the project root, honors `.gitignore`, and applies narrowly defined standard exclusions such as dependency, version-control, coverage, and generated-output directories. It accepts an explicit typed file-selection policy for overrideable conventions while keeping standard directories, `.gitignore`, declaration files, and unsupported languages permanently excluded. It does not use `tsconfig.json` as the authoritative file list. Project configuration guides dependency resolution, while filesystem discovery determines which project files exist.
 
 Initial executable extensions are:
 
@@ -37,7 +37,7 @@ Edges are authoritative. Import and consumer counts are derived from edges rathe
 
 ## Language modules
 
-A language module operates at project scope so it can use project configuration and resolve relationships across files. The internal JavaScript/TypeScript dependency module uses Oxc and exposes only language-neutral dependencies and diagnostics.
+A language module operates at project scope so it can use project configuration and resolve relationships across files. The internal JavaScript/TypeScript module uses Oxc and exposes only language-neutral file analyses, metrics, dependencies, and diagnostics. Oxc parser and resolver values remain contained behind focused adapters.
 
 Language modules are an architectural extension point, not a public plugin API. Adding another language initially means adding another module to the Show Me package. The core model and renderer must not gain language-specific AST types or resolution rules.
 

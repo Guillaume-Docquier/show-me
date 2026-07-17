@@ -1,8 +1,8 @@
 import { readFile } from "node:fs/promises"
-import { fileURLToPath } from "node:url"
 import { Result } from "@guillaume-docquier/tools-ts"
 import { describe, expect, it } from "vitest"
 import { discoverProjectFiles } from "../../project-files/discover-project-files.js"
+import { fixtureProjectPath } from "../../testing/fixture-project.js"
 import { analyzeJavaScriptTypeScript, type JavaScriptTypeScriptSourceFile } from "./analyze-javascript-typescript.js"
 
 describe("analyzeJavaScriptTypeScript", () => {
@@ -17,6 +17,20 @@ describe("analyzeJavaScriptTypeScript", () => {
     // Assert
     expect(result).toEqual(
       Result.Success({
+        files: expect.arrayContaining([
+          {
+            path: "src/runtime.ts",
+            language: "typescript",
+            lines: { nonBlank: 1 },
+            coverage: undefined,
+          },
+          {
+            path: "src/side-effect.js",
+            language: "javascript",
+            lines: { nonBlank: 1 },
+            coverage: undefined,
+          },
+        ]),
         dependencies: [
           { source: "src/cycle-a.ts", target: "src/cycle-b.ts", kind: "runtime" },
           { source: "src/cycle-b.ts", target: "src/cycle-a.ts", kind: "runtime" },
@@ -59,6 +73,20 @@ describe("analyzeJavaScriptTypeScript", () => {
     // Assert
     expect(result).toEqual(
       Result.Success({
+        files: [
+          {
+            path: "index.js",
+            language: "javascript",
+            lines: { nonBlank: 2 },
+            coverage: undefined,
+          },
+          {
+            path: "target.js",
+            language: "javascript",
+            lines: { nonBlank: 1 },
+            coverage: undefined,
+          },
+        ],
         dependencies: [{ source: "index.js", target: "target.js", kind: "runtime" }],
         diagnostics: [],
       }),
@@ -67,7 +95,7 @@ describe("analyzeJavaScriptTypeScript", () => {
 })
 
 async function readDiscoveredSourceFiles(projectRoot: string): Promise<readonly JavaScriptTypeScriptSourceFile[]> {
-  const discoveredFiles = await discoverProjectFiles(projectRoot)
+  const discoveredFiles = await discoverProjectFiles({ projectRoot })
   if (Result.isFailure(discoveredFiles)) {
     throw new Error(`Fixture discovery failed: ${discoveredFiles.error._tag}`)
   }
@@ -77,10 +105,7 @@ async function readDiscoveredSourceFiles(projectRoot: string): Promise<readonly 
       path: file.path,
       absolutePath: file.absolutePath,
       sourceText: await readFile(file.absolutePath, "utf8"),
+      language: file.language,
     })),
   )
-}
-
-function fixtureProjectPath(name: "static-esm" | "static-esm-no-config"): string {
-  return fileURLToPath(new URL(`../../../fixtures/projects/${name}/`, import.meta.url))
 }

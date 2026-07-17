@@ -3,7 +3,7 @@ import { join } from "node:path"
 import { Result } from "@guillaume-docquier/tools-ts"
 import { describe, expect, it } from "vitest"
 import { analyzeProject } from "../analysis/analyze-project.js"
-import { createEmptyProjectAnalysis, type ProjectAnalysis } from "../analysis/project-analysis.js"
+import type { ProjectAnalysis } from "../analysis/project-analysis.js"
 import { ProjectFilePath } from "../project-files/project-file-path.js"
 import { fixtureProjectPath } from "../testing/fixture-project.js"
 import { withTemporaryDirectory } from "../testing/temporary-directory.js"
@@ -13,7 +13,7 @@ describe("importIstanbulCoverage", () => {
   it("enriches covered, partial, uncovered, same-line, multiline, and empty files without changing language analysis", async () => {
     // Arrange
     const projectRoot = fixtureProjectPath("coverage-project")
-    const analysis = await analyzeProject(projectRoot)
+    const analysis = await analyzeProject({ projectRoot })
     if (Result.isFailure(analysis)) {
       throw new Error(`Fixture analysis failed: ${analysis.error._tag}`)
     }
@@ -53,7 +53,7 @@ describe("importIstanbulCoverage", () => {
   it("ignores coverage entries for default-excluded test files", async () => {
     // Arrange
     const projectRoot = fixtureProjectPath("test-file-exclusions")
-    const analysis = await analyzeProject(projectRoot)
+    const analysis = await analyzeProject({ projectRoot })
     if (Result.isFailure(analysis)) {
       throw new Error("Fixture analysis failed: " + analysis.error._tag)
     }
@@ -140,7 +140,7 @@ describe("importIstanbulCoverage", () => {
       await writeFile(coverageFile, contents, "utf8")
 
       // Act
-      const result = await importIstanbulCoverage(createEmptyProjectAnalysis("invalid"), temporaryDirectory, coverageFile)
+      const result = await importIstanbulCoverage(emptyProjectAnalysis("invalid"), temporaryDirectory, coverageFile)
 
       // Assert
       expect(Result.isFailure(result)).toBe(true)
@@ -156,7 +156,7 @@ describe("importIstanbulCoverage", () => {
       const missingCoverageFile = join(temporaryDirectory, "missing.json")
 
       // Act
-      const result = await importIstanbulCoverage(createEmptyProjectAnalysis("missing"), temporaryDirectory, missingCoverageFile)
+      const result = await importIstanbulCoverage(emptyProjectAnalysis("missing"), temporaryDirectory, missingCoverageFile)
 
       // Assert
       expect(Result.isFailure(result)).toBe(true)
@@ -267,7 +267,7 @@ function analysisWithOneFile(path: string): ProjectAnalysis {
   }
 
   return {
-    ...createEmptyProjectAnalysis("path-casing"),
+    ...emptyProjectAnalysis("path-casing"),
     files: [
       {
         path: projectFilePath.value,
@@ -276,5 +276,15 @@ function analysisWithOneFile(path: string): ProjectAnalysis {
         coverage: undefined,
       },
     ],
+  }
+}
+
+function emptyProjectAnalysis(projectName: string): ProjectAnalysis {
+  return {
+    schemaVersion: 1,
+    project: { name: projectName },
+    files: [],
+    dependencies: [],
+    diagnostics: [],
   }
 }

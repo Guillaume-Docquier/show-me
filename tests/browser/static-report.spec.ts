@@ -18,7 +18,7 @@ test("supports graph hover, selection, clearing, and side-panel navigation", asy
     await mkdir(sourceDirectory, { recursive: true })
     await writeFile(join(sourceDirectory, "index.ts"), "export const message = 'hello'\n", "utf8")
 
-    const analysis = await analyzeProject(projectDirectory)
+    const analysis = await analyzeProject({ projectRoot: projectDirectory })
     if (Result.isFailure(analysis)) {
       throw new Error(`Fixture analysis failed: ${analysis.error._tag}`)
     }
@@ -77,7 +77,7 @@ test("supports graph hover, selection, clearing, and side-panel navigation", asy
 test("shows imported and consumer project files in the selected-node side panel", async ({ page }) => {
   await withTemporaryDirectory(async (temporaryDirectory) => {
     // Arrange
-    const analysis = await analyzeProject(fixtureProjectPath("static-esm"))
+    const analysis = await analyzeProject({ projectRoot: fixtureProjectPath("static-esm") })
     if (Result.isFailure(analysis)) {
       throw new Error(`Fixture analysis failed: ${analysis.error._tag}`)
     }
@@ -130,7 +130,7 @@ test("shows numeric line coverage in the tooltip and selected-file side panel", 
       }),
       "utf8",
     )
-    const analysis = await analyzeProject(projectDirectory)
+    const analysis = await analyzeProject({ projectRoot: projectDirectory })
     if (Result.isFailure(analysis)) {
       throw new Error(`Fixture analysis failed: ${analysis.error._tag}`)
     }

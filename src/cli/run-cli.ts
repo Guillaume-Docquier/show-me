@@ -64,7 +64,7 @@ export async function runCli(arguments_: readonly string[], output: CliOutput, o
   const startedAt = Timer.start()
   const currentDirectory = options.currentDirectory ?? process.cwd()
   const projectRoot = resolve(currentDirectory, command.value.projectPath)
-  const analysis = await analyzeProject(projectRoot)
+  const analysis = await analyzeProject({ projectRoot })
 
   if (Result.isFailure(analysis)) {
     output.writeStandardError(`${formatAnalysisError(analysis.error)}\n`)
