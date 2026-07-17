@@ -4,15 +4,16 @@ import type { ProjectAnalysis } from "../analysis/project-analysis.js"
 import { ProjectFilePath } from "../project-files/project-file-path.js"
 import {
   buildReportPresentation,
+  activeLineCount,
   coverageColor,
   nodeSizeForLines,
   REPORT_PRESENTATION_SCHEMA_VERSION,
   truncatePathFromStart,
 } from "./report-presentation.js"
 
-it("uses presentation schema version 2 for the structured line-metric contract", () => {
+it("uses presentation schema version 3 for the CLOC-style line-metric contract", () => {
   // Assert
-  expect(REPORT_PRESENTATION_SCHEMA_VERSION).toBe(2)
+  expect(REPORT_PRESENTATION_SCHEMA_VERSION).toBe(3)
 })
 
 it.each([
@@ -46,24 +47,40 @@ it.each([
   expect(color).toBe(expectedColor)
 })
 
+it.each([
+  [["code"], 10],
+  [["comment"], 4],
+  [["blank"], 2],
+  [["code", "comment"], 14],
+  [["code", "blank"], 12],
+  [["comment", "blank"], 6],
+  [["code", "comment", "blank"], 16],
+] as const)("combines active line categories %j", (categories, expectedLines) => {
+  // Act
+  const lines = activeLineCount({ code: 10, comment: 4, blank: 2 }, categories)
+
+  // Assert
+  expect(lines).toBe(expectedLines)
+})
+
 it("builds deterministic coordinates and dependency metrics", () => {
   // Arrange
   const sourcePath = parseProjectFilePath("src/source.ts")
   const targetPath = parseProjectFilePath("src/deep/target.ts")
   const analysis: ProjectAnalysis = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     project: { name: "deterministic" },
     files: [
       {
         path: sourcePath,
         language: "typescript",
-        lines: { nonBlank: 4 },
+        lines: { code: 4, comment: 2, blank: 1 },
         coverage: undefined,
       },
       {
         path: targetPath,
         language: "typescript",
-        lines: { nonBlank: 16 },
+        lines: { code: 16, comment: 4, blank: 2 },
         coverage: undefined,
       },
     ],
@@ -79,8 +96,8 @@ it("builds deterministic coordinates and dependency metrics", () => {
   expect(firstPresentation).toEqual(secondPresentation)
   expect(firstPresentation.schemaVersion).toBe(REPORT_PRESENTATION_SCHEMA_VERSION)
   expect(firstPresentation.nodes.map(({ path, lineMetrics, imports, consumers }) => ({ path, lineMetrics, imports, consumers }))).toEqual([
-    { path: "src/source.ts", lineMetrics: { nonBlank: 4 }, imports: 1, consumers: 0 },
-    { path: "src/deep/target.ts", lineMetrics: { nonBlank: 16 }, imports: 0, consumers: 1 },
+    { path: "src/source.ts", lineMetrics: { code: 4, comment: 2, blank: 1 }, imports: 1, consumers: 0 },
+    { path: "src/deep/target.ts", lineMetrics: { code: 16, comment: 4, blank: 2 }, imports: 0, consumers: 1 },
   ])
   expect(firstPresentation.edges).toEqual([
     {
@@ -96,11 +113,11 @@ it("keeps large nodes from overlapping other nodes in large graphs", () => {
   const files = Array.from({ length: 101 }, (_, index) => ({
     path: parseProjectFilePath(`src/file-${String(index).padStart(3, "0")}.ts`),
     language: "typescript" as const,
-    lines: { nonBlank: index === 0 ? 500 : 1 },
+    lines: { code: index === 0 ? 500 : 1, comment: index === 1 ? 500 : 0, blank: index === 2 ? 500 : 0 },
     coverage: undefined,
   }))
   const analysis: ProjectAnalysis = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     project: { name: "large-nodes" },
     files,
     dependencies: [],

@@ -3,7 +3,7 @@ import type { ProjectFilePath } from "../project-files/project-file-path.js"
 /**
  * The schema version of the internal project analysis model.
  */
-export const PROJECT_ANALYSIS_SCHEMA_VERSION = 1
+export const PROJECT_ANALYSIS_SCHEMA_VERSION = 2
 
 /**
  * A language family understood by a language module.
@@ -15,9 +15,17 @@ export type LanguageId = string
  */
 export type ProjectFileLines = {
   /**
-   * Non-blank physical lines, including comments.
+   * Physical lines containing code, including mixed code-and-comment lines.
    */
-  readonly nonBlank: number
+  readonly code: number
+  /**
+   * Physical lines containing only comments and whitespace.
+   */
+  readonly comment: number
+  /**
+   * Physical lines containing only whitespace.
+   */
+  readonly blank: number
 }
 
 /**

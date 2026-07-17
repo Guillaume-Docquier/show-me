@@ -16,7 +16,7 @@ it("opens a real fixture through the analysis application seam", async () => {
   // Assert
   expect(result).toEqual(
     Result.Success({
-      schemaVersion: 1,
+      schemaVersion: 2,
       project: {
         name: "minimal-javascript",
       },
@@ -24,9 +24,7 @@ it("opens a real fixture through the analysis application seam", async () => {
         {
           path: "index.js",
           language: "javascript",
-          lines: {
-            nonBlank: 1,
-          },
+          lines: { code: 1, comment: 0, blank: 0 },
           coverage: undefined,
         },
       ],
@@ -34,6 +32,28 @@ it("opens a real fixture through the analysis application seam", async () => {
       diagnostics: [],
     }),
   )
+})
+
+it("classifies CLOC-style metrics through the project analysis seam", async () => {
+  // Arrange
+  const projectRoot = fixtureProjectPath("cloc-line-breakdown")
+
+  // Act
+  const result = await analyzeProject({ projectRoot })
+
+  // Assert
+  expect(Result.isSuccess(result)).toBe(true)
+  if (Result.isSuccess(result)) {
+    expect(result.value.files.map(({ path, lines }) => ({ path, lines }))).toEqual([
+      { path: "src/blank-only.ts", lines: { code: 0, comment: 0, blank: 1 } },
+      { path: "src/categories.ts", lines: { code: 1, comment: 4, blank: 1 } },
+      { path: "src/code-only.ts", lines: { code: 2, comment: 0, blank: 0 } },
+      { path: "src/comment-only.ts", lines: { code: 0, comment: 2, blank: 0 } },
+      { path: "src/hashbang.js", lines: { code: 0, comment: 2, blank: 0 } },
+      { path: "src/syntax.tsx", lines: { code: 14, comment: 2, blank: 1 } },
+      { path: "src/unicode.ts", lines: { code: 1, comment: 1, blank: 0 } },
+    ])
+  }
 })
 
 it("returns a typed failure when the project root is missing", async () => {
@@ -90,18 +110,18 @@ it("does not read, parse, measure, or link default-excluded test files", async (
   // Assert
   expect(Result.isSuccess(result)).toBe(true)
   if (Result.isSuccess(result)) {
-    expect(result.value.files.map(({ path, lines }) => ({ path, nonBlank: lines.nonBlank }))).toEqual([
-      { path: "src/__tests__/helper.ts", nonBlank: 1 },
-      { path: "src/app.ts", nonBlank: 3 },
-      { path: "src/aspect.ts", nonBlank: 1 },
-      { path: "src/contest.ts", nonBlank: 1 },
-      { path: "src/runtime.ts", nonBlank: 1 },
-      { path: "src/spec.ts", nonBlank: 1 },
-      { path: "src/suite.spec/helper.ts", nonBlank: 1 },
-      { path: "src/suite.test/helper.ts", nonBlank: 1 },
-      { path: "src/test.ts", nonBlank: 1 },
-      { path: "src/test/helper.ts", nonBlank: 1 },
-      { path: "src/tests/helper.ts", nonBlank: 1 },
+    expect(result.value.files.map(({ path, lines }) => ({ path, lines }))).toEqual([
+      { path: "src/__tests__/helper.ts", lines: { code: 1, comment: 0, blank: 0 } },
+      { path: "src/app.ts", lines: { code: 3, comment: 0, blank: 1 } },
+      { path: "src/aspect.ts", lines: { code: 1, comment: 0, blank: 0 } },
+      { path: "src/contest.ts", lines: { code: 1, comment: 0, blank: 0 } },
+      { path: "src/runtime.ts", lines: { code: 1, comment: 0, blank: 0 } },
+      { path: "src/spec.ts", lines: { code: 1, comment: 0, blank: 0 } },
+      { path: "src/suite.spec/helper.ts", lines: { code: 1, comment: 0, blank: 0 } },
+      { path: "src/suite.test/helper.ts", lines: { code: 1, comment: 0, blank: 0 } },
+      { path: "src/test.ts", lines: { code: 1, comment: 0, blank: 0 } },
+      { path: "src/test/helper.ts", lines: { code: 1, comment: 0, blank: 0 } },
+      { path: "src/tests/helper.ts", lines: { code: 1, comment: 0, blank: 0 } },
     ])
     expect(result.value.dependencies).toEqual([{ source: "src/app.ts", target: "src/runtime.ts", kind: "runtime" }])
     expect(result.value.diagnostics).toEqual([])

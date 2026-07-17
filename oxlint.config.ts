@@ -13,7 +13,7 @@ export default defineConfig({
   env: {
     builtin: true,
   },
-  ignorePatterns: ["**/dist/**", "**/coverage/**", "*.gen.*"],
+  ignorePatterns: ["**/dist/**", "**/coverage/**", "*.gen.*", "fixtures/projects/cloc-line-breakdown/src/blank-only.ts"],
   overrides: [
     {
       files: ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts"],

@@ -4,7 +4,7 @@ Analysis converts files on disk into an internal, language-neutral description t
 
 ## Current implementation
 
-Filesystem discovery, normalized project-file paths, non-blank physical line counts, static runtime ESM dependency analysis, and Istanbul line-coverage enrichment are implemented. CLOC-style line categories are not represented yet and remain owned by a later milestone.
+Filesystem discovery, normalized project-file paths, CLOC-style physical-line categories, static runtime ESM dependency analysis, and Istanbul line-coverage enrichment are implemented.
 
 ## Project discovery
 
@@ -66,7 +66,11 @@ Package subpaths collapse to their package name. For example, `drizzle-orm/pg-co
 
 ## Line metrics
 
-The initial line metric counts non-blank physical lines and includes comments. A later CLOC-style milestone classifies blank, comment, and code lines separately. At that point, code lines become the default node-sizing metric and the UI may combine any of the three categories.
+Each physical line belongs exclusively to code, comment, or blank. A line containing syntax and a comment is code; a line containing only parser-confirmed comment material and whitespace is comment; all other whitespace-only lines are blank. Empty source has zero physical lines. LF, CRLF, and lone CR terminate physical lines, while a final separator does not create a trailing phantom line.
+
+JavaScript and TypeScript dependency requests, diagnostics, and comments come from one Oxc parse. Parser spans prevent comment markers inside strings, template literals, regular expressions, and JSX syntax from being misclassified. An AST-confirmed JSX expression container whose sole content is one block comment counts as comment material, while ordinary object-literal braces remain code. Oxc reports a hashbang as a line comment, so Show Me classifies it consistently as comment.
+
+Code lines size project-file nodes by default. Report controls can combine any non-empty subset of code, comment, and blank counts.
 
 Node size grows with the base-2 logarithm of the selected line count. This keeps ordinary files in the broad 20-to-500-line range visually comparable, while files around 1,000 lines and above stand out without dominating the graph.
 

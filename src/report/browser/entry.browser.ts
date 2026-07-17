@@ -2,7 +2,15 @@ import { DirectedGraph } from "graphology"
 import Sigma from "sigma"
 import { createEdgeArrowProgram } from "sigma/rendering"
 import type { Extent, NodeDisplayData } from "sigma/types"
-import type { ReportNode, ReportPresentation } from "../report-presentation.js"
+import { layoutReportGraph } from "../report-layout.js"
+import {
+  activeLineCount,
+  nodeSizeForLines,
+  REPORT_LINE_CATEGORIES,
+  type ReportLineCategory,
+  type ReportNode,
+  type ReportPresentation,
+} from "../report-presentation.js"
 
 declare global {
   interface Window {
@@ -27,7 +35,9 @@ const tooltip = requiredElement("tooltip")
 const selectedEmpty = requiredElement("selected-empty")
 const selectedDetails = requiredElement("selected-details")
 const selectedPath = requiredElement("selected-path")
-const selectedLines = requiredElement("selected-lines")
+const selectedCodeLines = requiredElement("selected-code-lines")
+const selectedCommentLines = requiredElement("selected-comment-lines")
+const selectedBlankLines = requiredElement("selected-blank-lines")
 const selectedImports = requiredElement("selected-imports")
 const selectedConsumers = requiredElement("selected-consumers")
 const selectedCoverage = requiredElement("selected-coverage")
@@ -35,6 +45,10 @@ const selectedImportedFiles = requiredElement("selected-imported-files")
 const selectedConsumerFiles = requiredElement("selected-consumer-files")
 const clearSelection = requiredElement("clear-selection")
 const fileList = requiredElement("file-list")
+const lineCategoryControls = REPORT_LINE_CATEGORIES.map((category) => ({
+  category,
+  input: requiredCheckbox("line-category-" + category),
+}))
 const nodeById = new Map(presentation.nodes.map((node) => [node.id, node]))
 const graph = new DirectedGraph<BrowserNodeAttributes>()
 
@@ -56,6 +70,7 @@ for (const edge of presentation.edges) {
 
 let selectedNodeId: string | undefined
 let hoveredNodeId: string | undefined
+let viewState: ReportViewState = { lineCategories: ["code"] }
 const renderer = new Sigma<BrowserNodeAttributes>(graph, graphContainer, {
   allowInvalidContainer: false,
   defaultEdgeType: "arrow",
@@ -78,6 +93,18 @@ const renderer = new Sigma<BrowserNodeAttributes>(graph, graphContainer, {
   zIndex: true,
 })
 renderer.setCustomBBox(layoutBounds(presentation.nodes))
+
+for (const control of lineCategoryControls) {
+  control.input.addEventListener("change", () => {
+    const lineCategories = selectedLineCategories()
+    if (lineCategories.length === 0) {
+      control.input.checked = true
+      return
+    }
+    applyReportView({ lineCategories })
+  })
+}
+applyReportView(viewState)
 
 renderer.on("enterNode", ({ node, event }) => {
   const reportNode = nodeById.get(node)
@@ -150,7 +177,9 @@ function selectNode(nodeId: string | undefined): void {
   selectedEmpty.hidden = true
   selectedDetails.hidden = false
   selectedPath.textContent = node.path
-  selectedLines.textContent = String(node.lineMetrics.nonBlank)
+  selectedCodeLines.textContent = String(node.lineMetrics.code)
+  selectedCommentLines.textContent = String(node.lineMetrics.comment)
+  selectedBlankLines.textContent = String(node.lineMetrics.blank)
   selectedImports.textContent = String(node.imports)
   selectedConsumers.textContent = String(node.consumers)
   selectedCoverage.textContent = node.coverage === undefined ? "Not available" : `${node.coverage}%`
@@ -199,7 +228,9 @@ function showTooltip(node: ReportNode): void {
   const metrics = document.createElement("div")
   metrics.className = "tooltip-metrics"
   const metricElements = [
-    metric("Non-blank lines", node.lineMetrics.nonBlank),
+    metric("Code", node.lineMetrics.code),
+    metric("Comments", node.lineMetrics.comment),
+    metric("Blank", node.lineMetrics.blank),
     metric("Imports", node.imports),
     metric("Consumers", node.consumers),
   ]
@@ -247,7 +278,59 @@ function requiredElement(id: string): HTMLElement {
   return element
 }
 
-function layoutBounds(nodes: readonly ReportNode[]): { readonly x: Extent; readonly y: Extent } {
+function requiredCheckbox(id: string): HTMLInputElement {
+  const element = requiredElement(id)
+  if (!(element instanceof HTMLInputElement) || element.type !== "checkbox") {
+    throw new Error("Static report #" + id + " is not a checkbox.")
+  }
+  return element
+}
+
+type ReportViewState = {
+  readonly lineCategories: readonly ReportLineCategory[]
+}
+
+function selectedLineCategories(): readonly ReportLineCategory[] {
+  return lineCategoryControls.filter(({ input }) => input.checked).map(({ category }) => category)
+}
+
+function applyReportView(nextState: ReportViewState): void {
+  viewState = nextState
+  const layout = layoutReportGraph(
+    presentation.nodes.map((node) => ({
+      id: node.id,
+      size: nodeSizeForLines(activeLineCount(node.lineMetrics, viewState.lineCategories)),
+    })),
+    presentation.edges,
+  )
+
+  for (const node of layout) {
+    graph.mergeNodeAttributes(node.id, { x: node.x, y: node.y, size: node.size })
+  }
+  for (const control of lineCategoryControls) {
+    control.input.disabled = viewState.lineCategories.length === 1 && control.input.checked
+  }
+  document.documentElement.dataset.activeLineCategories = viewState.lineCategories.join(",")
+  graphContainer.dataset.layoutSignature = layoutSignature(layout)
+  renderer.setCustomBBox(layoutBounds(layout))
+  renderer.refresh()
+}
+
+function layoutSignature(
+  nodes: ReadonlyArray<{ readonly id: string; readonly x: number; readonly y: number; readonly size: number }>,
+): string {
+  let hash = 2_166_136_261
+  for (const character of JSON.stringify(nodes)) {
+    hash ^= character.charCodeAt(0)
+    hash = Math.imul(hash, 16_777_619)
+  }
+  return (hash >>> 0).toString(16)
+}
+
+function layoutBounds(nodes: ReadonlyArray<{ readonly x: number; readonly y: number; readonly size: number }>): {
+  readonly x: Extent
+  readonly y: Extent
+} {
   if (nodes.length === 0) {
     const halfSpan = MINIMUM_LAYOUT_SPAN / 2
     return { x: [-halfSpan, halfSpan], y: [-halfSpan, halfSpan] }

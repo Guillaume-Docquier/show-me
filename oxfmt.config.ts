@@ -9,5 +9,5 @@ export default defineConfig({
   sortImports: {
     newlinesBetween: false,
   },
-  ignorePatterns: ["pnpm-lock.yaml", "dist", ".pnpm-store", "*.gen.*"],
+  ignorePatterns: ["pnpm-lock.yaml", "dist", ".pnpm-store", "*.gen.*", "fixtures/projects/cloc-line-breakdown/src/blank-only.ts"],
 })

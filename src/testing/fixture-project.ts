@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url"
  * Names of deterministic fixture projects owned by the test suite.
  */
 export type FixtureProjectName =
+  | "cloc-line-breakdown"
   | "coverage-project"
   | "discovery"
   | "minimal-javascript"

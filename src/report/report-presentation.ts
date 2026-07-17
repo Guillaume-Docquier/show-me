@@ -1,13 +1,7 @@
-import { createRng, mulberry32Prng } from "@guillaume-docquier/tools-ts"
-import { DirectedGraph } from "graphology"
-import forceAtlas2 from "graphology-layout-forceatlas2"
-import type { ForceAtlas2SynchronousLayoutParameters } from "graphology-layout-forceatlas2"
 import type { ProjectAnalysis } from "../analysis/project-analysis.js"
+import { layoutReportGraph } from "./report-layout.js"
 
-const LAYOUT_SEED = 1_984_091
-const LAYOUT_ITERATIONS = 500
 const NODE_SIZE_SCALE = 3
-const NODE_LAYOUT_PADDING = 4
 const DEFAULT_NODE_COLOR = "#8fa3b8"
 const UNCOVERED_NODE_COLOR = "#dc2626"
 const PARTIALLY_COVERED_NODE_COLOR = "#eab308"
@@ -17,13 +11,25 @@ const PATH_TRUNCATION_PREFIX = "..."
 /**
  * The schema version of the presentation embedded in a static report.
  */
-export const REPORT_PRESENTATION_SCHEMA_VERSION = 2
+export const REPORT_PRESENTATION_SCHEMA_VERSION = 3
+
+/**
+ * Line categories that report controls can combine for project-file sizing.
+ */
+export const REPORT_LINE_CATEGORIES = ["code", "comment", "blank"] as const
+
+/**
+ * One selectable project-file line category.
+ */
+export type ReportLineCategory = (typeof REPORT_LINE_CATEGORIES)[number]
 
 /**
  * Renderer-neutral line metrics for one project file.
  */
 export type ReportNodeLineMetrics = {
-  readonly nonBlank: number
+  readonly code: number
+  readonly comment: number
+  readonly blank: number
 }
 
 /**
@@ -45,14 +51,6 @@ export type ReportNode = {
   readonly y: number
 }
 
-// SAFETY: This CommonJS package exposes its callable layout as the ESM default at runtime, but its declaration is interpreted as a module namespace under NodeNext.
-const forceAtlas2Layout = forceAtlas2 as unknown as {
-  readonly assign: (
-    graph: DirectedGraph<LayoutNodeAttributes>,
-    parameters: ForceAtlas2SynchronousLayoutParameters<LayoutNodeAttributes>,
-  ) => void
-}
-
 /**
  * Renderer-neutral data for one directed dependency edge.
  */
@@ -72,18 +70,11 @@ export type ReportPresentation = {
   readonly edges: readonly ReportEdge[]
 }
 
-type LayoutNodeAttributes = {
-  readonly size: number
-  readonly renderedSize: number
-  x: number
-  y: number
-}
-
 /**
  * Convert internal analysis into deterministic, renderer-neutral graph data.
  *
  * Node size is a radius-like renderer value that grows logarithmically with the
- * file's non-blank line count.
+ * file's code-line count by default.
  *
  * @param analysis - Language-neutral project analysis.
  * @returns Presentation data with deterministic node coordinates.
@@ -102,51 +93,25 @@ export function buildReportPresentation(analysis: ProjectAnalysis): ReportPresen
     source: dependency.source,
     target: dependency.target,
   }))
-  const graph = new DirectedGraph<LayoutNodeAttributes>()
-  const random = createRng(mulberry32Prng(LAYOUT_SEED))
-
-  for (const file of analysis.files) {
-    const renderedSize = nodeSizeForLines(file.lines.nonBlank)
-    graph.addNode(file.path, {
-      size: renderedSize + NODE_LAYOUT_PADDING,
-      renderedSize,
-      x: random.float() * 2 - 1,
-      y: random.float() * 2 - 1,
-    })
-  }
-
-  for (const edge of edges) {
-    graph.addDirectedEdgeWithKey(edge.id, edge.source, edge.target)
-  }
-
-  if (graph.order === 1) {
-    const onlyNode = graph.nodes()[0]
-    if (onlyNode !== undefined) {
-      graph.setNodeAttribute(onlyNode, "x", 0)
-      graph.setNodeAttribute(onlyNode, "y", 0)
-    }
-  } else if (graph.order > 1) {
-    forceAtlas2Layout.assign(graph, {
-      iterations: LAYOUT_ITERATIONS,
-      settings: {
-        adjustSizes: true,
-        // ForceAtlas2's Barnes-Hut branch does not include node radii in its repulsion calculation.
-        barnesHutOptimize: false,
-        gravity: 1,
-        scalingRatio: 4,
-        slowDown: 1,
-      },
-    })
-  }
+  const layout = layoutReportGraph(
+    analysis.files.map((file) => ({ id: file.path, size: nodeSizeForLines(file.lines.code) })),
+    edges,
+  )
+  const layoutByNodeId = new Map(layout.map((node) => [node.id, node]))
 
   const nodes = analysis.files.map((file) => {
-    const layout = graph.getNodeAttributes(file.path)
+    const nodeLayout = layoutByNodeId.get(file.path)
+    if (nodeLayout === undefined) {
+      throw new Error("Report layout omitted project file " + file.path + ".")
+    }
     return {
       id: file.path,
       path: file.path,
       tooltipPath: truncatePathFromStart(file.path),
       lineMetrics: {
-        nonBlank: file.lines.nonBlank,
+        code: file.lines.code,
+        comment: file.lines.comment,
+        blank: file.lines.blank,
       },
       imports: importedFilesBySource.get(file.path)?.length ?? 0,
       consumers: consumerFilesByTarget.get(file.path)?.length ?? 0,
@@ -154,9 +119,9 @@ export function buildReportPresentation(analysis: ProjectAnalysis): ReportPresen
       consumerFiles: consumerFilesByTarget.get(file.path) ?? [],
       coverage: file.coverage?.lines,
       color: coverageColor(file.coverage?.lines),
-      size: layout.renderedSize,
-      x: layout.x,
-      y: layout.y,
+      size: nodeLayout.size,
+      x: nodeLayout.x,
+      y: nodeLayout.y,
     }
   })
 
@@ -171,11 +136,22 @@ export function buildReportPresentation(analysis: ProjectAnalysis): ReportPresen
 /**
  * Calculate a renderer size that grows logarithmically with a line count.
  *
- * @param lines - Active non-blank line count.
+ * @param lines - Active combined line count.
  * @returns A positive renderer size.
  */
 export function nodeSizeForLines(lines: number): number {
   return Math.log2(Math.max(lines, 1) + 1) * NODE_SIZE_SCALE
+}
+
+/**
+ * Sum the selected line categories for project-file sizing.
+ *
+ * @param metrics - Complete exclusive line metrics.
+ * @param categories - Non-empty active line categories.
+ * @returns The combined active physical-line count.
+ */
+export function activeLineCount(metrics: ReportNodeLineMetrics, categories: readonly ReportLineCategory[]): number {
+  return categories.reduce((total, category) => total + metrics[category], 0)
 }
 
 /**

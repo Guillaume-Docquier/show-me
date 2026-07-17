@@ -20,7 +20,7 @@ test("supports graph hover, selection, clearing, and side-panel navigation", asy
     const longPath = "fixtures/projects/minimal-typescript/src/index.ts"
     const sourceDirectory = join(projectDirectory, "fixtures", "projects", "minimal-typescript", "src")
     await mkdir(sourceDirectory, { recursive: true })
-    await writeFile(join(sourceDirectory, "index.ts"), "export const message = 'hello'\n", "utf8")
+    await writeFile(join(sourceDirectory, "index.ts"), "// comment\n\nexport const message = 'hello'\n\n", "utf8")
 
     const analysis = await analyzeProject({ projectRoot: projectDirectory })
     if (Result.isFailure(analysis)) {
@@ -57,7 +57,9 @@ test("supports graph hover, selection, clearing, and side-panel navigation", asy
     await expect(tooltip).toBeVisible()
     const tooltipPath = tooltip.locator("strong")
     await expect(tooltipPath).toHaveText("...ures/projects/minimal-typescript/src/index.ts")
-    await expect(tooltip.locator(".tooltip-metrics")).toContainText("Non-blank lines")
+    await expect(tooltip.locator(".tooltip-metrics")).toContainText("Code")
+    await expect(tooltip.locator(".tooltip-metrics")).toContainText("Comments")
+    await expect(tooltip.locator(".tooltip-metrics")).toContainText("Blank")
     expect(await tooltipPath.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
     const tooltipBounds = await tooltip.boundingBox()
     if (tooltipBounds === null) {
@@ -69,8 +71,55 @@ test("supports graph hover, selection, clearing, and side-panel navigation", asy
     await page.mouse.click(centerX, centerY)
     await expect(page.locator("html")).toHaveAttribute("data-selected-node", longPath)
     await expect(page.locator("#selected-path")).toHaveText(longPath)
-    await expect(page.locator("#selected-details dt").first()).toHaveText("Non-blank lines")
-    await expect(page.locator("#selected-lines")).toHaveText("1")
+    await expect(page.locator("#selected-details dt").first()).toHaveText("Code lines")
+    await expect(page.locator("#selected-code-lines")).toHaveText("1")
+    await expect(page.locator("#selected-comment-lines")).toHaveText("1")
+    await expect(page.locator("#selected-blank-lines")).toHaveText("2")
+
+    const codeControl = page.getByRole("checkbox", { name: "Code" })
+    const commentControl = page.getByRole("checkbox", { name: "Comments" })
+    const blankControl = page.getByRole("checkbox", { name: "Blank" })
+    await expect(codeControl).toBeChecked()
+    await expect(codeControl).toBeDisabled()
+    await expect(commentControl).not.toBeChecked()
+    await expect(blankControl).not.toBeChecked()
+    const initialLayoutSignature = await graph.getAttribute("data-layout-signature")
+    const seenStates = new Set<string>()
+    const recordState = async (state: string): Promise<void> => {
+      await expect(page.locator("html")).toHaveAttribute("data-active-line-categories", state)
+      await expect(page.locator("html")).toHaveAttribute("data-selected-node", longPath)
+      seenStates.add(state)
+    }
+    await recordState("code")
+    await commentControl.check()
+    await recordState("code,comment")
+    expect(await graph.getAttribute("data-layout-signature")).not.toBe(initialLayoutSignature)
+    await blankControl.check()
+    await recordState("code,comment,blank")
+    await codeControl.uncheck()
+    await recordState("comment,blank")
+    await commentControl.uncheck()
+    await recordState("blank")
+    await codeControl.check()
+    await recordState("code,blank")
+    await commentControl.check()
+    await codeControl.uncheck()
+    await blankControl.uncheck()
+    await recordState("comment")
+    await codeControl.check()
+    await commentControl.uncheck()
+    await recordState("code")
+    expect([...seenStates].sort()).toEqual([
+      "blank",
+      "code",
+      "code,blank",
+      "code,comment",
+      "code,comment,blank",
+      "comment",
+      "comment,blank",
+    ])
+    await expect(graph).toHaveAttribute("data-layout-signature", initialLayoutSignature ?? "")
+    await expect(codeControl).toBeDisabled()
 
     await page.getByRole("button", { name: "Clear selection" }).click()
     await expect(page.locator("html")).not.toHaveAttribute("data-selected-node", /.+/u)

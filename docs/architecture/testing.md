@@ -36,6 +36,8 @@ Assertions should optimize failure output:
 
 Tests must control path normalization, line endings, initial graph positions, and any randomness used by layout. Rendering fixtures should use a fixed seed and stable viewport dimensions where visual or browser assertions require them.
 
+Line-classification fixtures use hand-written code, comment, and blank expectations. Algorithm tests cover LF, CRLF, lone CR, final separators, parser offsets, and syntax ambiguities, and assert that the three exclusive categories sum to the documented physical-line total. Browser sizing tests exercise every non-empty category combination, selection persistence, changed intermediate geometry, and exact deterministic geometry when toggling back.
+
 Canvas regressions should be split across observable seams: presentation tests assert geometry such as representative node sizes and circle intersections, while real-browser tests assert hover, tooltip placement, path visibility, selection, and navigation. Screenshots are reserved for failures that cannot be identified more precisely.
 
 ## Performance verification

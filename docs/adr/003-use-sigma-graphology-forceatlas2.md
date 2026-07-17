@@ -35,3 +35,9 @@ ForceAtlas2's Barnes-Hut implementation does not include individual node radii i
 The initial implementation keeps Barnes-Hut disabled and runs a deterministic exact size-aware layout with collision padding. The presentation stores separate collision and rendered radii so layout padding does not change the line-count-to-size contract. Sigma renders sizes relative to layout positions and fits a custom bounding box that includes node radii, keeping the collision geometry and rendered geometry in the same coordinate system.
 
 This is a correctness-first refinement of the accepted library choice, not a new layout architecture. Exact repulsion is quadratic per iteration: a 1,000-node synthetic layout took approximately 1.96 seconds on the development machine. Milestone 011 must profile the complete product and replace this path only with a measured optimization that preserves size-aware collision safety.
+
+### 2026-07-16 interactive-sizing amendment
+
+The deterministic collision-safe ForceAtlas2 operation is shared by initial presentation construction and browser report-view transitions. Selecting a different non-empty combination of code, comment, and blank line metrics changes rendered radii, so the browser recomputes coordinates and its radius-aware bounding box instead of retaining geometry created for stale sizes.
+
+This keeps layout and interaction state in the presentation and renderer layers as originally decided. The shared fixed seed makes returning to an earlier visible graph and size selection reproduce identical geometry. Future visibility controls, beginning with external packages, reuse the same report-view transition rather than introducing independent graph mutation paths.

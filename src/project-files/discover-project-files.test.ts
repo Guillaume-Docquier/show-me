@@ -101,7 +101,7 @@ it("resolves a relative discovery root before returning absolute file paths", as
   }
 })
 
-it("reports explicit, deterministic non-blank line counts for the discovery fixture", async () => {
+it("reports explicit, deterministic line categories for the discovery fixture", async () => {
   // Arrange
   const projectRoot = fixtureProjectPath("discovery")
 
@@ -111,18 +111,18 @@ it("reports explicit, deterministic non-blank line counts for the discovery fixt
   // Assert
   expect(Result.isSuccess(result)).toBe(true)
   if (Result.isSuccess(result)) {
-    expect(result.value.files.map(({ path, lines }) => ({ path, nonBlank: lines.nonBlank }))).toEqual([
-      { path: "keep.generated.ts", nonBlank: 1 },
-      { path: "nested/child.ts", nonBlank: 1 },
-      { path: "nested/kept.js", nonBlank: 1 },
-      { path: "src/app.js", nonBlank: 2 },
-      { path: "src/component.jsx", nonBlank: 1 },
-      { path: "src/legacy.cjs", nonBlank: 1 },
-      { path: "src/legacy.cts", nonBlank: 1 },
-      { path: "src/main.ts", nonBlank: 3 },
-      { path: "src/module.mjs", nonBlank: 1 },
-      { path: "src/module.mts", nonBlank: 1 },
-      { path: "src/view.tsx", nonBlank: 1 },
+    expect(result.value.files.map(({ path, lines }) => ({ path, lines }))).toEqual([
+      { path: "keep.generated.ts", lines: { code: 1, comment: 0, blank: 0 } },
+      { path: "nested/child.ts", lines: { code: 1, comment: 0, blank: 0 } },
+      { path: "nested/kept.js", lines: { code: 1, comment: 0, blank: 0 } },
+      { path: "src/app.js", lines: { code: 1, comment: 1, blank: 1 } },
+      { path: "src/component.jsx", lines: { code: 1, comment: 0, blank: 0 } },
+      { path: "src/legacy.cjs", lines: { code: 1, comment: 0, blank: 0 } },
+      { path: "src/legacy.cts", lines: { code: 1, comment: 0, blank: 0 } },
+      { path: "src/main.ts", lines: { code: 2, comment: 1, blank: 0 } },
+      { path: "src/module.mjs", lines: { code: 1, comment: 0, blank: 0 } },
+      { path: "src/module.mts", lines: { code: 1, comment: 0, blank: 0 } },
+      { path: "src/view.tsx", lines: { code: 1, comment: 0, blank: 0 } },
     ])
   }
 })

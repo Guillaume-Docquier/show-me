@@ -22,6 +22,11 @@ it("builds one offline document without embedding source contents", async () => 
   expect(html).toContain("<!doctype html>")
   expect(html).toContain("index.js")
   expect(html).toContain(browserBundle)
+  expect(html).toContain('<fieldset id="line-category-controls">')
+  expect(html).toContain('<input id="line-category-code" type="checkbox" value="code" checked>')
+  expect(html).toContain('<dt>Code lines</dt><dd id="selected-code-lines"></dd>')
+  expect(html).toContain('<dt>Comment lines</dt><dd id="selected-comment-lines"></dd>')
+  expect(html).toContain('<dt>Blank lines</dt><dd id="selected-blank-lines"></dd>')
   expect(html).not.toContain('src="')
   expect(html).not.toMatch(/https?:\/\//u)
   expect(html).not.toContain('export const message = "hello"')
@@ -57,7 +62,7 @@ it("escapes hostile report data and browser bundle script closings", () => {
         id: unsafeText,
         path: unsafeText,
         tooltipPath: unsafeText,
-        lineMetrics: { nonBlank: 1 },
+        lineMetrics: { code: 1, comment: 0, blank: 0 },
         imports: 0,
         consumers: 0,
         importedFiles: [],

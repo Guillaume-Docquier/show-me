@@ -1,9 +1,9 @@
 import { extname, resolve } from "node:path"
 import { Result } from "@guillaume-docquier/tools-ts"
 import type { AnalysisDiagnostic, ProjectDependency, ProjectFileAnalysis } from "../../analysis/project-analysis.js"
-import { countNonBlankPhysicalLines } from "../../project-files/count-non-blank-physical-lines.js"
 import { ProjectFilePath } from "../../project-files/project-file-path.js"
 import { compareText } from "../../text/compare-text.js"
+import { classifyJavaScriptTypeScriptLines } from "./classify-javascript-typescript-lines.js"
 import { collectStaticRuntimeRequests, type StaticRuntimeRequestSource } from "./collect-static-runtime-requests.js"
 import { hasJavaScriptTypeScriptExecutableExtension, type JavaScriptTypeScriptLanguageId } from "./javascript-typescript-file-support.js"
 import { createJavaScriptTypeScriptResolver, type JavaScriptTypeScriptResolver } from "./javascript-typescript-resolver.js"
@@ -68,6 +68,7 @@ export function analyzeJavaScriptTypeScript(
   const discoveredPathByAbsolutePath = new Map(files.map((file) => [resolve(file.absolutePath), file.path]))
   const dependencyByKey = new Map<string, ProjectDependency>()
   const diagnostics: AnalysisDiagnostic[] = []
+  const analyzedFiles: ProjectFileAnalysis[] = []
 
   for (const file of files) {
     const requests = collectStaticRuntimeRequests(file)
@@ -80,6 +81,12 @@ export function analyzeJavaScriptTypeScript(
     }
 
     diagnostics.push(...requests.value.diagnostics)
+    analyzedFiles.push({
+      path: file.path,
+      language: file.language,
+      lines: classifyJavaScriptTypeScriptLines(file.sourceText, requests.value.comments, requests.value.jsxCommentContainers),
+      coverage: undefined,
+    })
     for (const request of requests.value.requests) {
       const dependency = resolveProjectDependency(file, request, resolverResult.value, discoveredPathByAbsolutePath)
       if (Result.isFailure(dependency)) {
@@ -99,14 +106,7 @@ export function analyzeJavaScriptTypeScript(
   }
 
   return Result.Success({
-    files: files.map((file) => ({
-      path: file.path,
-      language: file.language,
-      lines: {
-        nonBlank: countNonBlankPhysicalLines(file.sourceText),
-      },
-      coverage: undefined,
-    })),
+    files: analyzedFiles,
     dependencies: [...dependencyByKey.values()].sort(compareDependencies),
     diagnostics: diagnostics.sort(compareDiagnostics),
   })

@@ -51,13 +51,13 @@ The report does not embed source file contents. Analysis JSON is an internal bou
 
 ## Initial visualization
 
-The renderer uses Sigma.js over a Graphology directed graph. The presentation builder runs ForceAtlas2 with a fixed seed, exact size-aware repulsion, and additional collision padding. Barnes-Hut optimization remains disabled because the library's optimized path does not include individual node radii and allowed large nodes to cover their neighbors.
+The renderer uses Sigma.js over a Graphology directed graph. A shared presentation-layer layout module runs ForceAtlas2 with a fixed seed, exact size-aware repulsion, and additional collision padding for both initial construction and interactive resizing. Barnes-Hut optimization remains disabled because the library's optimized path does not include individual node radii and allowed large nodes to cover their neighbors.
 
 The initial graph is flat:
 
 - directories do not create group nodes or visual containers;
 - nodes have no persistent labels;
-- project file node size grows logarithmically with the active line metric;
+- project file node size grows logarithmically with code lines by default;
 - project files with coverage use a red-yellow-green scale while missing coverage remains neutral gray;
 - collision radii include spacing without changing rendered node area;
 - edges point from an importing file to the imported file;
@@ -65,9 +65,15 @@ The initial graph is flat:
 
 Sigma renders node size relative to layout positions. A custom bounding box includes the node radii and preserves a minimum layout span, so viewport fitting cannot reintroduce overlaps or magnify a tiny graph excessively. Layout geometry remains in the presentation and renderer layers; it does not enter project analysis.
 
+## Line-category controls
+
+An accessible checkbox group combines code, comment, and blank physical lines for node sizing. Code is selected by default. Every non-empty combination is valid; the only selected checkbox is disabled so the active metric cannot become empty.
+
+Changing the active categories recomputes node sizes, deterministic collision-safe layout, and the custom viewport bounding box through one browser report-view state transition. Selection remains active across relayout. Returning to an earlier category combination reproduces the same geometry exactly. Tooltips and the selected-file panel always show the complete three-category breakdown regardless of the sizing selection.
+
 ## Hover and selection
 
-A hover tooltip follows the pointer with a small offset and flips or clamps at viewport edges. It shows a width-constrained, tail-preserving file path plus line count, import count, consumer count, and coverage when available. A long path truncates its beginning so the filename and nearest directories remain visible; CSS may wrap exceptionally long filenames but must not apply a second end-truncating ellipsis.
+A hover tooltip follows the pointer with a small offset and flips or clamps at viewport edges. It shows a width-constrained, tail-preserving file path plus the complete code, comment, and blank line breakdown, import count, consumer count, and coverage when available. A long path truncates its beginning so the filename and nearest directories remain visible; CSS may wrap exceptionally long filenames but must not apply a second end-truncating ellipsis.
 
 Clicking a project file node selects and visually highlights only that node. Selection opens a side panel containing:
 

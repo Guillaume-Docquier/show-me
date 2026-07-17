@@ -1,7 +1,11 @@
 import { Result } from "@guillaume-docquier/tools-ts"
-import { parseSync } from "oxc-parser"
+import { parseSync, Visitor } from "oxc-parser"
 import type { AnalysisDiagnostic } from "../../analysis/project-analysis.js"
 import type { ProjectFilePath } from "../../project-files/project-file-path.js"
+import type {
+  JavaScriptTypeScriptCommentSpan,
+  JavaScriptTypeScriptJsxCommentContainerSpan,
+} from "./classify-javascript-typescript-lines.js"
 
 /**
  * Source data required for syntax-level runtime-request collection.
@@ -17,6 +21,8 @@ export type StaticRuntimeRequestSource = {
  */
 export type StaticRuntimeRequestCollection = {
   readonly requests: readonly string[]
+  readonly comments: readonly JavaScriptTypeScriptCommentSpan[]
+  readonly jsxCommentContainers: readonly JavaScriptTypeScriptJsxCommentContainerSpan[]
   readonly diagnostics: readonly AnalysisDiagnostic[]
 }
 
@@ -46,12 +52,54 @@ export function collectStaticRuntimeRequests(file: StaticRuntimeRequestSource): 
     }
   }
 
+  const comments: readonly JavaScriptTypeScriptCommentSpan[] = parsed.value.comments.map((comment) => ({
+    start: comment.start,
+    end: comment.end,
+    type: comment.type === "Line" ? "line" : "block",
+  }))
+  const jsxExpressionContainers: Array<{ readonly start: number; readonly end: number }> = []
+  new Visitor({
+    JSXExpressionContainer(container): void {
+      if (container.expression.type === "JSXEmptyExpression") {
+        jsxExpressionContainers.push({ start: container.start, end: container.end })
+      }
+    },
+  }).visit(parsed.value.program)
+
   return Result.Success({
     requests: [...requests],
+    comments,
+    jsxCommentContainers: collectJsxCommentContainers(file.sourceText, comments, jsxExpressionContainers),
     diagnostics: parsed.value.errors.map((error) => ({
       code: "JAVASCRIPT_TYPESCRIPT_PARSE_ERROR",
       message: error.message,
       file: file.path,
     })),
   })
+}
+
+function collectJsxCommentContainers(
+  sourceText: string,
+  comments: readonly JavaScriptTypeScriptCommentSpan[],
+  containers: ReadonlyArray<{ readonly start: number; readonly end: number }>,
+): readonly JavaScriptTypeScriptJsxCommentContainerSpan[] {
+  const result: JavaScriptTypeScriptJsxCommentContainerSpan[] = []
+  for (const container of containers) {
+    const containedComments = comments.filter((comment) => comment.start > container.start && comment.end < container.end)
+    const onlyComment = containedComments[0]
+    if (
+      containedComments.length === 1 &&
+      onlyComment?.type === "block" &&
+      sourceText.slice(container.start + 1, onlyComment.start).trim().length === 0 &&
+      sourceText.slice(onlyComment.end, container.end - 1).trim().length === 0
+    ) {
+      result.push({
+        start: container.start,
+        end: container.end,
+        commentStart: onlyComment.start,
+        commentEnd: onlyComment.end,
+      })
+    }
+  }
+  return result
 }

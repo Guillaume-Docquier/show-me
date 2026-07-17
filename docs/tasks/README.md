@@ -6,7 +6,6 @@ This directory tracks milestones, implementation progress, verification evidence
 
 | Milestone                                                             | Status      | Outcome                                                                       |
 | --------------------------------------------------------------------- | ----------- | ----------------------------------------------------------------------------- |
-| [006 CLOC line breakdown](./006-cloc-line-breakdown.md)               | Not started | Separate code, comment, and blank lines and control node sizing.              |
 | [007 External packages](./007-external-packages.md)                   | Not started | Add optional synthetic external-package nodes without analyzing dependencies. |
 | [008 pnpm workspaces](./008-pnpm-workspaces.md)                       | Not started | Analyze and filter all packages in one pnpm workspace.                        |
 | [009 Import compatibility](./009-import-compatibility.md)             | Not started | Add CommonJS, dynamic imports, and broader resolution behavior.               |
@@ -26,6 +25,7 @@ Completed milestone files are retained under [`done/`](./done/) as implementatio
 | [003 Static visualization](./done/003-static-visualization.md)                 | 2026-07-16 | Added the self-contained interactive graph and hardened its layout. |
 | [004 Static ESM imports](./done/004-static-esm-imports.md)                     | 2026-07-16 | Added static runtime ESM dependencies and relationship details.     |
 | [005 Coverage](./done/005-coverage.md)                                         | 2026-07-16 | Added optional Istanbul line coverage and coverage-colored nodes.   |
+| [006 CLOC line breakdown](./done/006-cloc-line-breakdown.md)                   | 2026-07-16 | Added exclusive line categories and interactive node sizing.        |
 | [012 GitHub Pages report](./done/012-github-pages-report.md)                   | 2026-07-16 | Publishes a validated live visualization of the repository.         |
 | [013 Default test-file exclusions](./done/013-default-test-file-exclusions.md) | 2026-07-16 | Removes conventionally named test files from default analysis.      |
 | [016 Codebase consolidation](./done/016-codebase-consolidation.md)             | 2026-07-16 | Hardened analysis, report, CLI, build, and package boundaries.      |

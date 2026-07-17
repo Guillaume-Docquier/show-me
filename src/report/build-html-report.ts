@@ -45,7 +45,15 @@ export function createHtmlReport(presentation: ReportPresentation, browserBundle
 <style>${REPORT_STYLES}</style>
 </head>
 <body>
-<header><h1>${title}</h1><p>${presentation.nodes.length} project files</p></header>
+<header>
+  <div class="report-heading"><h1>${title}</h1><p>${presentation.nodes.length} project files</p></div>
+  <fieldset id="line-category-controls">
+    <legend>Size nodes by</legend>
+    <label><input id="line-category-code" type="checkbox" value="code" checked>Code</label>
+    <label><input id="line-category-comment" type="checkbox" value="comment">Comments</label>
+    <label><input id="line-category-blank" type="checkbox" value="blank">Blank</label>
+  </fieldset>
+</header>
 <main>
   <section id="graph" aria-label="Project file dependency graph"></section>
   <aside id="details" aria-label="File details">
@@ -54,7 +62,9 @@ export function createHtmlReport(presentation: ReportPresentation, browserBundle
     <section id="selected-details" hidden>
       <div class="detail-path" id="selected-path"></div>
       <dl>
-        <dt>Non-blank lines</dt><dd id="selected-lines"></dd>
+        <dt>Code lines</dt><dd id="selected-code-lines"></dd>
+        <dt>Comment lines</dt><dd id="selected-comment-lines"></dd>
+        <dt>Blank lines</dt><dd id="selected-blank-lines"></dd>
         <dt>Imports</dt><dd id="selected-imports"></dd>
         <dt>Consumers</dt><dd id="selected-consumers"></dd>
         <dt>Coverage</dt><dd id="selected-coverage"></dd>

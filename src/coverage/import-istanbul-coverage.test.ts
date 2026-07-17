@@ -272,7 +272,7 @@ function analysisWithOneFile(path: string): ProjectAnalysis {
       {
         path: projectFilePath.value,
         language: "typescript",
-        lines: { nonBlank: 1 },
+        lines: { code: 1, comment: 0, blank: 0 },
         coverage: undefined,
       },
     ],
@@ -281,7 +281,7 @@ function analysisWithOneFile(path: string): ProjectAnalysis {
 
 function emptyProjectAnalysis(projectName: string): ProjectAnalysis {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     project: { name: projectName },
     files: [],
     dependencies: [],

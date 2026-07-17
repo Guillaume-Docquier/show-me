@@ -6,9 +6,9 @@ This document describes the target architecture. The implementation is being bui
 
 ## Current implementation
 
-The initial end-to-end product is operational. The CLI discovers supported project files, excludes conventional test files by default, counts non-blank physical lines, analyzes static runtime ESM imports and re-exports through Oxc, optionally imports Istanbul line coverage, and writes a self-contained interactive graph report. The repository publishes its latest validated report through GitHub Pages.
+The initial end-to-end product is operational. The CLI discovers supported project files, excludes conventional test files by default, classifies code, comment, and blank physical lines, analyzes static runtime ESM imports and re-exports through Oxc, optionally imports Istanbul line coverage, and writes a self-contained interactive graph report. The repository publishes its latest validated report through GitHub Pages.
 
-Analysis, presentation, CLI, build, and package boundaries have been consolidated and are covered through Node and real-browser tests. CLOC-style metrics, external packages, workspace behavior, and user-facing file-selection controls remain planned rather than partially implemented.
+Analysis, presentation, CLI, build, and package boundaries have been consolidated and are covered through Node and real-browser tests. CLOC-style metrics and interactive line-category sizing are implemented. External packages, workspace behavior, and user-facing file-selection controls remain planned rather than partially implemented.
 
 ## System flow
 
@@ -39,7 +39,7 @@ The current product:
 - analyzes one JavaScript or TypeScript project with one root `tsconfig.json` or `jsconfig.json`;
 - discovers executable `.js`, `.jsx`, `.mjs`, `.cjs`, `.ts`, `.tsx`, `.mts`, and `.cts` files;
 - excludes TypeScript declaration files, non-code assets, and supported files whose basename contains `.test.` or `.spec.` case-insensitively, while marker-like directories and bare `test.ts` or `spec.ts` names remain included;
-- counts non-blank physical lines, including comments;
+- classifies every physical line exclusively as code, comment, or blank;
 - recognizes syntax-level runtime static ESM imports and re-exports;
 - excludes explicitly type-only imports and re-exports;
 - renders a flat, force-directed file graph without persistent node labels;
@@ -48,7 +48,7 @@ The current product:
 
 Analysis has a typed internal file-selection policy that can restore default-excluded tests without bypassing permanent discovery exclusions. CLI selection options and persistent configuration remain milestones 014 and 015.
 
-CommonJS, dynamic imports, external package nodes, CLOC-style line classification, pnpm workspaces, and richer visualization controls are planned as later milestones rather than partially supported in the first implementation.
+CommonJS, dynamic imports, external package nodes, pnpm workspaces, and richer visualization controls are planned as later milestones rather than partially supported in the current implementation.
 
 ## Package shape
 

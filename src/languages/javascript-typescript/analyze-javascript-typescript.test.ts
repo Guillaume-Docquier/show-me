@@ -21,13 +21,13 @@ describe("analyzeJavaScriptTypeScript", () => {
           {
             path: "src/runtime.ts",
             language: "typescript",
-            lines: { nonBlank: 1 },
+            lines: { code: 1, comment: 0, blank: 0 },
             coverage: undefined,
           },
           {
             path: "src/side-effect.js",
             language: "javascript",
-            lines: { nonBlank: 1 },
+            lines: { code: 1, comment: 0, blank: 0 },
             coverage: undefined,
           },
         ]),
@@ -77,13 +77,13 @@ describe("analyzeJavaScriptTypeScript", () => {
           {
             path: "index.js",
             language: "javascript",
-            lines: { nonBlank: 2 },
+            lines: { code: 2, comment: 0, blank: 1 },
             coverage: undefined,
           },
           {
             path: "target.js",
             language: "javascript",
-            lines: { nonBlank: 1 },
+            lines: { code: 1, comment: 0, blank: 0 },
             coverage: undefined,
           },
         ],
