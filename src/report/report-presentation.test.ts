@@ -2,7 +2,18 @@ import { Result } from "@guillaume-docquier/tools-ts"
 import { expect, it } from "vitest"
 import type { ProjectAnalysis } from "../analysis/project-analysis.js"
 import { ProjectFilePath } from "../project-files/project-file-path.js"
-import { buildReportPresentation, coverageColor, nodeSizeForLines, truncatePathFromStart } from "./report-presentation.js"
+import {
+  buildReportPresentation,
+  coverageColor,
+  nodeSizeForLines,
+  REPORT_PRESENTATION_SCHEMA_VERSION,
+  truncatePathFromStart,
+} from "./report-presentation.js"
+
+it("uses presentation schema version 2 for the structured line-metric contract", () => {
+  // Assert
+  expect(REPORT_PRESENTATION_SCHEMA_VERSION).toBe(2)
+})
 
 it.each([
   [0, 3],
@@ -66,9 +77,10 @@ it("builds deterministic coordinates and dependency metrics", () => {
 
   // Assert
   expect(firstPresentation).toEqual(secondPresentation)
-  expect(firstPresentation.nodes.map(({ path, imports, consumers }) => ({ path, imports, consumers }))).toEqual([
-    { path: "src/source.ts", imports: 1, consumers: 0 },
-    { path: "src/deep/target.ts", imports: 0, consumers: 1 },
+  expect(firstPresentation.schemaVersion).toBe(REPORT_PRESENTATION_SCHEMA_VERSION)
+  expect(firstPresentation.nodes.map(({ path, lineMetrics, imports, consumers }) => ({ path, lineMetrics, imports, consumers }))).toEqual([
+    { path: "src/source.ts", lineMetrics: { nonBlank: 4 }, imports: 1, consumers: 0 },
+    { path: "src/deep/target.ts", lineMetrics: { nonBlank: 16 }, imports: 0, consumers: 1 },
   ])
   expect(firstPresentation.edges).toEqual([
     {

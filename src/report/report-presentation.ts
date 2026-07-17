@@ -15,14 +15,25 @@ const COVERED_NODE_COLOR = "#16a34a"
 const PATH_TRUNCATION_PREFIX = "..."
 
 /**
+ * The schema version of the presentation embedded in a static report.
+ */
+export const REPORT_PRESENTATION_SCHEMA_VERSION = 2
+
+/**
+ * Renderer-neutral line metrics for one project file.
+ */
+export type ReportNodeLineMetrics = {
+  readonly nonBlank: number
+}
+
+/**
  * Renderer-neutral data for one project-file node.
  */
 export type ReportNode = {
   readonly id: string
   readonly path: string
   readonly tooltipPath: string
-  readonly fileName: string
-  readonly lines: number
+  readonly lineMetrics: ReportNodeLineMetrics
   readonly imports: number
   readonly consumers: number
   readonly importedFiles: readonly string[]
@@ -55,7 +66,7 @@ export type ReportEdge = {
  * Complete data embedded in one static report.
  */
 export type ReportPresentation = {
-  readonly schemaVersion: 1
+  readonly schemaVersion: typeof REPORT_PRESENTATION_SCHEMA_VERSION
   readonly projectName: string
   readonly nodes: readonly ReportNode[]
   readonly edges: readonly ReportEdge[]
@@ -86,6 +97,11 @@ export function buildReportPresentation(analysis: ProjectAnalysis): ReportPresen
     appendMapValue(consumerFilesByTarget, dependency.target, dependency.source)
   }
 
+  const edges = analysis.dependencies.map((dependency, index) => ({
+    id: `dependency-${index}`,
+    source: dependency.source,
+    target: dependency.target,
+  }))
   const graph = new DirectedGraph<LayoutNodeAttributes>()
   const random = createRng(mulberry32Prng(LAYOUT_SEED))
 
@@ -99,9 +115,9 @@ export function buildReportPresentation(analysis: ProjectAnalysis): ReportPresen
     })
   }
 
-  analysis.dependencies.forEach((dependency, index) => {
-    graph.addDirectedEdgeWithKey(`dependency-${index}`, dependency.source, dependency.target)
-  })
+  for (const edge of edges) {
+    graph.addDirectedEdgeWithKey(edge.id, edge.source, edge.target)
+  }
 
   if (graph.order === 1) {
     const onlyNode = graph.nodes()[0]
@@ -129,8 +145,9 @@ export function buildReportPresentation(analysis: ProjectAnalysis): ReportPresen
       id: file.path,
       path: file.path,
       tooltipPath: truncatePathFromStart(file.path),
-      fileName: fileNameFromPath(file.path),
-      lines: file.lines.nonBlank,
+      lineMetrics: {
+        nonBlank: file.lines.nonBlank,
+      },
       imports: importedFilesBySource.get(file.path)?.length ?? 0,
       consumers: consumerFilesByTarget.get(file.path)?.length ?? 0,
       importedFiles: importedFilesBySource.get(file.path) ?? [],
@@ -143,14 +160,8 @@ export function buildReportPresentation(analysis: ProjectAnalysis): ReportPresen
     }
   })
 
-  const edges = analysis.dependencies.map((dependency, index) => ({
-    id: `dependency-${index}`,
-    source: dependency.source,
-    target: dependency.target,
-  }))
-
   return {
-    schemaVersion: 1,
+    schemaVersion: REPORT_PRESENTATION_SCHEMA_VERSION,
     projectName: analysis.project.name,
     nodes,
     edges,
@@ -158,7 +169,7 @@ export function buildReportPresentation(analysis: ProjectAnalysis): ReportPresen
 }
 
 /**
- * Calculate a renderer size that grows logarithmically with LOC.
+ * Calculate a renderer size that grows logarithmically with a line count.
  *
  * @param lines - Active non-blank line count.
  * @returns A positive renderer size.

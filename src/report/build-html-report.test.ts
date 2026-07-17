@@ -3,7 +3,8 @@ import { expect, it } from "vitest"
 import { analyzeProject } from "../analysis/analyze-project.js"
 import { importIstanbulCoverage } from "../coverage/import-istanbul-coverage.js"
 import { fixtureProjectPath } from "../testing/fixture-project.js"
-import { buildHtmlReport } from "./build-html-report.js"
+import { buildHtmlReport, createHtmlReport } from "./build-html-report.js"
+import { REPORT_PRESENTATION_SCHEMA_VERSION, type ReportPresentation } from "./report-presentation.js"
 
 it("builds one offline document without embedding source contents", async () => {
   // Arrange
@@ -43,6 +44,46 @@ it("escapes script-closing project data before embedding it", async () => {
   // Assert
   expect(html).not.toContain("</script><script>unsafe()")
   expect(html).toContain("\\u003c/script\\u003e")
+})
+
+it("escapes hostile report data and browser bundle script closings", () => {
+  // Arrange
+  const unsafeText = "</title><script>unsafe()</script>&" + String.fromCodePoint(0x20_28, 0x20_29)
+  const presentation: ReportPresentation = {
+    schemaVersion: REPORT_PRESENTATION_SCHEMA_VERSION,
+    projectName: unsafeText,
+    nodes: [
+      {
+        id: unsafeText,
+        path: unsafeText,
+        tooltipPath: unsafeText,
+        lineMetrics: { nonBlank: 1 },
+        imports: 0,
+        consumers: 0,
+        importedFiles: [],
+        consumerFiles: [],
+        coverage: undefined,
+        color: "#8fa3b8",
+        size: 3,
+        x: 0,
+        y: 0,
+      },
+    ],
+    edges: [],
+  }
+  const browserBundle = 'window.bundleValue = "</ScRiPt><script>bundleUnsafe()</script>"'
+
+  // Act
+  const html = createHtmlReport(presentation, browserBundle)
+
+  // Assert
+  expect(html).not.toContain(unsafeText)
+  expect(html).not.toContain("</ScRiPt>")
+  expect(html).not.toContain("</script><script>bundleUnsafe()")
+  expect(html).toContain("&lt;/title&gt;&lt;script&gt;unsafe()&lt;/script&gt;&amp;")
+  expect(html).toContain("\\u003c/title\\u003e\\u003cscript\\u003eunsafe()\\u003c/script\\u003e\\u0026\\u2028\\u2029")
+  expect(html).toContain("<\\/script><script>bundleUnsafe()<\\/script>")
+  expect(html.match(/<\/script>/gu)).toHaveLength(2)
 })
 
 it("keeps missing coverage neutral instead of treating it as zero coverage", async () => {

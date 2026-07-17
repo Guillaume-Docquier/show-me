@@ -54,7 +54,7 @@ export function createHtmlReport(presentation: ReportPresentation, browserBundle
     <section id="selected-details" hidden>
       <div class="detail-path" id="selected-path"></div>
       <dl>
-        <dt>Lines of code</dt><dd id="selected-lines"></dd>
+        <dt>Non-blank lines</dt><dd id="selected-lines"></dd>
         <dt>Imports</dt><dd id="selected-imports"></dd>
         <dt>Consumers</dt><dd id="selected-consumers"></dd>
         <dt>Coverage</dt><dd id="selected-coverage"></dd>

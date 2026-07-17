@@ -19,7 +19,6 @@ type BrowserNodeAttributes = {
   readonly y: number
   readonly size: number
   readonly color: string
-  readonly originalColor: string
 }
 
 const presentation = window.showMePresentation
@@ -45,7 +44,6 @@ for (const node of presentation.nodes) {
     y: node.y,
     size: node.size,
     color: node.color,
-    originalColor: node.color,
   })
 }
 for (const edge of presentation.edges) {
@@ -152,7 +150,7 @@ function selectNode(nodeId: string | undefined): void {
   selectedEmpty.hidden = true
   selectedDetails.hidden = false
   selectedPath.textContent = node.path
-  selectedLines.textContent = String(node.lines)
+  selectedLines.textContent = String(node.lineMetrics.nonBlank)
   selectedImports.textContent = String(node.imports)
   selectedConsumers.textContent = String(node.consumers)
   selectedCoverage.textContent = node.coverage === undefined ? "Not available" : `${node.coverage}%`
@@ -200,7 +198,11 @@ function showTooltip(node: ReportNode): void {
 
   const metrics = document.createElement("div")
   metrics.className = "tooltip-metrics"
-  const metricElements = [metric("LOC", node.lines), metric("Imports", node.imports), metric("Consumers", node.consumers)]
+  const metricElements = [
+    metric("Non-blank lines", node.lineMetrics.nonBlank),
+    metric("Imports", node.imports),
+    metric("Consumers", node.consumers),
+  ]
   if (node.coverage !== undefined) {
     metricElements.push(metric("Coverage", `${node.coverage}%`))
   }

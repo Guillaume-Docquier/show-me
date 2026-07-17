@@ -53,6 +53,7 @@ test("supports graph hover, selection, clearing, and side-panel navigation", asy
     await expect(tooltip).toBeVisible()
     const tooltipPath = tooltip.locator("strong")
     await expect(tooltipPath).toHaveText("...ures/projects/minimal-typescript/src/index.ts")
+    await expect(tooltip.locator(".tooltip-metrics")).toContainText("Non-blank lines")
     expect(await tooltipPath.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
     const tooltipBounds = await tooltip.boundingBox()
     if (tooltipBounds === null) {
@@ -64,6 +65,8 @@ test("supports graph hover, selection, clearing, and side-panel navigation", asy
     await page.mouse.click(centerX, centerY)
     await expect(page.locator("html")).toHaveAttribute("data-selected-node", longPath)
     await expect(page.locator("#selected-path")).toHaveText(longPath)
+    await expect(page.locator("#selected-details dt").first()).toHaveText("Non-blank lines")
+    await expect(page.locator("#selected-lines")).toHaveText("1")
 
     await page.getByRole("button", { name: "Clear selection" }).click()
     await expect(page.locator("html")).not.toHaveAttribute("data-selected-node", /.+/u)
