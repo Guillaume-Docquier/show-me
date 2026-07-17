@@ -8,14 +8,16 @@
     "dist"
   ],
   "type": "module",
+  "exports": {},
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "build": "pnpm build:node && pnpm build:browser",
+    "build": "pnpm clean && pnpm build:node && pnpm build:browser",
     "build:browser": "esbuild src/report/browser/entry.browser.ts --bundle --format=iife --target=es2022 --outfile=dist/report/browser.js",
     "build:node": "tsc --project tsconfig.build.json",
     "checks": "pnpm format:fix && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm test:browser",
+    "clean": "node --eval \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
     "format": "oxfmt --check",
     "format:fix": "oxfmt",
     "lint": "oxlint --max-warnings 0",

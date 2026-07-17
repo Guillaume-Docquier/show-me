@@ -52,6 +52,8 @@ CommonJS, dynamic imports, external package nodes, CLOC-style line classificatio
 
 The npm package is `@guillaume-docquier/show-me`. It exposes the `show-me` executable through its `bin` entry.
 
+The package has no programmatic JavaScript exports. Its analysis, presentation, and report-building modules remain internal.
+
 The repository remains one package until a concrete need justifies splitting it. Source directories should express the architectural boundaries without creating package-level ceremony.
 
 ## Dependency direction
