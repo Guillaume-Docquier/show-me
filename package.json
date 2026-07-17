@@ -24,6 +24,7 @@
     "lint:fix": "pnpm lint --fix",
     "prepack": "pnpm build",
     "prepare": "husky",
+    "show-me": "pnpm build && node ./dist/cli/entry.cli.js",
     "test": "vitest run --silent",
     "test:browser": "playwright test",
     "test:coverage": "pnpm test --coverage",
