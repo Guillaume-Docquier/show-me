@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { TypeGuard } from "@guillaume-docquier/tools-ts"
 import { describe, expect, it } from "vitest"
+import packageMetadata from "../../package.json" with { type: "json" }
 import { fixtureProjectPath } from "../testing/fixture-project.js"
 import { withTemporaryDirectory } from "../testing/temporary-directory.js"
 import { type CliOutput, runCli } from "./run-cli.js"
@@ -14,7 +15,55 @@ type CapturedOutput = {
   readonly standardError: string[]
 }
 
-describe("runCli report generation", () => {
+describe("runCli", () => {
+  it("reports invalid arguments on standard error", async () => {
+    // Arrange
+    const captured = captureOutput()
+
+    // Act
+    const exitCode = await runCli(["--open"], captured.output, { browserBundle: TEST_BROWSER_BUNDLE })
+
+    // Assert
+    expect(exitCode).toBe(1)
+    expect(captured.standardOutput).toEqual([])
+    expect(captured.standardError).toEqual(["Unknown option: --open\n"])
+  })
+
+  it("prints help without analyzing a project", async () => {
+    // Arrange
+    const captured = captureOutput()
+
+    // Act
+    const exitCode = await runCli(["--help"], captured.output, { browserBundle: TEST_BROWSER_BUNDLE })
+
+    // Assert
+    expect(exitCode).toBe(0)
+    expect(captured.standardOutput).toEqual([
+      `Usage: show-me [project-path] [options]
+
+Options:
+  --output <path>    Write the report to this path
+  --coverage <path>  Read coverage from this path
+  -h, --help         Show this help
+  -v, --version      Show the version
+`,
+    ])
+    expect(captured.standardError).toEqual([])
+  })
+
+  it("prints the package version without analyzing a project", async () => {
+    // Arrange
+    const captured = captureOutput()
+
+    // Act
+    const exitCode = await runCli(["--version"], captured.output, { browserBundle: TEST_BROWSER_BUNDLE })
+
+    // Assert
+    expect(exitCode).toBe(0)
+    expect(captured.standardOutput).toEqual([`${packageMetadata.version}\n`])
+    expect(captured.standardError).toEqual([])
+  })
+
   it("analyzes and writes show-me.html in the invocation directory by default", async () => {
     await withTemporaryDirectory(async (currentDirectory) => {
       // Arrange
@@ -75,6 +124,28 @@ describe("runCli report generation", () => {
       expect(exitCode).toBe(0)
       expect(html).not.toContain("stale report")
       expect(html).toContain("index.js")
+    })
+  })
+
+  it("reports a write failure without printing completion", async () => {
+    await withTemporaryDirectory(async (currentDirectory) => {
+      // Arrange
+      await writeFile(join(currentDirectory, "index.js"), "export const value = true")
+      const outputDirectory = join(currentDirectory, "report-directory")
+      await mkdir(outputDirectory)
+      const captured = captureOutput()
+
+      // Act
+      const exitCode = await runCli(["--output", outputDirectory], captured.output, {
+        currentDirectory,
+        browserBundle: TEST_BROWSER_BUNDLE,
+      })
+
+      // Assert
+      expect(exitCode).toBe(1)
+      expect(captured.standardOutput.join("")).not.toContain("Report written")
+      expect(captured.standardOutput.join("")).not.toContain("Completed in")
+      expect(captured.standardError.join("")).toContain(`Could not write report to ${outputDirectory}:`)
     })
   })
 

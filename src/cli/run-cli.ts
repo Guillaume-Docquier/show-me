@@ -1,6 +1,7 @@
 import { writeFile } from "node:fs/promises"
 import { resolve } from "node:path"
 import { isNodeJSError, Result, Time, Timer, UnitOfTime } from "@guillaume-docquier/tools-ts"
+import packageMetadata from "../../package.json" with { type: "json" }
 import { analyzeProject, type AnalyzeProjectError } from "../analysis/analyze-project.js"
 import { importIstanbulCoverage, type IstanbulCoverageImportError } from "../coverage/import-istanbul-coverage.js"
 import { buildHtmlReport, loadBrowserBundle, type BrowserBundleReadError } from "../report/build-html-report.js"
@@ -9,7 +10,7 @@ import { parseCliArguments } from "./parse-cli-arguments.js"
 /**
  * Current package version reported by the CLI.
  */
-export const SHOW_ME_VERSION = "0.0.1"
+export const SHOW_ME_VERSION = packageMetadata.version
 
 /**
  * Text-output boundary used by the CLI entrypoint.
