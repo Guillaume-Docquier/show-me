@@ -1,5 +1,4 @@
 import type { ProjectAnalysis } from "../analysis/project-analysis.js"
-import { layoutReportGraph } from "./report-layout.js"
 
 const NODE_SIZE_SCALE = 3
 const DEFAULT_NODE_COLOR = "#8fa3b8"
@@ -9,7 +8,7 @@ const COVERED_NODE_COLOR = "#16a34a"
 const PATH_TRUNCATION_PREFIX = "..."
 
 /** Fixed renderer size for synthetic external-package nodes. */
-export const EXTERNAL_PACKAGE_NODE_SIZE = 15
+export const EXTERNAL_PACKAGE_NODE_SIZE = 8
 /** Accessible non-coverage color for synthetic external-package nodes. */
 export const EXTERNAL_PACKAGE_NODE_COLOR = "#c084fc"
 
@@ -37,8 +36,6 @@ type ReportNodeBase = {
   readonly consumerNodeIds: readonly string[]
   readonly color: string
   readonly size: number
-  readonly x: number
-  readonly y: number
 }
 
 /** Renderer-neutral data for one project-file node. */
@@ -74,8 +71,6 @@ export type ReportPresentation = {
   readonly edges: readonly ReportEdge[]
 }
 
-type UnpositionedReportNode = Omit<ReportProjectFileNode, "x" | "y"> | Omit<ReportExternalPackageNode, "x" | "y">
-
 /**
  * Convert internal analysis into deterministic, renderer-neutral graph data.
  *
@@ -103,7 +98,7 @@ export function buildReportPresentation(analysis: ProjectAnalysis): ReportPresen
     appendMapValue(consumerNodeIdsByTarget, edge.target, edge.source)
   }
 
-  const nodes: UnpositionedReportNode[] = [
+  const nodes: ReportNode[] = [
     ...analysis.files.map((file): Omit<ReportProjectFileNode, "x" | "y"> => {
       const id = projectFileNodeId(file.path)
       return {
@@ -135,23 +130,11 @@ export function buildReportPresentation(analysis: ProjectAnalysis): ReportPresen
       }
     }),
   ]
-  const layout = layoutReportGraph(
-    nodes.map((node) => ({ id: node.id, size: node.size })),
-    edges,
-  )
-  const layoutByNodeId = new Map(layout.map((node) => [node.id, node]))
-  const positionedNodes = nodes.map((node): ReportNode => {
-    const nodeLayout = layoutByNodeId.get(node.id)
-    if (nodeLayout === undefined) {
-      throw new Error("Report layout omitted node " + node.id + ".")
-    }
-    return { ...node, x: nodeLayout.x, y: nodeLayout.y }
-  })
 
   return {
     schemaVersion: REPORT_PRESENTATION_SCHEMA_VERSION,
     projectName: analysis.project.name,
-    nodes: positionedNodes,
+    nodes,
     edges,
   }
 }

@@ -3,8 +3,7 @@ import { circular } from "graphology-layout"
 import forceAtlas2 from "graphology-layout-forceatlas2"
 import Sigma from "sigma"
 import { createEdgeArrowProgram } from "sigma/rendering"
-import type { Extent, NodeDisplayData } from "sigma/types"
-import { layoutReportGraph } from "../report-layout.js"
+import type { NodeDisplayData } from "sigma/types"
 import {
   activeLineCount,
   nodeSizeForLines,
@@ -23,11 +22,8 @@ declare global {
 
 const TOOLTIP_OFFSET = 14
 const VIEWPORT_MARGIN = 10
-const MINIMUM_LAYOUT_SPAN = 600
 
 type BrowserNodeAttributes = {
-  readonly x: number
-  readonly y: number
   readonly size: number
   readonly color: string
 }
@@ -76,7 +72,9 @@ const renderer = new Sigma<BrowserNodeAttributes>(graph, graphContainer, {
   labelRenderedSizeThreshold: Number.POSITIVE_INFINITY,
   itemSizesReference: "positions",
   nodeReducer(node, attributes): Partial<NodeDisplayData> {
-    return node === selectedNodeId ? { ...attributes, color: "#f4c66a", highlighted: true, zIndex: 1 } : attributes
+    return node === selectedNodeId
+      ? { x: 0, y: 0, ...attributes, color: "#f4c66a", highlighted: true, zIndex: 1 }
+      : { x: 0, y: 0, ...attributes }
   },
   zIndex: true,
 })
@@ -130,32 +128,26 @@ applyReportView(viewState)
 document.documentElement.dataset.showMeReady = "true"
 
 function applyReportView(nextState: ReportViewState): void {
+  graph.clear()
   viewState = nextState
-  const visibleNodes = presentation.nodes.filter((node) => node.kind === "project-file" || viewState.externalPackages)
+  const visibleNodes = presentation.nodes
+    .filter((node) => node.kind === "project-file" || viewState.externalPackages)
+    .map((node) => ({
+      id: node.id,
+      color: node.color,
+      size: node.kind === "project-file" ? nodeSizeForLines(activeLineCount(node.lineMetrics, viewState.lineCategories)) : node.size,
+    }))
   visibleNodeIds = new Set(visibleNodes.map((node) => node.id))
   const visibleEdges = presentation.edges.filter((edge) => visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target))
-  const layout = layoutReportGraph(
-    visibleNodes.map((node) => ({
-      id: node.id,
-      size: node.kind === "project-file" ? nodeSizeForLines(activeLineCount(node.lineMetrics, viewState.lineCategories)) : node.size,
-    })),
-    visibleEdges,
-  )
-  const layoutByNodeId = new Map(layout.map((node) => [node.id, node]))
 
-  graph.clear()
   for (const node of visibleNodes) {
-    const nodeLayout = layoutByNodeId.get(node.id)
-    if (nodeLayout === undefined) {
-      throw new Error("Report layout omitted visible node " + node.id + ".")
-    }
-    graph.addNode(node.id, { x: nodeLayout.x, y: nodeLayout.y, size: nodeLayout.size, color: node.color })
+    graph.addNode(node.id, { size: node.size, color: node.color })
   }
   for (const edge of visibleEdges) {
     graph.addDirectedEdgeWithKey(edge.id, edge.source, edge.target, {
       type: "arrow",
       color: edge.kind === "external-package" ? "#7c4aa5" : "#405267",
-      size: 1,
+      size: 2,
     })
   }
 
@@ -174,8 +166,7 @@ function applyReportView(nextState: ReportViewState): void {
   document.documentElement.dataset.activeLineCategories = viewState.lineCategories.join(",")
   document.documentElement.dataset.externalPackages = viewState.externalPackages ? "visible" : "hidden"
   graphContainer.dataset.visibleNodeCount = String(visibleNodes.length)
-  graphContainer.dataset.layoutSignature = layoutSignature(layout)
-  renderer.setCustomBBox(layoutBounds(layout))
+  graphContainer.dataset.layoutSignature = layoutSignature(visibleNodes)
   renderer.refresh()
 
   circular.assign(graph)
@@ -374,34 +365,11 @@ function requiredCheckbox(id: string): HTMLInputElement {
   return element
 }
 
-function layoutSignature(
-  nodes: ReadonlyArray<{ readonly id: string; readonly x: number; readonly y: number; readonly size: number }>,
-): string {
+function layoutSignature(nodes: ReadonlyArray<{ readonly id: string; readonly size: number }>): string {
   let hash = 2_166_136_261
   for (const character of JSON.stringify(nodes)) {
     hash ^= character.charCodeAt(0)
     hash = Math.imul(hash, 16_777_619)
   }
   return (hash >>> 0).toString(16)
-}
-
-function layoutBounds(nodes: ReadonlyArray<{ readonly x: number; readonly y: number; readonly size: number }>): {
-  readonly x: Extent
-  readonly y: Extent
-} {
-  if (nodes.length === 0) {
-    const halfSpan = MINIMUM_LAYOUT_SPAN / 2
-    return { x: [-halfSpan, halfSpan], y: [-halfSpan, halfSpan] }
-  }
-  const minimumX = Math.min(...nodes.map((node) => node.x - node.size))
-  const maximumX = Math.max(...nodes.map((node) => node.x + node.size))
-  const minimumY = Math.min(...nodes.map((node) => node.y - node.size))
-  const maximumY = Math.max(...nodes.map((node) => node.y + node.size))
-  return { x: centeredExtent(minimumX, maximumX), y: centeredExtent(minimumY, maximumY) }
-}
-
-function centeredExtent(minimum: number, maximum: number): Extent {
-  const center = (minimum + maximum) / 2
-  const halfSpan = Math.max(maximum - minimum, MINIMUM_LAYOUT_SPAN) / 2
-  return [center - halfSpan, center + halfSpan]
 }
