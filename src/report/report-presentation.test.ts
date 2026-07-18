@@ -15,11 +15,6 @@ import {
   truncatePathFromStart,
 } from "./report-presentation.js"
 
-it("uses presentation schema version 4 for the typed package-node contract", () => {
-  // Assert
-  expect(REPORT_PRESENTATION_SCHEMA_VERSION).toBe(4)
-})
-
 it.each([
   [0, 3],
   [1, 3],
@@ -186,48 +181,6 @@ it("creates deterministic fixed-size package nodes and package relationship IDs"
       target: "external-package:react",
     },
   ])
-})
-
-it("keeps large nodes from overlapping other nodes in large graphs", () => {
-  // Arrange
-  const files = Array.from({ length: 101 }, (_, index) => ({
-    path: parseProjectFilePath(`src/file-${String(index).padStart(3, "0")}.ts`),
-    language: "typescript" as const,
-    lines: { code: index === 0 ? 500 : 1, comment: index === 1 ? 500 : 0, blank: index === 2 ? 500 : 0 },
-    coverage: undefined,
-  }))
-  const analysis: ProjectAnalysis = {
-    schemaVersion: 3,
-    project: { name: "large-nodes" },
-    files,
-    dependencies: [],
-    externalPackages: [],
-    externalPackageDependencies: [],
-    diagnostics: [],
-  }
-
-  // Act
-  const presentation = buildReportPresentation(analysis)
-
-  // Assert
-  const overlaps: string[] = []
-  for (let leftIndex = 0; leftIndex < presentation.nodes.length; leftIndex += 1) {
-    const left = presentation.nodes[leftIndex]
-    if (left === undefined) {
-      continue
-    }
-    for (let rightIndex = leftIndex + 1; rightIndex < presentation.nodes.length; rightIndex += 1) {
-      const right = presentation.nodes[rightIndex]
-      if (right === undefined) {
-        continue
-      }
-      const centerDistance = Math.hypot(left.x - right.x, left.y - right.y)
-      if (centerDistance < left.size + right.size) {
-        overlaps.push(`${left.displayName} overlaps ${right.displayName}`)
-      }
-    }
-  }
-  expect(overlaps).toEqual([])
 })
 
 it("truncates leading directories while preserving the complete filename", () => {

@@ -1,4 +1,6 @@
 import { DirectedGraph } from "graphology"
+import { circular } from "graphology-layout"
+import forceAtlas2 from "graphology-layout-forceatlas2"
 import Sigma from "sigma"
 import { createEdgeArrowProgram } from "sigma/rendering"
 import type { Extent, NodeDisplayData } from "sigma/types"
@@ -175,6 +177,20 @@ function applyReportView(nextState: ReportViewState): void {
   graphContainer.dataset.layoutSignature = layoutSignature(layout)
   renderer.setCustomBBox(layoutBounds(layout))
   renderer.refresh()
+
+  circular.assign(graph)
+  forceAtlas2.assign(graph, {
+    iterations: 5000,
+    settings: {
+      adjustSizes: true,
+      // ForceAtlas2's Barnes-Hut branch does not include node radii in its repulsion calculation.
+      barnesHutOptimize: false,
+      gravity: 3,
+      scalingRatio: 6,
+      slowDown: 1.5,
+      outboundAttractionDistribution: true,
+    },
+  })
 }
 
 function selectNode(nodeId: string | undefined): void {
