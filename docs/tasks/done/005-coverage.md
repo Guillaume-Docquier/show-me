@@ -33,4 +33,4 @@ The CLI optionally enriches project files from Istanbul `coverage-final.json`, a
 
 ## Discovered gaps
 
-- Additional coverage formats remain deferred until observed product needs justify them in milestone 010.
+- LCOV import and deterministic multi-format discovery are planned in [milestone 018](../018-lcov-coverage.md).

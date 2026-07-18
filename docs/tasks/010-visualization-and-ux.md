@@ -18,7 +18,6 @@ This milestone is intentionally broad. Select and refine work from observed usag
 - [ ] Add search or focus modes when real navigation needs justify them.
 - [ ] Add additional layout strategies only when measured graph shapes require them.
 - [ ] Revisit report packaging only if single-file size or browser constraints become concrete problems.
-- [ ] Evaluate additional coverage formats from observed user needs.
 
 ## Required tests
 
