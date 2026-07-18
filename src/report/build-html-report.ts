@@ -45,6 +45,10 @@ export function buildHtmlReport(analysis: ProjectAnalysis, browserBundle: string
       <legend>Show</legend>
       <label><input id="external-packages-toggle" type="checkbox">External packages</label>
     </fieldset>
+    <fieldset id="workspace-package-fieldset" hidden>
+      <legend>Workspace packages</legend>
+      <span id="workspace-package-controls"></span>
+    </fieldset>
   </div>
 </header>
 <main>

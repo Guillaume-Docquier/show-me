@@ -11,6 +11,7 @@ export type FixtureProjectName =
   | "minimal-javascript"
   | "minimal-typescript"
   | "path-aliases"
+  | "pnpm-workspace"
   | "static-esm"
   | "static-esm-no-config"
   | "test-file-exclusions"

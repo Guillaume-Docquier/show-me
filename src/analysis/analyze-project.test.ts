@@ -16,10 +16,11 @@ it("opens a real fixture through the analysis application seam", async () => {
   // Assert
   expect(result).toEqual(
     Result.Success({
-      schemaVersion: 3,
+      schemaVersion: 4,
       project: {
         name: "minimal-javascript",
       },
+      workspacePackages: [],
       files: [
         {
           path: "index.js",
@@ -34,6 +35,53 @@ it("opens a real fixture through the analysis application seam", async () => {
       diagnostics: [],
     }),
   )
+})
+
+it("analyzes one pnpm workspace with ownership, package aliases, and cross-package dependencies", async () => {
+  // Arrange
+  const projectRoot = fixtureProjectPath("pnpm-workspace")
+
+  // Act
+  const result = await analyzeProject({ projectRoot })
+
+  // Assert
+  expect(Result.isSuccess(result)).toBe(true)
+  if (Result.isSuccess(result)) {
+    expect(result.value.workspacePackages).toEqual([
+      { path: ".", name: "@fixture/root" },
+      { path: "apps/backend", name: "@fixture/backend" },
+      { path: "apps/frontend", name: "@fixture/frontend" },
+      { path: "packages/platform/shared", name: "@fixture/shared" },
+    ])
+    expect(result.value.files.map(({ path, workspacePackage }) => ({ path, workspacePackage }))).toEqual([
+      { path: "apps/backend/src/api.ts", workspacePackage: "apps/backend" },
+      { path: "apps/backend/src/value.ts", workspacePackage: "apps/backend" },
+      { path: "apps/frontend/src/main.ts", workspacePackage: "apps/frontend" },
+      { path: "apps/frontend/src/value.ts", workspacePackage: "apps/frontend" },
+      { path: "packages/excluded/src/index.ts", workspacePackage: "." },
+      { path: "packages/platform/shared/src/index.ts", workspacePackage: "packages/platform/shared" },
+      { path: "packages/platform/shared/src/value.ts", workspacePackage: "packages/platform/shared" },
+      { path: "root.ts", workspacePackage: "." },
+    ])
+    expect(result.value.dependencies).toEqual([
+      { source: "apps/backend/src/api.ts", target: "apps/backend/src/value.ts", kind: "runtime" },
+      { source: "apps/backend/src/api.ts", target: "packages/platform/shared/src/value.ts", kind: "runtime" },
+      { source: "apps/frontend/src/main.ts", target: "apps/frontend/src/value.ts", kind: "runtime" },
+      { source: "apps/frontend/src/main.ts", target: "packages/platform/shared/src/index.ts", kind: "runtime" },
+      {
+        source: "packages/platform/shared/src/index.ts",
+        target: "packages/platform/shared/src/value.ts",
+        kind: "runtime",
+      },
+      { source: "root.ts", target: "packages/platform/shared/src/index.ts", kind: "runtime" },
+    ])
+    expect(result.value.externalPackages).toEqual([{ name: "backend-library" }, { name: "frontend-library" }])
+    expect(result.value.externalPackageDependencies).toEqual([
+      { source: "apps/backend/src/api.ts", target: "backend-library", kind: "runtime" },
+      { source: "apps/frontend/src/main.ts", target: "frontend-library", kind: "runtime" },
+    ])
+    expect(result.value.diagnostics).toEqual([])
+  }
 })
 
 it("classifies CLOC-style metrics through the project analysis seam", async () => {

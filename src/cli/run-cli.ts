@@ -139,6 +139,18 @@ function formatAnalysisError(error: AnalyzeProjectError): string {
       return `Could not initialize dependency resolution for ${error.projectRoot}: ${error.cause.message}`
     case "JavaScriptTypeScriptResolverFailed":
       return `Could not resolve ${JSON.stringify(error.request)} from ${error.file}: ${error.cause.message}`
+    case "PnpmWorkspaceReadFailed":
+      return `Could not read pnpm workspace file ${error.workspaceFile}: ${error.cause.message}`
+    case "PnpmWorkspaceInvalid":
+      return `Could not parse pnpm workspace file ${error.workspaceFile}: ${error.cause.message}`
+    case "WorkspacePackageDiscoveryFailed":
+      return `Could not discover packages from ${error.workspaceFile}: ${error.cause.message}`
+    case "WorkspacePackageManifestReadFailed":
+      return `Could not read workspace package manifest ${error.packageManifest}: ${error.cause.message}`
+    case "WorkspacePackageManifestInvalid":
+      return `Could not parse workspace package manifest ${error.packageManifest}: ${error.cause.message}`
+    case "DuplicateWorkspacePackageName":
+      return `Workspace package name ${JSON.stringify(error.packageName)} is used by ${error.packagePaths.join(" and ")}.`
   }
 }
 

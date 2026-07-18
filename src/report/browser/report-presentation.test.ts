@@ -56,8 +56,9 @@ it("derives deterministic identities, display data, and relationship indexes fro
   const sourcePath = parseProjectFilePath("src/source.ts")
   const targetPath = parseProjectFilePath("src/deep/target.ts")
   const analysis: ProjectAnalysis = {
-    schemaVersion: 3,
+    schemaVersion: 4,
     project: { name: "deterministic" },
+    workspacePackages: [],
     files: [
       {
         path: sourcePath,

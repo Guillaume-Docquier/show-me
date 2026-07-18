@@ -44,6 +44,8 @@ type ReportViewState = {
   readonly lineCategories: readonly ReportLineCategory[]
   /** Controls graph membership and therefore which relationships are visible. */
   readonly externalPackages: boolean
+  /** Workspace packages whose owned project files participate in the visible graph. */
+  readonly workspacePackages: ReadonlySet<string>
 }
 
 const analysis = window.showMeAnalysis
@@ -73,6 +75,8 @@ const fileList = requiredElement("file-list")
 const externalPackageSection = requiredElement("external-package-section")
 const externalPackageList = requiredElement("external-package-list")
 const externalPackageToggle = requiredCheckbox("external-packages-toggle")
+const workspacePackageFieldset = requiredElement("workspace-package-fieldset")
+const workspacePackageControls = requiredElement("workspace-package-controls")
 const lineCategoryControls = REPORT_LINE_CATEGORIES.map((category) => ({
   category,
   input: requiredCheckbox("line-category-" + category),
@@ -89,7 +93,11 @@ const graph = new DirectedGraph<BrowserNodeAttributes>()
 let selectedNodeId: string | undefined
 let hoveredNodeId: string | undefined
 let visibleNodeIds = new Set<string>()
-let viewState: ReportViewState = { lineCategories: ["code"], externalPackages: false }
+let viewState: ReportViewState = {
+  lineCategories: ["code"],
+  externalPackages: false,
+  workspacePackages: new Set(presentation.workspacePackages.map((workspacePackage) => workspacePackage.path)),
+}
 const renderer = new Sigma<BrowserNodeAttributes>(graph, graphContainer, {
   allowInvalidContainer: false,
   defaultEdgeType: "arrow",
@@ -122,6 +130,27 @@ for (const control of lineCategoryControls) {
 externalPackageToggle.addEventListener("change", () => {
   applyReportView({ ...viewState, externalPackages: externalPackageToggle.checked })
 })
+const workspacePackageInputs = presentation.workspacePackages.map((workspacePackage, index) => {
+  const label = document.createElement("label")
+  const input = document.createElement("input")
+  input.id = `workspace-package-${index}`
+  input.type = "checkbox"
+  input.checked = true
+  input.dataset.workspacePackage = workspacePackage.path
+  input.addEventListener("change", () => {
+    const visibleWorkspacePackages = new Set(viewState.workspacePackages)
+    if (input.checked) {
+      visibleWorkspacePackages.add(workspacePackage.path)
+    } else {
+      visibleWorkspacePackages.delete(workspacePackage.path)
+    }
+    applyReportView({ ...viewState, workspacePackages: visibleWorkspacePackages })
+  })
+  label.append(input, document.createTextNode(workspacePackage.name))
+  workspacePackageControls.append(label)
+  return input
+})
+workspacePackageFieldset.hidden = workspacePackageInputs.length === 0
 
 renderer.on("enterNode", ({ node, event }) => {
   const reportNode = nodeById.get(node)
@@ -149,11 +178,6 @@ clearSelection.addEventListener("click", () => {
   selectNode(undefined)
 })
 
-for (const node of presentation.nodes) {
-  if (node.kind === "project-file") {
-    fileList.append(nodeListItem(node))
-  }
-}
 applyReportView(viewState)
 // The graph and interaction state are initialized synchronously. Sigma may still
 // paint the resulting WebGL frame on the next animation frame.
@@ -169,8 +193,27 @@ document.documentElement.dataset.showMeReady = "true"
 function applyReportView(nextState: ReportViewState): void {
   graph.clear()
   viewState = nextState
+  const visibleProjectNodeIds = new Set(
+    presentation.nodes
+      .filter(
+        (node) =>
+          node.kind === "project-file" && (node.workspacePackage === undefined || viewState.workspacePackages.has(node.workspacePackage)),
+      )
+      .map((node) => node.id),
+  )
+  const visibleExternalPackageNodeIds = new Set(
+    viewState.externalPackages
+      ? presentation.edges
+          .filter((edge) => edge.kind === "external-package" && visibleProjectNodeIds.has(edge.source))
+          .map((edge) => edge.target)
+      : [],
+  )
   const visibleNodes = presentation.nodes
-    .filter((node) => node.kind === "project-file" || viewState.externalPackages)
+    .filter(
+      (node) =>
+        (node.kind === "project-file" && visibleProjectNodeIds.has(node.id)) ||
+        (node.kind === "external-package" && visibleExternalPackageNodeIds.has(node.id)),
+    )
     .map((node) => ({
       id: node.id,
       color: node.color,
@@ -200,11 +243,16 @@ function applyReportView(nextState: ReportViewState): void {
     control.input.disabled = viewState.lineCategories.length === 1 && control.input.checked
   }
   externalPackageToggle.checked = viewState.externalPackages
+  for (const input of workspacePackageInputs) {
+    input.checked = viewState.workspacePackages.has(input.dataset.workspacePackage ?? "")
+  }
+  renderProjectFileList()
   renderExternalPackageList()
   renderSelection()
   // Expose otherwise canvas-only state to black-box Playwright tests. Runtime behavior never reads these attributes.
   document.documentElement.dataset.activeLineCategories = viewState.lineCategories.join(",")
   document.documentElement.dataset.externalPackages = viewState.externalPackages ? "visible" : "hidden"
+  document.documentElement.dataset.workspacePackages = JSON.stringify([...viewState.workspacePackages])
   graphContainer.dataset.visibleNodeCount = String(visibleNodes.length)
   graphContainer.dataset.visibleEdgeCount = String(visibleEdges.length)
   graphContainer.dataset.visibleNodeColors = JSON.stringify(visibleNodes.map(({ id, color }) => ({ id, color })))
@@ -229,6 +277,15 @@ function applyReportView(nextState: ReportViewState): void {
       outboundAttractionDistribution: true,
     },
   })
+}
+
+function renderProjectFileList(): void {
+  fileList.replaceChildren()
+  for (const node of presentation.nodes) {
+    if (node.kind === "project-file" && visibleNodeIds.has(node.id)) {
+      fileList.append(nodeListItem(node))
+    }
+  }
 }
 
 function selectNode(nodeId: string | undefined): void {
@@ -302,7 +359,7 @@ function renderExternalPackageList(): void {
     return
   }
   for (const node of presentation.nodes) {
-    if (node.kind === "external-package") {
+    if (node.kind === "external-package" && visibleNodeIds.has(node.id)) {
       externalPackageList.append(nodeListItem(node))
     }
   }

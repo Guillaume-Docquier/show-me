@@ -1,0 +1,7 @@
+{
+  "name": "@fixture/shared",
+  "exports": {
+    ".": "./src/index.ts",
+    "./value": "./src/value.ts"
+  }
+}

@@ -483,6 +483,7 @@ function emptyProjectAnalysis(projectName: string): ProjectAnalysis {
   return {
     schemaVersion: PROJECT_ANALYSIS_SCHEMA_VERSION,
     project: { name: projectName },
+    workspacePackages: [],
     files: [],
     dependencies: [],
     externalPackages: [],

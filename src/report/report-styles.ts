@@ -19,11 +19,12 @@ header {
 h1 { margin: 0; font-size: 17px; font-weight: 650; letter-spacing: 0.01em; }
 header p { margin: 0; color: #8fa3b8; font-size: 12px; }
 .report-heading { display: flex; align-items: baseline; gap: 14px; min-width: 0; }
-.report-controls, #line-category-controls, #graph-content-controls {
+.report-controls, #line-category-controls, #graph-content-controls, #workspace-package-fieldset, #workspace-package-controls {
   display: flex; align-items: center; gap: 12px; margin: 0; padding: 0; border: 0;
   color: #aebdca; font-size: 11px;
 }
-.report-controls { gap: 20px; }
+.report-controls { gap: 20px; flex-wrap: wrap; justify-content: flex-end; }
+#workspace-package-fieldset[hidden] { display: none; }
 .report-controls legend { float: left; margin-right: 2px; color: #8fa3b8; }
 .report-controls label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
 .report-controls label:has(input:disabled) { color: #6f8295; cursor: default; }

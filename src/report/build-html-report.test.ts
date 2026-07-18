@@ -63,6 +63,7 @@ it("escapes hostile analysis and browser bundle text inside one offline document
   const analysis: ProjectAnalysis = {
     schemaVersion: PROJECT_ANALYSIS_SCHEMA_VERSION,
     project: { name: unsafeText },
+    workspacePackages: [],
     files: [
       {
         path: unsafePath,
@@ -114,6 +115,7 @@ function embeddedProjectAnalysis(html: string): unknown {
   const analysis: unknown = JSON.parse(serializedAnalysis)
   if (
     !TypeGuard.isRecord(analysis) ||
+    !TypeGuard.isArray(analysis.workspacePackages) ||
     !TypeGuard.isArray(analysis.files) ||
     !TypeGuard.isArray(analysis.dependencies) ||
     !TypeGuard.isArray(analysis.externalPackages) ||

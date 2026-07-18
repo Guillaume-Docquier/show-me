@@ -6,7 +6,6 @@ This directory tracks milestones, implementation progress, verification evidence
 
 | Milestone                                                                       | Status      | Outcome                                                                |
 | ------------------------------------------------------------------------------- | ----------- | ---------------------------------------------------------------------- |
-| [008 pnpm workspaces](./008-pnpm-workspaces.md)                                 | Not started | Analyze and filter all packages in one pnpm workspace.                 |
 | [009 Import compatibility](./009-import-compatibility.md)                       | In progress | Add CommonJS, dynamic imports, and broader resolution behavior.        |
 | [010 Visualization and UX](./010-visualization-and-ux.md)                       | Not started | Improve navigation, focus, clustering, and accessibility.              |
 | [011 Large-codebase performance](./011-large-codebase-performance.md)           | Not started | Profile and optimize analysis and rendering for large projects.        |
@@ -27,6 +26,7 @@ Completed milestone files are retained under [`done/`](./done/) as implementatio
 | [005 Coverage](./done/005-coverage.md)                                         | 2026-07-16 | Added optional Istanbul line coverage and coverage-colored nodes.   |
 | [006 CLOC line breakdown](./done/006-cloc-line-breakdown.md)                   | 2026-07-16 | Added exclusive line categories and interactive node sizing.        |
 | [007 External packages](./done/007-external-packages.md)                       | 2026-07-16 | Added optional package nodes without analyzing installed code.      |
+| [008 pnpm workspaces](./done/008-pnpm-workspaces.md)                           | 2026-07-18 | Analyzes and filters all packages in one pnpm workspace.            |
 | [012 GitHub Pages report](./done/012-github-pages-report.md)                   | 2026-07-16 | Publishes a validated live visualization of the repository.         |
 | [013 Default test-file exclusions](./done/013-default-test-file-exclusions.md) | 2026-07-16 | Removes conventionally named test files from default analysis.      |
 | [016 Codebase consolidation](./done/016-codebase-consolidation.md)             | 2026-07-16 | Hardened analysis, report, CLI, build, and package boundaries.      |

@@ -4,7 +4,7 @@ import type { ExternalPackageName } from "./external-package-name.js"
 /**
  * The schema version of the internal project analysis model.
  */
-export const PROJECT_ANALYSIS_SCHEMA_VERSION = 3
+export const PROJECT_ANALYSIS_SCHEMA_VERSION = 4
 
 /**
  * A language family understood by a language module.
@@ -47,6 +47,14 @@ export type ProjectFileAnalysis = {
   readonly language: LanguageId
   readonly lines: ProjectFileLines
   readonly coverage: ProjectFileCoverage | undefined
+  readonly workspacePackage?: string
+}
+
+/** One package participating in the analyzed pnpm workspace. */
+export type WorkspacePackageAnalysis = {
+  /** Stable project-relative identity; the workspace root is `"."`. */
+  readonly path: string
+  readonly name: string
 }
 
 /**
@@ -91,6 +99,7 @@ export type ProjectAnalysis = {
   readonly project: {
     readonly name: string
   }
+  readonly workspacePackages: readonly WorkspacePackageAnalysis[]
   readonly files: readonly ProjectFileAnalysis[]
   readonly dependencies: readonly ProjectDependency[]
   readonly externalPackages: readonly ExternalPackageAnalysis[]

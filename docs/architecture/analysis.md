@@ -4,7 +4,7 @@ Analysis converts files on disk into an internal, language-neutral description t
 
 ## Current implementation
 
-Filesystem discovery, normalized project-file paths, CLOC-style physical-line categories, static runtime ESM project and external-package dependency analysis, and Istanbul or LCOV line-coverage enrichment are implemented.
+Filesystem and pnpm workspace discovery, normalized project-file paths, CLOC-style physical-line categories, static runtime ESM project and external-package dependency analysis, and Istanbul or LCOV line-coverage enrichment are implemented.
 
 ## Project discovery
 
@@ -28,6 +28,7 @@ Internal analysis callers can restore only this default test-file exclusion thro
 The internal model is versioned even though it is not initially a public CLI format. Its concepts are language-neutral:
 
 - project metadata;
+- pnpm workspace packages and per-file ownership when a workspace is present;
 - project files with normalized project-relative paths and metrics;
 - directed dependencies;
 - canonical external-package facts and distinct file-to-package dependencies;
@@ -43,6 +44,14 @@ Edges are authoritative. Import and consumer counts are derived from edges rathe
 A language module operates at project scope so it can use project configuration and resolve relationships across files. The internal JavaScript/TypeScript module uses Oxc's file-based resolution to discover the configuration applicable to each importer, including referenced project configurations. It exposes only language-neutral file analyses, metrics, dependencies, and diagnostics. Oxc parser and resolver values remain contained behind focused adapters.
 
 Language modules are an architectural extension point, not a public plugin API. Adding another language initially means adding another module to the Show Me package. The core model and renderer must not gain language-specific AST types or resolution rules.
+
+## pnpm workspaces
+
+When the project root contains `pnpm-workspace.yaml`, workspace discovery parses its `packages` array and expands positive, negative, and nested patterns to package manifests. The workspace root is always a package. Every analyzed file belongs to its nearest workspace package; files outside selected nested packages, including files beneath an excluded package directory, fall back to root ownership.
+
+Workspace package paths are stable project-relative identities. Package names remain display and request-classification data. The complete ordered package list and file ownership cross the language-neutral analysis boundary so the browser can derive filters without reading package configuration.
+
+The JavaScript and TypeScript analyzer keeps ordinary Oxc resolution first, preserving the `tsconfig.json` or `jsconfig.json` applicable to each importer. If an otherwise bare request names a workspace package, its package exports or conventional source entry point resolve against analyzed files before external-package classification. A matched but unresolved workspace request produces a diagnostic rather than an external-package fact.
 
 ## Initial JavaScript and TypeScript dependency rules
 
@@ -65,7 +74,7 @@ Unaliased bare npm requests create canonical external-package facts and distinct
 
 Package subpaths collapse to their package name. For example, `drizzle-orm/pg-core` belongs to `drizzle-orm`, and `@scope/package/subpath` belongs to `@scope/package`.
 
-Relative paths, absolute paths, package-import specifiers beginning with `#`, protocol requests, malformed package roots, and Node built-ins are not external packages. A request matching a path alias from the importing file's automatically discovered `tsconfig.json` or `jsconfig.json`, its relative base configuration, or a referenced project configuration retains project-resolution precedence: a resolved alias creates a project-file dependency, while a missing alias produces the existing unresolved-runtime diagnostic rather than a package fact. Milestone 008 will insert workspace-package ownership before external-package classification.
+Relative paths, absolute paths, package-import specifiers beginning with `#`, protocol requests, malformed package roots, Node built-ins, and workspace-owned package requests are not external packages. A request matching a path alias from the importing file's automatically discovered `tsconfig.json` or `jsconfig.json`, its relative base configuration, or a referenced project configuration retains project-resolution precedence: a resolved alias creates a project-file dependency, while a missing alias produces the existing unresolved-runtime diagnostic rather than a package fact.
 
 ## Line metrics
 

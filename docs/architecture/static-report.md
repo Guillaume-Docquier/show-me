@@ -76,9 +76,15 @@ Changing the active categories recomputes node sizes and browser layout through 
 
 ## External-package control
 
-External-package nodes and their edges are hidden by default, so package facts do not perturb the initial file-only layout or relationship counts. An accessible unchecked control reveals all canonical package roots. The same report-view transition rebuilds and lays out the visible Graphology subgraph, combining package visibility with the active line categories.
+External-package nodes and their edges are hidden by default, so package facts do not perturb the initial file-only layout or relationship counts. An accessible unchecked control reveals the canonical package roots referenced by currently visible project files. The same report-view transition rebuilds and lays out the visible Graphology subgraph, combining package visibility with the active line categories and workspace-package filters.
 
 Package nodes use a fixed size and a distinct purple appearance. Color is not their only cue: the package list, tooltip, and selected-node panel all identify them as external packages. Package details show the project files that import the package and never fabricate line metrics, coverage, or installed-package contents. Hiding packages clears package hover or selection while preserving a selected project file.
+
+## Workspace-package controls
+
+A pnpm workspace report shows one checked control for every workspace package, including the root. All packages are visible initially. Disabling a package removes its owned files, incident cross-package edges, file-list entries, and external packages that no remaining visible file imports from the visible projection without changing the embedded analysis.
+
+Package filters compose with line-category sizing and external-package visibility through the same report-view transition. A project-file edge remains visible only while both owning packages are enabled. Re-enabling packages reconstructs the complete graph from immutable presentation facts.
 
 ## Hover and selection
 

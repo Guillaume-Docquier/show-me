@@ -36,6 +36,7 @@ type ReportNodeBase = {
 export type ReportProjectFileNode = ReportNodeBase & {
   readonly kind: "project-file"
   readonly path: string
+  readonly workspacePackage: string | undefined
   readonly lineMetrics: ReportNodeLineMetrics
   readonly coverage: number | undefined
 }
@@ -58,6 +59,7 @@ type ReportEdge = {
 
 type BrowserPresentation = {
   readonly projectName: string
+  readonly workspacePackages: ProjectAnalysis["workspacePackages"]
   readonly nodes: readonly ReportNode[]
   readonly edges: readonly ReportEdge[]
 }
@@ -98,6 +100,7 @@ export function buildBrowserPresentation(analysis: ProjectAnalysis): BrowserPres
         displayName: file.path,
         tooltipName: truncatePathFromStart(file.path),
         path: file.path,
+        workspacePackage: file.workspacePackage,
         lineMetrics: file.lines,
         importedNodeIds: importedNodeIdsBySource.get(id) ?? [],
         consumerNodeIds: consumerNodeIdsByTarget.get(id) ?? [],
@@ -122,7 +125,7 @@ export function buildBrowserPresentation(analysis: ProjectAnalysis): BrowserPres
     }),
   ]
 
-  return { projectName: analysis.project.name, nodes, edges }
+  return { projectName: analysis.project.name, workspacePackages: analysis.workspacePackages, nodes, edges }
 }
 
 /**

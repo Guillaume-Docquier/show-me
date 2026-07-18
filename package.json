@@ -41,7 +41,9 @@
     "jsonc-parser": "^3.3.1",
     "oxc-parser": "^0.140.0",
     "oxc-resolver": "^11.24.2",
-    "sigma": "^3.0.3"
+    "sigma": "^3.0.3",
+    "tinyglobby": "^0.2.17",
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",

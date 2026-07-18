@@ -1,5 +1,5 @@
 import { extname, resolve } from "node:path"
-import { Result } from "@guillaume-docquier/tools-ts"
+import { Result, TypeGuard } from "@guillaume-docquier/tools-ts"
 import { ExternalPackageName } from "../../analysis/external-package-name.js"
 import type {
   AnalysisDiagnostic,
@@ -9,10 +9,15 @@ import type {
 } from "../../analysis/project-analysis.js"
 import { ProjectFilePath } from "../../project-files/project-file-path.js"
 import { compareText } from "../../text/compare-text.js"
+import type { WorkspacePackageDefinition } from "../../workspaces/pnpm-workspace.js"
 import { classifyJavaScriptTypeScriptLines } from "./classify-javascript-typescript-lines.js"
 import { collectStaticRuntimeRequests, type StaticRuntimeRequestSource } from "./collect-static-runtime-requests.js"
 import { externalPackageNameFromRequest } from "./external-package-name.js"
-import { hasJavaScriptTypeScriptExecutableExtension, type JavaScriptTypeScriptLanguageId } from "./javascript-typescript-file-support.js"
+import {
+  hasJavaScriptTypeScriptExecutableExtension,
+  JAVASCRIPT_TYPESCRIPT_EXECUTABLE_EXTENSIONS,
+  type JavaScriptTypeScriptLanguageId,
+} from "./javascript-typescript-file-support.js"
 import { createJavaScriptTypeScriptResolver, type JavaScriptTypeScriptResolver } from "./javascript-typescript-resolver.js"
 
 /**
@@ -20,6 +25,7 @@ import { createJavaScriptTypeScriptResolver, type JavaScriptTypeScriptResolver }
  */
 export type JavaScriptTypeScriptSourceFile = StaticRuntimeRequestSource & {
   readonly language: JavaScriptTypeScriptLanguageId
+  readonly workspacePackage?: string
 }
 
 /**
@@ -64,6 +70,7 @@ export type JavaScriptTypeScriptAnalysisError =
 export function analyzeJavaScriptTypeScript(
   projectRoot: string,
   files: readonly JavaScriptTypeScriptSourceFile[],
+  workspacePackages: readonly WorkspacePackageDefinition[] = [],
 ): Result<JavaScriptTypeScriptAnalysis, JavaScriptTypeScriptAnalysisError> {
   const resolverResult = createJavaScriptTypeScriptResolver(projectRoot)
   if (Result.isFailure(resolverResult)) {
@@ -97,6 +104,7 @@ export function analyzeJavaScriptTypeScript(
       language: file.language,
       lines: classifyJavaScriptTypeScriptLines(file.sourceText, requests.value.comments, requests.value.jsxCommentContainers),
       coverage: undefined,
+      ...(file.workspacePackage === undefined ? {} : { workspacePackage: file.workspacePackage }),
     })
     for (const request of requests.value.requests) {
       const dependency = resolveProjectDependency(file, request, resolverResult.value, discoveredPathByAbsolutePath)
@@ -110,6 +118,22 @@ export function analyzeJavaScriptTypeScript(
       }
 
       if (!dependency.value.matchesConfiguredAlias) {
+        const workspacePackage = workspacePackageForRequest(workspacePackages, request)
+        if (workspacePackage !== undefined) {
+          const target = resolveWorkspacePackageTarget(workspacePackage, request, discoveredPathByAbsolutePath)
+          if (target === undefined) {
+            diagnostics.push({
+              code: "UNRESOLVED_RUNTIME_DEPENDENCY",
+              message: `Could not resolve runtime dependency ${JSON.stringify(request)}.`,
+              file: file.path,
+            })
+          } else {
+            const workspaceDependency: ProjectDependency = { source: file.path, target, kind: "runtime" }
+            dependencyByKey.set(`${workspaceDependency.source}\u0000${workspaceDependency.target}`, workspaceDependency)
+          }
+          continue
+        }
+
         const externalPackageName = externalPackageNameFromRequest(request)
         if (externalPackageName !== undefined) {
           externalPackageNames.add(externalPackageName)
@@ -140,6 +164,105 @@ export function analyzeJavaScriptTypeScript(
     externalPackageDependencies: [...externalPackageDependencyByKey.values()].sort(compareExternalPackageDependencies),
     diagnostics: diagnostics.sort(compareDiagnostics),
   })
+}
+
+function workspacePackageForRequest(
+  workspacePackages: readonly WorkspacePackageDefinition[],
+  request: string,
+): WorkspacePackageDefinition | undefined {
+  return workspacePackages.find((workspacePackage) => request === workspacePackage.name || request.startsWith(`${workspacePackage.name}/`))
+}
+
+function resolveWorkspacePackageTarget(
+  workspacePackage: WorkspacePackageDefinition,
+  request: string,
+  discoveredPathByAbsolutePath: ReadonlyMap<string, ProjectFilePath>,
+): ProjectFilePath | undefined {
+  const subpath = request === workspacePackage.name ? "." : `.${request.slice(workspacePackage.name.length)}`
+  const exportedTarget = workspaceExportTarget(workspacePackage.manifest.exports, subpath)
+  const candidates =
+    exportedTarget === undefined
+      ? subpath === "."
+        ? [workspacePackage.manifest.module, workspacePackage.manifest.main, "src/index", "index"]
+        : [subpath.slice(2)]
+      : [exportedTarget]
+
+  for (const candidate of candidates) {
+    if (candidate === undefined) {
+      continue
+    }
+    const target = discoveredTargetForCandidate(resolve(workspacePackage.absoluteRoot, candidate), discoveredPathByAbsolutePath)
+    if (target !== undefined) {
+      return target
+    }
+  }
+  return undefined
+}
+
+function workspaceExportTarget(exportsValue: unknown, subpath: string): string | undefined {
+  if (subpath === ".") {
+    if (TypeGuard.isString(exportsValue) || TypeGuard.isArray(exportsValue)) {
+      return runtimeExportTarget(exportsValue)
+    }
+    if (TypeGuard.isRecord(exportsValue)) {
+      return runtimeExportTarget(exportsValue["."] ?? exportsValue)
+    }
+    return undefined
+  }
+  return TypeGuard.isRecord(exportsValue) ? runtimeExportTarget(exportsValue[subpath]) : undefined
+}
+
+function runtimeExportTarget(value: unknown): string | undefined {
+  if (TypeGuard.isString(value)) {
+    return value
+  }
+  if (TypeGuard.isArray(value)) {
+    for (const candidate of value) {
+      const target = runtimeExportTarget(candidate)
+      if (target !== undefined) {
+        return target
+      }
+    }
+    return undefined
+  }
+  if (!TypeGuard.isRecord(value)) {
+    return undefined
+  }
+  for (const condition of ["import", "node", "default"]) {
+    const target = runtimeExportTarget(value[condition])
+    if (target !== undefined) {
+      return target
+    }
+  }
+  return undefined
+}
+
+function discoveredTargetForCandidate(
+  absoluteCandidate: string,
+  discoveredPathByAbsolutePath: ReadonlyMap<string, ProjectFilePath>,
+): ProjectFilePath | undefined {
+  const extension = extname(absoluteCandidate)
+  const candidates = [absoluteCandidate]
+  if (extension === ".js") {
+    candidates.push(...[".ts", ".tsx", ".jsx"].map((replacement) => absoluteCandidate.slice(0, -3) + replacement))
+  } else if (extension === ".cjs") {
+    candidates.push(absoluteCandidate.slice(0, -4) + ".cts")
+  } else if (extension === ".mjs") {
+    candidates.push(absoluteCandidate.slice(0, -4) + ".mts")
+  } else if (extension.length === 0) {
+    candidates.push(...JAVASCRIPT_TYPESCRIPT_EXECUTABLE_EXTENSIONS.map((candidateExtension) => absoluteCandidate + candidateExtension))
+    candidates.push(
+      ...JAVASCRIPT_TYPESCRIPT_EXECUTABLE_EXTENSIONS.map((candidateExtension) => resolve(absoluteCandidate, `index${candidateExtension}`)),
+    )
+  }
+
+  for (const candidate of candidates) {
+    const target = discoveredPathByAbsolutePath.get(resolve(candidate))
+    if (target !== undefined) {
+      return target
+    }
+  }
+  return undefined
 }
 
 function resolveProjectDependency(

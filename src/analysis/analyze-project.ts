@@ -9,6 +9,7 @@ import {
 import { discoverProjectFiles, type ProjectFileDiscoveryError } from "../project-files/discover-project-files.js"
 import type { ProjectFilePath } from "../project-files/project-file-path.js"
 import type { ProjectFileSelection } from "../project-files/project-file-selection.js"
+import { discoverPnpmWorkspace, owningWorkspacePackagePath, type PnpmWorkspaceDiscoveryError } from "../workspaces/pnpm-workspace.js"
 import { PROJECT_ANALYSIS_SCHEMA_VERSION, type ProjectAnalysis } from "./project-analysis.js"
 
 /**
@@ -44,6 +45,7 @@ export type AnalyzeProjectError =
   | ProjectFileDiscoveryError
   | ProjectFileReadError
   | JavaScriptTypeScriptAnalysisError
+  | PnpmWorkspaceDiscoveryError
 
 /**
  * Discover project files and collect language-neutral physical line metrics.
@@ -70,6 +72,11 @@ export async function analyzeProject(input: AnalyzeProjectInput): Promise<Result
     })
   }
 
+  const workspace = await discoverPnpmWorkspace(resolvedProjectRoot)
+  if (Result.isFailure(workspace)) {
+    return workspace
+  }
+
   const discoveredFiles = await discoverProjectFiles({
     projectRoot: resolvedProjectRoot,
     ...(input.fileSelection === undefined ? {} : { fileSelection: input.fileSelection }),
@@ -94,10 +101,11 @@ export async function analyzeProject(input: AnalyzeProjectInput): Promise<Result
       absolutePath: discoveredFile.absolutePath,
       sourceText: sourceText.value,
       language: discoveredFile.language,
+      ...(workspace.value === undefined ? {} : { workspacePackage: owningWorkspacePackagePath(workspace.value, discoveredFile.path) }),
     })
   }
 
-  const languageAnalysis = analyzeJavaScriptTypeScript(resolvedProjectRoot, sourceFiles)
+  const languageAnalysis = analyzeJavaScriptTypeScript(resolvedProjectRoot, sourceFiles, workspace.value?.packages ?? [])
   if (Result.isFailure(languageAnalysis)) {
     return languageAnalysis
   }
@@ -107,6 +115,7 @@ export async function analyzeProject(input: AnalyzeProjectInput): Promise<Result
     project: {
       name: basename(resolvedProjectRoot),
     },
+    workspacePackages: (workspace.value?.packages ?? []).map(({ path, name }) => ({ path, name })),
     files: languageAnalysis.value.files,
     dependencies: languageAnalysis.value.dependencies,
     externalPackages: languageAnalysis.value.externalPackages,
