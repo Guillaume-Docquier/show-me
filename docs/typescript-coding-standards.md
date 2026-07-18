@@ -85,7 +85,7 @@ throw new FatalError("something went wrong", { data })
 
 Use `Assert.isExhausted` for exhaustive union handling.
 
-### Custom errors (aspirational)
+### Custom errors
 
 Expected failures should use custom tagged errors extending `TaggedError` from `@guillaume-docquier/tools-ts`
 
@@ -122,7 +122,7 @@ Result<User, UserNotFound | UserStoreUnavailable>
 
 Avoid broad `AppError`-style types except near entrypoints, orchestration, logging, and rendering layers.
 
-## Sensitive data, telemetry, and debugging (aspirational)
+## Sensitive data, telemetry, and debugging
 
 Prefer end-to-end structured tracing across requests, jobs, workflows, application modules, adapters, and external calls.
 
@@ -175,7 +175,7 @@ Use Zod as boundary parsers, not as ad-hoc validators sprinkled through core log
 
 Schema parsing should produce refined/domain types and typed custom errors where practical.
 
-## Branded types and correct construction (aspirational)
+## Branded types and correct construction
 
 Use branded/refined types for meaningful primitives:
 
@@ -450,7 +450,7 @@ Avoid spy-driven tests like `expect(sendEmail).toHaveBeenCalledWith(...)` unless
 
 For persistence behavior, prefer PGLite/local DB-backed tests over hand-rolled in-memory fakes when SQL/schema/transaction behavior matters.
 
-### Property tests and arbitraries (aspirational)
+### Property tests and arbitraries
 
 Use `fast-check` where properties are clearer than examples, especially for:
 
