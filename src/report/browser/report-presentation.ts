@@ -26,7 +26,7 @@ type ReportNodeBase = {
   readonly id: string
   readonly displayName: string
   readonly tooltipName: string
-  readonly importedNodeIds: readonly string[]
+  readonly dependencyNodeIds: readonly string[]
   readonly consumerNodeIds: readonly string[]
   readonly color: string
   readonly size: number
@@ -71,7 +71,7 @@ type BrowserPresentation = {
  * @returns Browser-owned identities, display metadata, and relationship indexes.
  */
 export function buildBrowserPresentation(analysis: ProjectAnalysis): BrowserPresentation {
-  const importedNodeIdsBySource = new Map<string, string[]>()
+  const dependencyNodeIdsBySource = new Map<string, string[]>()
   const consumerNodeIdsByTarget = new Map<string, string[]>()
   const projectEdges: ReportEdge[] = analysis.dependencies.map((dependency, index) => ({
     id: `project-dependency-${index}`,
@@ -87,7 +87,7 @@ export function buildBrowserPresentation(analysis: ProjectAnalysis): BrowserPres
   }))
   const edges = [...projectEdges, ...externalPackageEdges]
   for (const edge of edges) {
-    appendMapValue(importedNodeIdsBySource, edge.source, edge.target)
+    appendMapValue(dependencyNodeIdsBySource, edge.source, edge.target)
     appendMapValue(consumerNodeIdsByTarget, edge.target, edge.source)
   }
 
@@ -102,7 +102,7 @@ export function buildBrowserPresentation(analysis: ProjectAnalysis): BrowserPres
         path: file.path,
         workspacePackage: file.workspacePackage,
         lineMetrics: file.lines,
-        importedNodeIds: importedNodeIdsBySource.get(id) ?? [],
+        dependencyNodeIds: dependencyNodeIdsBySource.get(id) ?? [],
         consumerNodeIds: consumerNodeIdsByTarget.get(id) ?? [],
         coverage: file.coverage?.lines,
         color: coverageColor(file.coverage?.lines),
@@ -117,7 +117,7 @@ export function buildBrowserPresentation(analysis: ProjectAnalysis): BrowserPres
         displayName: externalPackage.name,
         tooltipName: externalPackage.name,
         packageName: externalPackage.name,
-        importedNodeIds: [],
+        dependencyNodeIds: [],
         consumerNodeIds: consumerNodeIdsByTarget.get(id) ?? [],
         color: EXTERNAL_PACKAGE_NODE_COLOR,
         size: EXTERNAL_PACKAGE_NODE_SIZE,

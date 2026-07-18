@@ -6,13 +6,13 @@ Complete.
 
 ## Outcome
 
-The report can optionally reveal which project files import each canonical npm package root without discovering, reading, parsing, or measuring installed dependency code.
+The report can optionally reveal which project files consume each canonical npm package root without discovering, reading, parsing, or measuring installed dependency code.
 
 ## Tasks
 
 - [x] Represent external package dependencies distinctly from project-file dependencies.
 - [x] Collapse unscoped and scoped package subpaths to their package roots.
-- [x] Create one fixed-size synthetic graph node per imported package.
+- [x] Create one fixed-size synthetic graph node per external package dependency.
 - [x] Never read or analyze files beneath `node_modules` for package-node creation.
 - [x] Hide package nodes and their edges by default.
 - [x] Add a report control to enable or disable external packages.
@@ -32,7 +32,7 @@ The report can optionally reveal which project files import each canonical npm p
 - `pnpm build`: passed both Node and browser targets; the self-contained browser bundle was 433.6 kB.
 - `pnpm test:browser`: all 5 Playwright tests passed.
 - The external-package browser test proved the default file-only layout exactly matches an equivalent presentation with no package facts, then covered toggle-on relationships, explicit package type cues, package selection, combined line-metric relayout, toggle-off selection clearing, and exact default-geometry restoration.
-- The temporary-filesystem integration test created malformed installed package contents but produced only the importing project file, one uninstalled package fact, one file-to-package edge, and no parser diagnostic from `node_modules`.
+- The temporary-filesystem integration test created malformed installed package contents but produced only the consumer project file, one uninstalled package fact, one file-to-package edge, and no parser diagnostic from `node_modules`.
 
 ## Discovered gaps
 

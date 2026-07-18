@@ -44,7 +44,7 @@ it("embeds the complete project analysis without presentation-only data", async 
     diagnostics: [{ code: "test-diagnostic", message: "Diagnostic detail", file: "src/entry.ts" }],
   })
   expect(JSON.stringify(embeddedAnalysis)).not.toMatch(
-    /"(?:color|size|displayName|tooltipName|importedNodeIds|consumerNodeIds|nodes|edges|id)"/u,
+    /"(?:color|size|displayName|tooltipName|dependencyNodeIds|consumerNodeIds|nodes|edges|id)"/u,
   )
   expect(html).toContain("<!doctype html>")
   expect(html).toContain("<title>Show Me</title>")

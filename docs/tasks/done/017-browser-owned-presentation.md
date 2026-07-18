@@ -22,7 +22,7 @@ The current user-visible report behavior remains unchanged. Coverage remains the
 - [x] Replace `window.showMePresentation` with an internal analysis handoff whose type and schema version come from `ProjectAnalysis`.
 - [x] Make the Node report builder a packaging and escaping boundary only: it embeds the analysis, fixed HTML shell, styles, and prebuilt browser bundle without calculating presentation data.
 - [x] Move project title, project-file count, node identity, relationship indexing, display names, tooltip names, external-package presentation, node sizing, and coverage color calculation into `entry.browser.ts`. Any helper extracted for cohesion or testing must remain browser-only under `src/report/browser/` and enter the bundle exclusively through that entrypoint.
-- [x] Derive import and consumer lists from authoritative analysis edges in the browser instead of embedding duplicated relationship arrays.
+- [x] Derive dependency and consumer lists from authoritative analysis edges in the browser instead of embedding duplicated relationship arrays.
 - [x] Derive project-file sizes from raw line metrics for every view transition; keep code lines as the initial selection and preserve every non-empty line-category combination.
 - [x] Derive project-file colors from raw optional coverage in the browser; keep the current neutral and red-yellow-green behavior without adding color configuration in this milestone.
 - [x] Preserve raw diagnostics in the embedded analysis without adding diagnostics UI; presentation of diagnostics remains milestone 010.

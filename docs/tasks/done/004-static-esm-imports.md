@@ -17,8 +17,8 @@ The report shows directed runtime dependencies between project files for static 
 - [x] Resolve project-file targets through one root `tsconfig.json` or `jsconfig.json`.
 - [x] Ignore resolved non-code assets and external npm packages in this milestone.
 - [x] Produce diagnostics for unresolved executable-code dependencies without fabricating edges.
-- [x] Derive import and consumer counts from unique directed edges.
-- [x] Display imported and consumer project files in the selected-node side panel.
+- [x] Derive dependency and consumer counts from unique directed edges.
+- [x] Display dependency and consumer project files in the selected-node side panel.
 
 ## Required tests
 

@@ -63,7 +63,7 @@ The initial graph is flat:
 - project file node size grows logarithmically with code lines by default;
 - external-package nodes have one fixed size and a distinct non-coverage color and type label;
 - project files with coverage use a red-yellow-green scale while missing coverage remains neutral gray;
-- edges point from an importing file to the imported file;
+- edges point from a consumer to its dependency;
 - pan, zoom, hover, and selection are supported.
 
 Sigma renders node size relative to layout positions so its radii use the same coordinate system as ForceAtlas2's size adjustment. Sigma fits the browser-owned coordinates from the current Graphology graph. The embedded analysis contains no presentation identities or layout coordinates; the browser derives renderer-neutral presentation before creating Graphology and Sigma state.
@@ -78,24 +78,24 @@ Changing the active categories recomputes node sizes and browser layout through 
 
 External-package nodes and their edges are hidden by default, so package facts do not perturb the initial file-only layout or relationship counts. An accessible unchecked control reveals the canonical package roots referenced by currently visible project files. The same report-view transition rebuilds and lays out the visible Graphology subgraph, combining package visibility with the active line categories and workspace-package filters.
 
-Package nodes use a fixed size and a distinct purple appearance. Color is not their only cue: the package list, tooltip, and selected-node panel all identify them as external packages. Package details show the project files that import the package and never fabricate line metrics, coverage, or installed-package contents. Hiding packages clears package hover or selection while preserving a selected project file.
+Package nodes use a fixed size and a distinct purple appearance. Color is not their only cue: the package list, tooltip, and selected-node panel all identify them as external packages. Package details show the project files that consume the package and never fabricate line metrics, coverage, or installed-package contents. Hiding packages clears package hover or selection while preserving a selected project file.
 
 ## Workspace-package controls
 
-A pnpm workspace report shows one checked control for every workspace package, including the root. All packages are visible initially. Disabling a package removes its owned files, incident cross-package edges, file-list entries, and external packages that no remaining visible file imports from the visible projection without changing the embedded analysis.
+A pnpm workspace report shows one checked control for every workspace package, including the root. All packages are visible initially. Disabling a package removes its owned files, incident cross-package edges, file-list entries, and external packages with no remaining visible consumer without changing the embedded analysis.
 
 Package filters compose with line-category sizing and external-package visibility through the same report-view transition. A project-file edge remains visible only while both owning packages are enabled. Re-enabling packages reconstructs the complete graph from immutable presentation facts.
 
 ## Hover and selection
 
-A hover tooltip follows the pointer with a small offset and flips or clamps at viewport edges. Project-file tooltips show a width-constrained, tail-preserving path plus the complete code, comment, and blank line breakdown, visible import count, consumer count, and coverage when available. Package tooltips show the canonical package root, explicit entity type, and visible relationships. A long file path truncates its beginning so the filename and nearest directories remain visible; CSS may wrap exceptionally long filenames but must not apply a second end-truncating ellipsis.
+A hover tooltip follows the pointer with a small offset and flips or clamps at viewport edges. Project-file tooltips show a width-constrained, tail-preserving path plus the complete code, comment, and blank line breakdown, visible dependency count, consumer count, and coverage when available. Package tooltips show the canonical package root, explicit entity type, and visible relationships. A long file path truncates its beginning so the filename and nearest directories remain visible; CSS may wrap exceptionally long filenames but must not apply a second end-truncating ellipsis.
 
 Clicking a project file node selects and visually highlights only that node. Selection opens a side panel containing:
 
 - the complete path;
 - line metrics;
 - coverage when available;
-- visible imported project files and external packages;
+- visible project-file and external-package dependencies;
 - consumer project files.
 
 Visible file and package entries in the side panel select their corresponding nodes. Clicking empty graph space or the clear-selection control clears selection.

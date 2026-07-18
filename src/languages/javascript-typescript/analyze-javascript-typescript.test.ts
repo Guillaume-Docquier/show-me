@@ -97,7 +97,7 @@ describe("analyzeJavaScriptTypeScript", () => {
     )
   })
 
-  it("resolves path aliases from the project configuration that applies to each importing file", async () => {
+  it("resolves path aliases from the project configuration that applies to each source file", async () => {
     // Arrange
     const projectRoot = fixtureProjectPath("path-aliases")
     const files = await readDiscoveredSourceFiles(projectRoot)

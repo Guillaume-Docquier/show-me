@@ -10,7 +10,7 @@ import { JAVASCRIPT_TYPESCRIPT_EXECUTABLE_EXTENSIONS } from "./javascript-typesc
  * Language-owned dependency-resolution operations without exposing Oxc values.
  */
 export type JavaScriptTypeScriptResolver = {
-  readonly resolveRequest: (importerFile: string, request: string) => Result<JavaScriptTypeScriptResolution, Error>
+  readonly resolveRequest: (sourceFile: string, request: string) => Result<JavaScriptTypeScriptResolution, Error>
 }
 
 /**
@@ -49,16 +49,13 @@ export function createJavaScriptTypeScriptResolver(projectRoot: string): Result<
     const resolverByJavaScriptConfigPath = new Map<string, ResolverFactory>()
 
     return {
-      resolveRequest(importerFile: string, request: string): Result<JavaScriptTypeScriptResolution, Error> {
+      resolveRequest(sourceFile: string, request: string): Result<JavaScriptTypeScriptResolution, Error> {
         return Result.tryCatch(() => {
-          const configPath = nearestProjectConfigPath(projectRoot, importerFile)
+          const configPath = nearestProjectConfigPath(projectRoot, sourceFile)
           const resolution =
             configPath?.endsWith("jsconfig.json") === true
-              ? resolverForJavaScriptConfig(configPath, resolverOptions, resolverByJavaScriptConfigPath).sync(
-                  dirname(importerFile),
-                  request,
-                )
-              : resolver.resolveFileSync(importerFile, request)
+              ? resolverForJavaScriptConfig(configPath, resolverOptions, resolverByJavaScriptConfigPath).sync(dirname(sourceFile), request)
+              : resolver.resolveFileSync(sourceFile, request)
           const configuredAliasPatterns =
             configPath === undefined ? [] : readConfiguredAliasPatterns(configPath, configuredAliasPatternsByConfigPath)
           return {
@@ -99,9 +96,9 @@ function rootProjectConfigPath(projectRoot: string): string | undefined {
   return existsSync(javaScriptConfig) ? javaScriptConfig : undefined
 }
 
-function nearestProjectConfigPath(projectRoot: string, importerFile: string): string | undefined {
+function nearestProjectConfigPath(projectRoot: string, sourceFile: string): string | undefined {
   const absoluteProjectRoot = resolve(projectRoot)
-  let directory = dirname(resolve(importerFile))
+  let directory = dirname(resolve(sourceFile))
 
   while (true) {
     const typeScriptConfig = resolve(directory, "tsconfig.json")

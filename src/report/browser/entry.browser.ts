@@ -65,10 +65,10 @@ const selectedPath = requiredElement("selected-path")
 const selectedCodeLines = requiredElement("selected-code-lines")
 const selectedCommentLines = requiredElement("selected-comment-lines")
 const selectedBlankLines = requiredElement("selected-blank-lines")
-const selectedImports = requiredElement("selected-imports")
+const selectedDependencies = requiredElement("selected-dependencies")
 const selectedConsumers = requiredElement("selected-consumers")
 const selectedCoverage = requiredElement("selected-coverage")
-const selectedImportedNodes = requiredElement("selected-imported-files")
+const selectedDependencyNodes = requiredElement("selected-dependency-nodes")
 const selectedConsumerNodes = requiredElement("selected-consumer-files")
 const clearSelection = requiredElement("clear-selection")
 const fileList = requiredElement("file-list")
@@ -319,11 +319,11 @@ function renderSelection(): void {
   if (projectFile) {
     showProjectFileDetails(node)
   }
-  const importedNodeIds = visibleRelationships(node.importedNodeIds)
+  const dependencyNodeIds = visibleRelationships(node.dependencyNodeIds)
   const consumerNodeIds = visibleRelationships(node.consumerNodeIds)
-  selectedImports.textContent = String(importedNodeIds.length)
+  selectedDependencies.textContent = String(dependencyNodeIds.length)
   selectedConsumers.textContent = String(consumerNodeIds.length)
-  renderRelatedNodes(selectedImportedNodes, importedNodeIds)
+  renderRelatedNodes(selectedDependencyNodes, dependencyNodeIds)
   renderRelatedNodes(selectedConsumerNodes, consumerNodeIds)
   document.documentElement.dataset.selectedNode = node.id
 }
@@ -394,7 +394,7 @@ function showTooltip(node: ReportNode): void {
   const name = document.createElement("strong")
   name.textContent = node.tooltipName
   name.title = node.displayName
-  const importedNodeIds = visibleRelationships(node.importedNodeIds)
+  const dependencyNodeIds = visibleRelationships(node.dependencyNodeIds)
   const consumerNodeIds = visibleRelationships(node.consumerNodeIds)
   const metricElements = []
   if (node.kind === "project-file") {
@@ -404,7 +404,7 @@ function showTooltip(node: ReportNode): void {
       metric("Blank", node.lineMetrics.blank),
     )
   }
-  metricElements.push(metric("Imports", importedNodeIds.length), metric("Consumers", consumerNodeIds.length))
+  metricElements.push(metric("Dependencies", dependencyNodeIds.length), metric("Consumers", consumerNodeIds.length))
   if (node.kind === "project-file" && node.coverage !== undefined) {
     metricElements.push(metric("Coverage", `${node.coverage}%`))
   }

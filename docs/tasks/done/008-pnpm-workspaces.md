@@ -18,7 +18,7 @@ One analysis and report contain every package in a pnpm workspace, including cro
 - [x] Show all workspace packages by default.
 - [x] Add report controls to enable or disable individual workspace packages.
 - [x] Define how filtering affects cross-package edges without mutating the underlying analysis.
-- [x] Filter external packages to those imported by currently visible workspace files.
+- [x] Filter external packages to those consumed by currently visible workspace files.
 
 ## Required tests
 

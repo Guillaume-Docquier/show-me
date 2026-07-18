@@ -13,7 +13,7 @@ Default analysis omits conventional JavaScript and TypeScript test files so prod
 - [x] Exclude supported files whose basename contains `.test.` or `.spec.` case-insensitively.
 - [x] Match anywhere in the basename without matching directory names or bare `test.ts` and `spec.ts` names.
 - [x] Filter excluded files before source reading, parsing, line metrics, dependency analysis, coverage matching, and report construction.
-- [x] Keep the dependency graph induced by discovered project files: imports to an existing excluded target create neither an edge nor an unresolved diagnostic.
+- [x] Keep the dependency graph induced by discovered project files: dependencies on an existing excluded target create neither an edge nor an unresolved diagnostic.
 - [x] Preserve declaration-file, unsupported-asset, `.gitignore`, and standard-directory exclusions.
 - [x] Document the default behavior and defer configurable file selection to dedicated milestones.
 

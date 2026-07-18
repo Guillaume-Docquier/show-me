@@ -163,8 +163,8 @@ test("keeps packages hidden by default and rebuilds one combined metric and pack
       await expect(page.locator("#external-package-list button")).toHaveCount(0)
       const signature = await graph.getAttribute("data-layout-signature")
       await page.locator("#file-list").getByRole("button", { name: "src/entry.ts", exact: true }).click()
-      await expect(page.locator("#selected-imports")).toHaveText("2")
-      await expect(page.locator("#selected-imported-files button")).toHaveText(["src/alias/value.ts", "src/aliased.ts"])
+      await expect(page.locator("#selected-dependencies")).toHaveText("2")
+      await expect(page.locator("#selected-dependency-nodes button")).toHaveText(["src/alias/value.ts", "src/aliased.ts"])
       return signature
     })
 
@@ -176,9 +176,9 @@ test("keeps packages hidden by default and rebuilds one combined metric and pack
       await expect(graph).toHaveAttribute("data-visible-node-count", "6")
       await expect(page.locator("#external-package-section")).toBeVisible()
       await expect(page.locator("#external-package-list button")).toHaveCount(2)
-      await expect(page.locator("#selected-imports")).toHaveText("4")
-      await expect(page.locator("#selected-imported-files button")).toHaveCount(4)
-      await expect(page.locator("#selected-imported-files")).toContainText("External package")
+      await expect(page.locator("#selected-dependencies")).toHaveText("4")
+      await expect(page.locator("#selected-dependency-nodes button")).toHaveCount(4)
+      await expect(page.locator("#selected-dependency-nodes")).toContainText("External package")
       expect(await graph.getAttribute("data-layout-signature")).not.toBe(defaultLayoutSignature)
 
       const reactPackage = page.locator("#external-package-list button").filter({ hasText: "react" })
@@ -221,13 +221,15 @@ test("derives project-file edges and relationship indexes in the browser", async
       return path
     })
 
-    await test.step("Inspect browser-derived import and consumer navigation", async () => {
+    await test.step("Inspect browser-derived dependency and consumer navigation", async () => {
       await page.goto(pathToFileURL(reportPath).href)
       await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
       await expect(page.locator("#graph")).toHaveAttribute("data-visible-edge-count", "13")
       await page.locator("#file-list").getByRole("button", { name: "src/main.ts", exact: true }).click()
-      await expect(page.locator("#selected-imports")).toHaveText("7")
-      await expect(page.locator("#selected-imported-files button")).toHaveText([
+      await expect(page.getByRole("heading", { name: "Dependencies", exact: true })).toBeVisible()
+      await expect(page.getByText("Imports", { exact: true })).toHaveCount(0)
+      await expect(page.locator("#selected-dependencies")).toHaveText("7")
+      await expect(page.locator("#selected-dependency-nodes button")).toHaveText([
         "src/default-export.ts",
         "src/directory/index.ts",
         "src/lib/aliased.ts",
@@ -236,7 +238,7 @@ test("derives project-file edges and relationship indexes in the browser", async
         "src/runtime.ts",
         "src/side-effect.js",
       ])
-      await page.locator("#selected-imported-files").getByRole("button", { name: "src/runtime.ts", exact: true }).click()
+      await page.locator("#selected-dependency-nodes").getByRole("button", { name: "src/runtime.ts", exact: true }).click()
       await expect(page.locator("#selected-consumers")).toHaveText("2")
       await expect(page.locator("#selected-consumer-files button")).toHaveText(["src/main.ts", "src/reexports.ts"])
     })

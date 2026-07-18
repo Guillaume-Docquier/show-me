@@ -8,7 +8,7 @@ This document describes the target architecture. The implementation is being bui
 
 The initial end-to-end product is operational. The CLI discovers supported project files, excludes conventional test files by default, classifies code, comment, and blank physical lines, analyzes static runtime ESM imports and re-exports through Oxc, identifies pnpm workspace ownership and external npm package roots, optionally imports Istanbul or LCOV line coverage, and writes a self-contained interactive graph report. The repository publishes its latest validated report through GitHub Pages.
 
-Analysis, report packaging, browser presentation, CLI, build, and package boundaries have been consolidated and are covered through Node and real-browser tests. CLOC-style metrics, interactive line-category sizing, optional external-package nodes, per-importer TypeScript configuration discovery, pnpm workspace ownership, cross-package resolution, and package filters are implemented. User-facing file-selection controls remain planned.
+Analysis, report packaging, browser presentation, CLI, build, and package boundaries have been consolidated and are covered through Node and real-browser tests. CLOC-style metrics, interactive line-category sizing, optional external-package nodes, per-source-file TypeScript configuration discovery, pnpm workspace ownership, cross-package resolution, and package filters are implemented. User-facing file-selection controls remain planned.
 
 ## System flow
 
@@ -38,7 +38,7 @@ The boundaries have different responsibilities:
 
 The current product:
 
-- analyzes one JavaScript or TypeScript project or pnpm workspace, automatically discovering the `tsconfig.json` or `jsconfig.json` applicable to each importing file and following project references;
+- analyzes one JavaScript or TypeScript project or pnpm workspace, automatically discovering the `tsconfig.json` or `jsconfig.json` applicable to each source file and following project references;
 - discovers executable `.js`, `.jsx`, `.mjs`, `.cjs`, `.ts`, `.tsx`, `.mts`, and `.cts` files;
 - excludes TypeScript declaration files, non-code assets, and supported files whose basename contains `.test.` or `.spec.` case-insensitively, while marker-like directories and bare `test.ts` or `spec.ts` names remain included;
 - classifies every physical line exclusively as code, comment, or blank;

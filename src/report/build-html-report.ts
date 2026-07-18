@@ -63,13 +63,13 @@ export function buildHtmlReport(analysis: ProjectAnalysis, browserBundle: string
         <dt data-project-file-detail>Code lines</dt><dd id="selected-code-lines" data-project-file-detail></dd>
         <dt data-project-file-detail>Comment lines</dt><dd id="selected-comment-lines" data-project-file-detail></dd>
         <dt data-project-file-detail>Blank lines</dt><dd id="selected-blank-lines" data-project-file-detail></dd>
-        <dt>Imports</dt><dd id="selected-imports"></dd>
+        <dt>Dependencies</dt><dd id="selected-dependencies"></dd>
         <dt>Consumers</dt><dd id="selected-consumers"></dd>
         <dt data-project-file-detail>Coverage</dt><dd id="selected-coverage" data-project-file-detail></dd>
       </dl>
       <button id="clear-selection" class="clear-selection" type="button" hidden>Clear selection</button>
-      <h3>Imports</h3>
-      <ol id="selected-imported-files" class="file-list relationship-list"></ol>
+      <h3>Dependencies</h3>
+      <ol id="selected-dependency-nodes" class="file-list relationship-list"></ol>
       <h3>Consumers</h3>
       <ol id="selected-consumer-files" class="file-list relationship-list"></ol>
     </section>

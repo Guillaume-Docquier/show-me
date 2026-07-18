@@ -10,7 +10,7 @@ Filesystem and pnpm workspace discovery, normalized project-file paths, CLOC-sty
 
 The project root defaults to the current working directory and may be supplied as the optional positional CLI argument.
 
-Discovery scans beneath the project root, honors `.gitignore`, and applies narrowly defined standard exclusions such as dependency, version-control, coverage, and generated-output directories. It accepts an explicit typed file-selection policy for overrideable conventions while keeping standard directories, `.gitignore`, declaration files, and unsupported languages permanently excluded. It does not use TypeScript project configuration as the authoritative file list. Automatically discovered `tsconfig.json` and `jsconfig.json` files guide dependency resolution for each importer, while filesystem discovery determines which project files exist.
+Discovery scans beneath the project root, honors `.gitignore`, and applies narrowly defined standard exclusions such as dependency, version-control, coverage, and generated-output directories. It accepts an explicit typed file-selection policy for overrideable conventions while keeping standard directories, `.gitignore`, declaration files, and unsupported languages permanently excluded. It does not use TypeScript project configuration as the authoritative file list. Automatically discovered `tsconfig.json` and `jsconfig.json` files guide dependency resolution for each source file, while filesystem discovery determines which project files exist.
 
 Initial executable extensions are:
 
@@ -37,11 +37,11 @@ The internal model is versioned even though it is not initially a public CLI for
 
 Project-relative paths use forward slashes on every platform. Construction normalizes duplicate separators and lexical dot segments, rejects absolute, project-root-only, and outside-root paths, and compares paths with locale-independent ordinal ordering. One canonical relative path identifies a file within an analysis.
 
-Edges are authoritative. Import and consumer counts are derived from edges rather than duplicated as independently maintained data.
+Edges are authoritative. Dependency and consumer counts are derived from edges rather than duplicated as independently maintained data.
 
 ## Language modules
 
-A language module operates at project scope so it can use project configuration and resolve relationships across files. The internal JavaScript/TypeScript module uses Oxc's file-based resolution to discover the configuration applicable to each importer, including referenced project configurations. It exposes only language-neutral file analyses, metrics, dependencies, and diagnostics. Oxc parser and resolver values remain contained behind focused adapters.
+A language module operates at project scope so it can use project configuration and resolve relationships across files. The internal JavaScript/TypeScript module uses Oxc's file-based resolution to discover the configuration applicable to each source file, including referenced project configurations. It exposes only language-neutral file analyses, metrics, dependencies, and diagnostics. Oxc parser and resolver values remain contained behind focused adapters.
 
 Language modules are an architectural extension point, not a public plugin API. Adding another language initially means adding another module to the Show Me package. The core model and renderer must not gain language-specific AST types or resolution rules.
 
@@ -51,7 +51,7 @@ When the project root contains `pnpm-workspace.yaml`, workspace discovery parses
 
 Workspace package paths are stable project-relative identities. Package names remain display and request-classification data. The complete ordered package list and file ownership cross the language-neutral analysis boundary so the browser can derive filters without reading package configuration.
 
-The JavaScript and TypeScript analyzer keeps ordinary Oxc resolution first, preserving the `tsconfig.json` or `jsconfig.json` applicable to each importer. If an otherwise bare request names a workspace package, its package exports or conventional source entry point resolve against analyzed files before external-package classification. A matched but unresolved workspace request produces a diagnostic rather than an external-package fact.
+The JavaScript and TypeScript analyzer keeps ordinary Oxc resolution first, preserving the `tsconfig.json` or `jsconfig.json` applicable to each source file. If an otherwise bare request names a workspace package, its package exports or conventional source entry point resolve against analyzed files before external-package classification. A matched but unresolved workspace request produces a diagnostic rather than an external-package fact.
 
 ## Initial JavaScript and TypeScript dependency rules
 
@@ -74,7 +74,7 @@ Unaliased bare npm requests create canonical external-package facts and distinct
 
 Package subpaths collapse to their package name. For example, `drizzle-orm/pg-core` belongs to `drizzle-orm`, and `@scope/package/subpath` belongs to `@scope/package`.
 
-Relative paths, absolute paths, package-import specifiers beginning with `#`, protocol requests, malformed package roots, Node built-ins, and workspace-owned package requests are not external packages. A request matching a path alias from the importing file's automatically discovered `tsconfig.json` or `jsconfig.json`, its relative base configuration, or a referenced project configuration retains project-resolution precedence: a resolved alias creates a project-file dependency, while a missing alias produces the existing unresolved-runtime diagnostic rather than a package fact.
+Relative paths, absolute paths, package-import specifiers beginning with `#`, protocol requests, malformed package roots, Node built-ins, and workspace-owned package requests are not external packages. A request matching a path alias from the source file's automatically discovered `tsconfig.json` or `jsconfig.json`, its relative base configuration, or a referenced project configuration retains project-resolution precedence: a resolved alias creates a project-file dependency, while a missing alias produces the existing unresolved-runtime diagnostic rather than a package fact.
 
 ## Line metrics
 
