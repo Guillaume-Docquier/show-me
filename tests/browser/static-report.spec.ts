@@ -308,8 +308,8 @@ test("uses weighted folder nodes as the primary force graph under dependency arr
 
     await test.step("Reveal directory labels progressively while zooming", async () => {
       const graph = page.locator("#graph")
-      await expect(graph).toHaveAttribute("data-visible-directory-label-depth", "2")
-      await expect(graph).toHaveAttribute("data-visible-directory-labels", '["project","src","features","platform"]')
+      await expect(graph).toHaveAttribute("data-visible-directory-label-depth", "1")
+      await expect(graph).toHaveAttribute("data-visible-directory-labels", '["project","src"]')
       const bounds = await graph.boundingBox()
       Assert.isDefined(bounds)
       await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2)
