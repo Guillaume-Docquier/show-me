@@ -99,7 +99,17 @@ export function analyzeJavaScriptTypeScript(
       coverage: undefined,
     })
     for (const request of requests.value.requests) {
-      if (!resolverResult.value.matchesConfiguredAlias(request)) {
+      const dependency = resolveProjectDependency(file, request, resolverResult.value, discoveredPathByAbsolutePath)
+      if (Result.isFailure(dependency)) {
+        return dependency
+      }
+      if (dependency.value._tag === "Dependency") {
+        const resolvedDependency = dependency.value.dependency
+        dependencyByKey.set(`${resolvedDependency.source}\u0000${resolvedDependency.target}`, resolvedDependency)
+        continue
+      }
+
+      if (!dependency.value.matchesConfiguredAlias) {
         const externalPackageName = externalPackageNameFromRequest(request)
         if (externalPackageName !== undefined) {
           externalPackageNames.add(externalPackageName)
@@ -113,14 +123,7 @@ export function analyzeJavaScriptTypeScript(
         }
       }
 
-      const dependency = resolveProjectDependency(file, request, resolverResult.value, discoveredPathByAbsolutePath)
-      if (Result.isFailure(dependency)) {
-        return dependency
-      }
-      if (dependency.value._tag === "Dependency") {
-        const resolvedDependency = dependency.value.dependency
-        dependencyByKey.set(`${resolvedDependency.source}\u0000${resolvedDependency.target}`, resolvedDependency)
-      } else if (dependency.value._tag === "Unresolved" && shouldDiagnoseUnresolvedRequest(request, resolverResult.value)) {
+      if (dependency.value._tag === "Unresolved" && shouldDiagnoseUnresolvedRequest(request, dependency.value.matchesConfiguredAlias)) {
         diagnostics.push({
           code: "UNRESOLVED_RUNTIME_DEPENDENCY",
           message: `Could not resolve runtime dependency ${JSON.stringify(request)}.`,
@@ -155,13 +158,18 @@ function resolveProjectDependency(
     })
   }
 
-  if (resolution.value === undefined) {
-    return Result.Success({ _tag: "Unresolved" })
+  const target = resolution.value.path === undefined ? undefined : discoveredPathByAbsolutePath.get(resolve(resolution.value.path))
+  if (resolution.value.path === undefined) {
+    return Result.Success({
+      _tag: "Unresolved",
+      matchesConfiguredAlias: resolution.value.matchesConfiguredAlias,
+    })
   }
-
-  const target = discoveredPathByAbsolutePath.get(resolve(resolution.value))
   return target === undefined
-    ? Result.Success({ _tag: "OutsideAnalysis" })
+    ? Result.Success({
+        _tag: "OutsideAnalysis",
+        matchesConfiguredAlias: resolution.value.matchesConfiguredAlias,
+      })
     : Result.Success({
         _tag: "Dependency",
         dependency: {
@@ -173,12 +181,12 @@ function resolveProjectDependency(
 }
 
 type ProjectDependencyResolution =
-  | { readonly _tag: "Unresolved" }
-  | { readonly _tag: "OutsideAnalysis" }
+  | { readonly _tag: "Unresolved"; readonly matchesConfiguredAlias: boolean }
+  | { readonly _tag: "OutsideAnalysis"; readonly matchesConfiguredAlias: boolean }
   | { readonly _tag: "Dependency"; readonly dependency: ProjectDependency }
 
-function shouldDiagnoseUnresolvedRequest(request: string, resolver: JavaScriptTypeScriptResolver): boolean {
-  if (resolver.matchesConfiguredAlias(request)) {
+function shouldDiagnoseUnresolvedRequest(request: string, matchesConfiguredAlias: boolean): boolean {
+  if (matchesConfiguredAlias) {
     return true
   }
 

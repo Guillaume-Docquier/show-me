@@ -10,6 +10,7 @@ export type FixtureProjectName =
   | "external-packages"
   | "minimal-javascript"
   | "minimal-typescript"
+  | "path-aliases"
   | "static-esm"
   | "static-esm-no-config"
   | "test-file-exclusions"

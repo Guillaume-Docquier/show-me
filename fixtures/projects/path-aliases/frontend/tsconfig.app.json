@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["./src/*"],
+      "features/*": ["./src/features/*"]
+    }
+  },
+  "include": ["src"]
+}

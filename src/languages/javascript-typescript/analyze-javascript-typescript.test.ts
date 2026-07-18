@@ -97,6 +97,36 @@ describe("analyzeJavaScriptTypeScript", () => {
     )
   })
 
+  it("resolves path aliases from the project configuration that applies to each importing file", async () => {
+    // Arrange
+    const projectRoot = fixtureProjectPath("path-aliases")
+    const files = await readDiscoveredSourceFiles(projectRoot)
+
+    // Act
+    const result = analyzeJavaScriptTypeScript(projectRoot, files)
+
+    // Assert
+    expect(Result.isSuccess(result)).toBe(true)
+    if (Result.isSuccess(result)) {
+      expect(result.value.dependencies).toEqual([
+        { source: "frontend/src/main.ts", target: "frontend/src/features/value.ts", kind: "runtime" },
+        { source: "frontend/src/main.ts", target: "frontend/src/shared.ts", kind: "runtime" },
+        { source: "javascript/src/main.js", target: "javascript/src/lib/value.js", kind: "runtime" },
+      ])
+      expect(result.value.externalPackages).toEqual([{ name: "uninstalled-package" }])
+      expect(result.value.externalPackageDependencies).toEqual([
+        { source: "frontend/src/main.ts", target: "uninstalled-package", kind: "runtime" },
+      ])
+      expect(result.value.diagnostics).toEqual([
+        {
+          code: "UNRESOLVED_RUNTIME_DEPENDENCY",
+          message: 'Could not resolve runtime dependency "features/missing".',
+          file: "frontend/src/main.ts",
+        },
+      ])
+    }
+  })
+
   it("normalizes external packages while configured aliases keep project-resolution precedence", async () => {
     // Arrange
     const projectRoot = fixtureProjectPath("external-packages")

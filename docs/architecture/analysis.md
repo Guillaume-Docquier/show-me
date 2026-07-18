@@ -10,7 +10,7 @@ Filesystem discovery, normalized project-file paths, CLOC-style physical-line ca
 
 The project root defaults to the current working directory and may be supplied as the optional positional CLI argument.
 
-Discovery scans beneath the project root, honors `.gitignore`, and applies narrowly defined standard exclusions such as dependency, version-control, coverage, and generated-output directories. It accepts an explicit typed file-selection policy for overrideable conventions while keeping standard directories, `.gitignore`, declaration files, and unsupported languages permanently excluded. It does not use `tsconfig.json` as the authoritative file list. Project configuration guides dependency resolution, while filesystem discovery determines which project files exist.
+Discovery scans beneath the project root, honors `.gitignore`, and applies narrowly defined standard exclusions such as dependency, version-control, coverage, and generated-output directories. It accepts an explicit typed file-selection policy for overrideable conventions while keeping standard directories, `.gitignore`, declaration files, and unsupported languages permanently excluded. It does not use TypeScript project configuration as the authoritative file list. Automatically discovered `tsconfig.json` and `jsconfig.json` files guide dependency resolution for each importer, while filesystem discovery determines which project files exist.
 
 Initial executable extensions are:
 
@@ -40,7 +40,7 @@ Edges are authoritative. Import and consumer counts are derived from edges rathe
 
 ## Language modules
 
-A language module operates at project scope so it can use project configuration and resolve relationships across files. The internal JavaScript/TypeScript module uses Oxc and exposes only language-neutral file analyses, metrics, dependencies, and diagnostics. Oxc parser and resolver values remain contained behind focused adapters.
+A language module operates at project scope so it can use project configuration and resolve relationships across files. The internal JavaScript/TypeScript module uses Oxc's file-based resolution to discover the configuration applicable to each importer, including referenced project configurations. It exposes only language-neutral file analyses, metrics, dependencies, and diagnostics. Oxc parser and resolver values remain contained behind focused adapters.
 
 Language modules are an architectural extension point, not a public plugin API. Adding another language initially means adding another module to the Show Me package. The core model and renderer must not gain language-specific AST types or resolution rules.
 
@@ -65,7 +65,7 @@ Unaliased bare npm requests create canonical external-package facts and distinct
 
 Package subpaths collapse to their package name. For example, `drizzle-orm/pg-core` belongs to `drizzle-orm`, and `@scope/package/subpath` belongs to `@scope/package`.
 
-Relative paths, absolute paths, package-import specifiers beginning with `#`, protocol requests, malformed package roots, and Node built-ins are not external packages. A request matching a configured `tsconfig.json` or `jsconfig.json` path alias retains project-resolution precedence: a resolved alias creates a project-file dependency, while a missing alias produces the existing unresolved-runtime diagnostic rather than a package fact. Milestone 008 will insert workspace-package ownership before external-package classification.
+Relative paths, absolute paths, package-import specifiers beginning with `#`, protocol requests, malformed package roots, and Node built-ins are not external packages. A request matching a path alias from the importing file's automatically discovered `tsconfig.json` or `jsconfig.json`, its relative base configuration, or a referenced project configuration retains project-resolution precedence: a resolved alias creates a project-file dependency, while a missing alias produces the existing unresolved-runtime diagnostic rather than a package fact. Milestone 008 will insert workspace-package ownership before external-package classification.
 
 ## Line metrics
 

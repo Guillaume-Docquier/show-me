@@ -7,7 +7,7 @@ This directory tracks milestones, implementation progress, verification evidence
 | Milestone                                                                       | Status      | Outcome                                                                |
 | ------------------------------------------------------------------------------- | ----------- | ---------------------------------------------------------------------- |
 | [008 pnpm workspaces](./008-pnpm-workspaces.md)                                 | Not started | Analyze and filter all packages in one pnpm workspace.                 |
-| [009 Import compatibility](./009-import-compatibility.md)                       | Not started | Add CommonJS, dynamic imports, and broader resolution behavior.        |
+| [009 Import compatibility](./009-import-compatibility.md)                       | In progress | Add CommonJS, dynamic imports, and broader resolution behavior.        |
 | [010 Visualization and UX](./010-visualization-and-ux.md)                       | Not started | Improve navigation, focus, clustering, and accessibility.              |
 | [011 Large-codebase performance](./011-large-codebase-performance.md)           | Not started | Profile and optimize analysis and rendering for large projects.        |
 | [014 CLI file selection](./014-cli-file-selection.md)                           | Not started | Include default-excluded tests and add one-invocation ignore patterns. |
