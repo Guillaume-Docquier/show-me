@@ -34,8 +34,8 @@ declare global {
 
 const TOOLTIP_OFFSET = 14
 const VIEWPORT_MARGIN = 10
-const DIRECTORY_NODE_SIZE = 7
-const ROOT_DIRECTORY_NODE_SIZE = 10
+const DIRECTORY_NODE_SIZE = 9
+const ROOT_DIRECTORY_NODE_SIZE = 15
 const STRUCTURE_EDGE_WEIGHT = 6
 const DEPENDENCY_EDGE_WEIGHT = 0.25
 const EXTERNAL_DEPENDENCY_EDGE_WEIGHT = 1.2
@@ -352,9 +352,10 @@ function renderStructureLinks(): void {
     structureContext.moveTo(sourceViewport.x, sourceViewport.y)
     structureContext.lineTo(targetViewport.x, targetViewport.y)
   }
-  structureContext.setLineDash([2, 5])
-  structureContext.lineWidth = 1
-  structureContext.strokeStyle = "rgba(111, 130, 149, 0.34)"
+
+  structureContext.setLineDash([2, 4])
+  structureContext.lineWidth = 2
+  structureContext.strokeStyle = "rgba(111, 130, 149, 0.68)"
   structureContext.stroke()
   structureContext.setLineDash([])
 }

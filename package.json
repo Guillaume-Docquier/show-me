@@ -18,7 +18,7 @@
     "build:node": "tsc --project tsconfig.build.json",
     "checks": "pnpm format:fix && pnpm lint:fix && pnpm typecheck && pnpm test && pnpm build && pnpm test:browser && pnpm show-me",
     "clean": "rimraf dist",
-    "dev": "chokidar \"src/**/*\" -c \"pnpm show-me\"",
+    "dev": "chokidar \"src/**/*\" -c \"pnpm build && pnpm show-me\"",
     "format": "oxfmt --check",
     "format:fix": "oxfmt",
     "lint": "oxlint --max-warnings 0",
