@@ -27,7 +27,7 @@
     "prepare": "husky",
     "show-me": "pnpm build && node ./dist/cli/entry.cli.js",
     "test": "vitest run --silent",
-    "test:browser": "playwright test",
+    "test:browser": "pnpm build && playwright test",
     "test:coverage": "pnpm test --coverage",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
