@@ -1,7 +1,6 @@
 import { createRng, mulberry32Prng } from "@guillaume-docquier/tools-ts"
 import { DirectedGraph } from "graphology"
 import forceAtlas2 from "graphology-layout-forceatlas2"
-import type { ForceAtlas2SynchronousLayoutParameters } from "graphology-layout-forceatlas2"
 
 const LAYOUT_SEED = 1_984_091
 const LAYOUT_ITERATIONS = 500
@@ -39,14 +38,6 @@ type LayoutNodeAttributes = {
   y: number
 }
 
-// SAFETY: This CommonJS package exposes its callable layout as the ESM default at runtime, but its declaration is interpreted as a module namespace under NodeNext.
-const forceAtlas2Layout = forceAtlas2 as unknown as {
-  readonly assign: (
-    graph: DirectedGraph<LayoutNodeAttributes>,
-    parameters: ForceAtlas2SynchronousLayoutParameters<LayoutNodeAttributes>,
-  ) => void
-}
-
 /**
  * Lay out report nodes deterministically with rendered-size-aware collision spacing.
  *
@@ -80,7 +71,7 @@ export function layoutReportGraph(
       graph.setNodeAttribute(onlyNode, "y", 0)
     }
   } else if (graph.order > 1) {
-    forceAtlas2Layout.assign(graph, {
+    forceAtlas2.assign(graph, {
       iterations: LAYOUT_ITERATIONS,
       settings: {
         adjustSizes: true,
