@@ -48,9 +48,15 @@ test("supports graph hover, selection, clearing, and side-panel navigation", asy
       const graph = page.locator("#graph")
       const bounds = await graph.boundingBox()
       Assert.isDefined(bounds)
-      const centerX = bounds.x + bounds.width / 2
-      const centerY = bounds.y + bounds.height / 2
-      await page.mouse.move(centerX, centerY)
+      const serializedNodePositions = await graph.getAttribute("data-visible-node-positions")
+      Assert.isDefined(serializedNodePositions)
+      const nodePosition = (
+        JSON.parse(serializedNodePositions) as Array<{ readonly id: string; readonly x: number; readonly y: number }>
+      ).find(({ id }) => id === report.longPathNodeId)
+      Assert.isDefined(nodePosition)
+      const pointerX = bounds.x + nodePosition.x
+      const pointerY = bounds.y + nodePosition.y
+      await page.mouse.move(pointerX, pointerY)
       await expect(page.locator("html")).toHaveAttribute("data-hovered-node", report.longPathNodeId)
       const tooltip = page.locator("#tooltip")
       await expect(tooltip).toBeVisible()
@@ -62,13 +68,17 @@ test("supports graph hover, selection, clearing, and side-panel navigation", asy
       expect(await tooltipPath.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
       const tooltipBounds = await tooltip.boundingBox()
       Assert.isDefined(tooltipBounds)
-      expect(Math.abs(tooltipBounds.x - (centerX + 14))).toBeLessThanOrEqual(1)
-      expect(Math.abs(tooltipBounds.y - (centerY + 14))).toBeLessThanOrEqual(1)
-      return { centerX, centerY }
+      expect(
+        Math.min(Math.abs(tooltipBounds.x - (pointerX + 14)), Math.abs(tooltipBounds.x - (pointerX - tooltipBounds.width - 14))),
+      ).toBeLessThanOrEqual(1)
+      expect(
+        Math.min(Math.abs(tooltipBounds.y - (pointerY + 14)), Math.abs(tooltipBounds.y - (pointerY - tooltipBounds.height - 14))),
+      ).toBeLessThanOrEqual(1)
+      return { pointerX, pointerY }
     })
 
     await test.step("Select the file and rebuild every non-empty line-category view", async () => {
-      await page.mouse.click(pointer.centerX, pointer.centerY)
+      await page.mouse.click(pointer.pointerX, pointer.pointerY)
       await expect(page.locator("html")).toHaveAttribute("data-selected-node", report.longPathNodeId)
       await expect(page.locator("#selected-path")).toHaveText(report.longPath)
       await expect(page.locator("#selected-code-lines")).toHaveText("1")
@@ -159,6 +169,9 @@ test("keeps packages hidden by default and rebuilds one combined metric and pack
       await expect(externalPackages).not.toBeChecked()
       await expect(page.locator("html")).toHaveAttribute("data-external-packages", "hidden")
       await expect(graph).toHaveAttribute("data-visible-node-count", "4")
+      await expect(graph).toHaveAttribute("data-graph-node-count", "7")
+      await expect(graph).toHaveAttribute("data-directory-node-count", "3")
+      await expect(graph).toHaveAttribute("data-structure-edge-count", "6")
       await expect(page.locator("#external-package-section")).toBeHidden()
       await expect(page.locator("#external-package-list button")).toHaveCount(0)
       const signature = await graph.getAttribute("data-layout-signature")
@@ -174,6 +187,9 @@ test("keeps packages hidden by default and rebuilds one combined metric and pack
       await externalPackages.check()
       await expect(page.locator("html")).toHaveAttribute("data-external-packages", "visible")
       await expect(graph).toHaveAttribute("data-visible-node-count", "6")
+      await expect(graph).toHaveAttribute("data-graph-node-count", "9")
+      await expect(graph).toHaveAttribute("data-directory-node-count", "3")
+      await expect(graph).toHaveAttribute("data-structure-edge-count", "6")
       await expect(page.locator("#external-package-section")).toBeVisible()
       await expect(page.locator("#external-package-list button")).toHaveCount(2)
       await expect(page.locator("#selected-dependencies")).toHaveText("4")
@@ -241,6 +257,51 @@ test("derives project-file edges and relationship indexes in the browser", async
       await page.locator("#selected-dependency-nodes").getByRole("button", { name: "src/runtime.ts", exact: true }).click()
       await expect(page.locator("#selected-consumers")).toHaveText("2")
       await expect(page.locator("#selected-consumer-files button")).toHaveText(["src/main.ts", "src/reexports.ts"])
+    })
+  })
+})
+
+test("uses weighted folder nodes as the primary force graph under dependency arrows", async ({ page }) => {
+  await withTemporaryDirectory(async (temporaryDirectory) => {
+    const reportPath = await test.step("Generate a report with one cross-branch dependency", async () => {
+      const projectDirectory = join(temporaryDirectory, "project")
+      const featureDirectory = join(projectDirectory, "src", "features", "accounts")
+      const platformDirectory = join(projectDirectory, "src", "platform", "database")
+      await mkdir(featureDirectory, { recursive: true })
+      await mkdir(platformDirectory, { recursive: true })
+      await writeFile(join(featureDirectory, "create.ts"), 'import "../../platform/database/query.js"\n', "utf8")
+      await writeFile(join(platformDirectory, "query.ts"), "export const query = true\n", "utf8")
+      const analysis = await analyzeProject({ projectRoot: projectDirectory })
+      Assert.isSuccess(analysis)
+      const browserBundle = await readFile(join(process.cwd(), "dist", "report", "browser.js"), "utf8")
+      const path = join(temporaryDirectory, "structure.html")
+      await writeFile(path, buildHtmlReport(analysis.value, browserBundle), "utf8")
+      return path
+    })
+
+    await test.step("Inspect the structural graph, force weights, and overlaid dependency", async () => {
+      await page.goto(pathToFileURL(reportPath).href)
+      await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
+      const graph = page.locator("#graph")
+      await expect(graph).toHaveAttribute("data-visible-node-count", "2")
+      await expect(graph).toHaveAttribute("data-visible-edge-count", "1")
+      await expect(graph).toHaveAttribute("data-graph-node-count", "8")
+      await expect(graph).toHaveAttribute("data-directory-node-count", "6")
+      await expect(graph).toHaveAttribute("data-structure-edge-count", "7")
+      await expect(graph).toHaveAttribute("data-structure-edge-weight", "6")
+      await expect(graph).toHaveAttribute("data-dependency-edge-weight", "0.25")
+      const structureCanvas = graph.locator("canvas.sigma-structure")
+      await expect(structureCanvas).toHaveCount(1)
+      expect(
+        await structureCanvas.evaluate((canvas) => {
+          if (!(canvas instanceof HTMLCanvasElement)) {
+            return false
+          }
+          return (
+            canvas.width === canvas.clientWidth * window.devicePixelRatio && canvas.height === canvas.clientHeight * window.devicePixelRatio
+          )
+        }),
+      ).toBe(true)
     })
   })
 })

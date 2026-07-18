@@ -29,6 +29,11 @@ header p { margin: 0; color: #8fa3b8; font-size: 12px; }
 .report-controls label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
 .report-controls label:has(input:disabled) { color: #6f8295; cursor: default; }
 .report-controls input { accent-color: #79b8ff; }
+.graph-key, .graph-key span { display: flex; align-items: center; gap: 6px; }
+.graph-key { gap: 12px; color: #8fa3b8; }
+.graph-edge-swatch { display: inline-block; width: 18px; }
+.structure-edge-swatch { height: 0; border-top: 1px dashed #6f8295; }
+.dependency-edge-swatch { height: 2px; background: #628bb5; }
 main { min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 320px; }
 #graph { position: relative; min-width: 0; background: #0d1117; }
 #details { border-left: 1px solid #25303b; background: #111821; overflow: auto; padding: 18px; }

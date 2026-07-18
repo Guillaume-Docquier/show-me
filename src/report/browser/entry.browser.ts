@@ -14,6 +14,7 @@ import Sigma from "sigma"
 import { createEdgeArrowProgram } from "sigma/rendering"
 import type { NodeDisplayData } from "sigma/types"
 import { PROJECT_ANALYSIS_SCHEMA_VERSION, type ProjectAnalysis } from "../../analysis/project-analysis.js"
+import { buildProjectStructure, type ProjectStructureEdge } from "./project-structure.js"
 import {
   activeLineCount,
   buildBrowserPresentation,
@@ -33,10 +34,19 @@ declare global {
 
 const TOOLTIP_OFFSET = 14
 const VIEWPORT_MARGIN = 10
+const DIRECTORY_NODE_SIZE = 7
+const ROOT_DIRECTORY_NODE_SIZE = 10
+const STRUCTURE_EDGE_WEIGHT = 6
+const DEPENDENCY_EDGE_WEIGHT = 0.25
+const EXTERNAL_DEPENDENCY_EDGE_WEIGHT = 1.2
 
 type BrowserNodeAttributes = {
   readonly size: number
   readonly color: string
+  readonly x: number
+  readonly y: number
+  readonly label?: string
+  readonly forceLabel?: boolean
 }
 
 type ReportViewState = {
@@ -98,24 +108,30 @@ let viewState: ReportViewState = {
   externalPackages: false,
   workspacePackages: new Set(presentation.workspacePackages.map((workspacePackage) => workspacePackage.path)),
 }
+let structureEdges: readonly ProjectStructureEdge[] = []
 const renderer = new Sigma<BrowserNodeAttributes>(graph, graphContainer, {
   allowInvalidContainer: false,
   defaultEdgeType: "arrow",
   edgeProgramClasses: { arrow: createEdgeArrowProgram<BrowserNodeAttributes>() },
-  // Node names live in the accessible DOM lists, tooltip, and details panel rather than on the WebGL canvas.
+  labelColor: { color: "#aebdca" },
+  labelFont: "ui-monospace, SFMono-Regular, Consolas, monospace",
   labelRenderedSizeThreshold: Number.POSITIVE_INFINITY,
-  // ForceAtlas2 and Sigma must interpret node radii in the same coordinate system for adjustSizes to prevent overlap.
+  labelSize: 11,
+  labelWeight: "500",
+  // ForceAtlas2 and Sigma interpret node radii in the same graph-coordinate system.
   itemSizesReference: "positions",
   nodeReducer(node, attributes): Partial<NodeDisplayData> {
-    // Graphology announces new nodes before the layout assigns x/y. Temporary
-    // coordinates keep Sigma's display data valid; the spread lets real layout
-    // coordinates override them once present.
-    return node === selectedNodeId
-      ? { x: 0, y: 0, ...attributes, color: "#f4c66a", highlighted: true, zIndex: 1 }
-      : { x: 0, y: 0, ...attributes }
+    return node === selectedNodeId ? { ...attributes, color: "#f4c66a", highlighted: true, zIndex: 1 } : attributes
   },
   zIndex: true,
 })
+const structureLayer = renderer.createCanvas("structure", {
+  beforeLayer: "edges",
+  style: { pointerEvents: "none" },
+})
+const structureContext = requiredCanvasContext(structureLayer)
+renderer.resize(true)
+renderer.on("afterRender", renderStructureLinks)
 
 for (const control of lineCategoryControls) {
   control.input.addEventListener("change", () => {
@@ -192,6 +208,7 @@ document.documentElement.dataset.showMeReady = "true"
  */
 function applyReportView(nextState: ReportViewState): void {
   graph.clear()
+  structureEdges = []
   viewState = nextState
   const visibleProjectNodeIds = new Set(
     presentation.nodes
@@ -218,20 +235,62 @@ function applyReportView(nextState: ReportViewState): void {
       id: node.id,
       color: node.color,
       size: node.kind === "project-file" ? nodeSizeForLines(activeLineCount(node.lineMetrics, viewState.lineCategories)) : node.size,
+      reportNode: node,
     }))
   visibleNodeIds = new Set(visibleNodes.map((node) => node.id))
   const visibleEdges = presentation.edges.filter((edge) => visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target))
+  const projectStructure = buildProjectStructure(
+    visibleNodes
+      .filter(({ reportNode }) => reportNode.kind === "project-file")
+      .map(({ id, reportNode }) => ({ id, path: reportNode.kind === "project-file" ? reportNode.path : "" })),
+    presentation.projectName,
+  )
+  structureEdges = projectStructure.edges
 
   for (const node of visibleNodes) {
-    graph.addNode(node.id, { size: node.size, color: node.color })
+    graph.addNode(node.id, { size: node.size, color: node.color, x: 0, y: 0 })
   }
-  for (const edge of visibleEdges) {
-    graph.addDirectedEdgeWithKey(edge.id, edge.source, edge.target, {
-      type: "arrow",
-      color: edge.kind === "external-package" ? "#7c4aa5" : "#405267",
-      size: 2,
+  for (const directory of projectStructure.directories) {
+    graph.addNode(directory.id, {
+      size: directory.depth === 0 ? ROOT_DIRECTORY_NODE_SIZE : DIRECTORY_NODE_SIZE,
+      color: directory.depth === 0 ? "#79b8ff" : "#50677d",
+      label: directory.label,
+      forceLabel: true,
+      x: 0,
+      y: 0,
     })
   }
+  for (const edge of structureEdges) {
+    graph.addDirectedEdgeWithKey(edge.id, edge.source, edge.target, {
+      hidden: true,
+      weight: STRUCTURE_EDGE_WEIGHT,
+    })
+  }
+  for (const edge of visibleEdges) {
+    const externalPackage = edge.kind === "external-package"
+    graph.addDirectedEdgeWithKey(edge.id, edge.source, edge.target, {
+      type: "arrow",
+      color: externalPackage ? "#9a68c1" : "#628bb5",
+      size: externalPackage ? 2 : 2.4,
+      weight: externalPackage ? EXTERNAL_DEPENDENCY_EDGE_WEIGHT : DEPENDENCY_EDGE_WEIGHT,
+    })
+  }
+
+  circular.assign(graph)
+  forceAtlas2.assign(graph, {
+    iterations: 5000,
+    settings: {
+      adjustSizes: true,
+      barnesHutOptimize: false,
+      edgeWeightInfluence: 1,
+      gravity: 1,
+      linLogMode: false,
+      outboundAttractionDistribution: false,
+      scalingRatio: 6,
+      slowDown: 2,
+      strongGravityMode: false,
+    },
+  })
 
   if (selectedNodeId !== undefined && !visibleNodeIds.has(selectedNodeId)) {
     selectedNodeId = undefined
@@ -255,28 +314,57 @@ function applyReportView(nextState: ReportViewState): void {
   document.documentElement.dataset.workspacePackages = JSON.stringify([...viewState.workspacePackages])
   graphContainer.dataset.visibleNodeCount = String(visibleNodes.length)
   graphContainer.dataset.visibleEdgeCount = String(visibleEdges.length)
+  graphContainer.dataset.graphNodeCount = String(graph.order)
+  graphContainer.dataset.directoryNodeCount = String(projectStructure.directories.length)
+  graphContainer.dataset.structureEdgeCount = String(structureEdges.length)
+  graphContainer.dataset.structureEdgeWeight = String(STRUCTURE_EDGE_WEIGHT)
+  graphContainer.dataset.dependencyEdgeWeight = String(DEPENDENCY_EDGE_WEIGHT)
+  graphContainer.dataset.externalDependencyEdgeWeight = String(EXTERNAL_DEPENDENCY_EDGE_WEIGHT)
   graphContainer.dataset.visibleNodeColors = JSON.stringify(visibleNodes.map(({ id, color }) => ({ id, color })))
-  graphContainer.dataset.layoutSignature = layoutSignature(visibleNodes)
-  // Index the rebuilt graph while nodeReducer supplies temporary coordinates.
-  // The layout mutations below cause Sigma to schedule the final repaint.
+  graphContainer.dataset.layoutSignature = layoutSignature(visibleNodes.map(({ id, size }) => ({ id, size })))
   renderer.refresh()
+  graphContainer.dataset.visibleNodePositions = JSON.stringify(
+    visibleNodes.map(({ id }) => ({ id, ...renderer.graphToViewport(graph.getNodeAttributes(id)) })),
+  )
+}
 
-  // ForceAtlas2 requires non-degenerate starting coordinates. Circular layout is
-  // deterministic for the presentation's stable insertion order, then the
-  // synchronous ForceAtlas2 pass refines the visible graph before this transition returns.
-  circular.assign(graph)
-  forceAtlas2.assign(graph, {
-    iterations: 5000,
-    settings: {
-      adjustSizes: true,
-      // ForceAtlas2's Barnes-Hut branch does not include node radii in its repulsion calculation.
-      barnesHutOptimize: false,
-      gravity: 3,
-      scalingRatio: 6,
-      slowDown: 1.5,
-      outboundAttractionDistribution: true,
-    },
-  })
+function renderStructureLinks(): void {
+  const { width, height } = renderer.getDimensions()
+  const pixelRatio = window.devicePixelRatio
+  const pixelWidth = Math.max(1, Math.round(width * pixelRatio))
+  const pixelHeight = Math.max(1, Math.round(height * pixelRatio))
+  if (structureLayer.width !== pixelWidth || structureLayer.height !== pixelHeight) {
+    structureLayer.width = pixelWidth
+    structureLayer.height = pixelHeight
+  }
+  structureContext.setTransform(1, 0, 0, 1, 0, 0)
+  structureContext.clearRect(0, 0, structureLayer.width, structureLayer.height)
+  structureContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0)
+  structureContext.beginPath()
+  for (const edge of structureEdges) {
+    if (!graph.hasNode(edge.source) || !graph.hasNode(edge.target)) {
+      continue
+    }
+    const source = graph.getNodeAttributes(edge.source)
+    const target = graph.getNodeAttributes(edge.target)
+    const sourceViewport = renderer.graphToViewport(source)
+    const targetViewport = renderer.graphToViewport(target)
+    structureContext.moveTo(sourceViewport.x, sourceViewport.y)
+    structureContext.lineTo(targetViewport.x, targetViewport.y)
+  }
+  structureContext.setLineDash([2, 5])
+  structureContext.lineWidth = 1
+  structureContext.strokeStyle = "rgba(111, 130, 149, 0.34)"
+  structureContext.stroke()
+  structureContext.setLineDash([])
+}
+
+function requiredCanvasContext(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
+  const context = canvas.getContext("2d")
+  if (context === null) {
+    throw new Error("Could not create the project structure canvas.")
+  }
+  return context
 }
 
 function renderProjectFileList(): void {

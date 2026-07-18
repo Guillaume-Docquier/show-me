@@ -49,10 +49,14 @@ export function buildHtmlReport(analysis: ProjectAnalysis, browserBundle: string
       <legend>Workspace packages</legend>
       <span id="workspace-package-controls"></span>
     </fieldset>
+    <div class="graph-key" aria-label="Graph edge types">
+      <span><i class="graph-edge-swatch structure-edge-swatch" aria-hidden="true"></i>Structure</span>
+      <span><i class="graph-edge-swatch dependency-edge-swatch" aria-hidden="true"></i>Dependency</span>
+    </div>
   </div>
 </header>
 <main>
-  <section id="graph" aria-label="Project file and external package dependency graph"></section>
+  <section id="graph" aria-label="Project folder and file structure with dependency arrows"></section>
   <aside id="details" aria-label="Graph node details">
     <h2 id="selected-heading">Selected node</h2>
     <p id="selected-empty">Select a node to inspect it.</p>
