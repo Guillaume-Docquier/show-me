@@ -14,7 +14,7 @@
   },
   "scripts": {
     "build": "pnpm clean && pnpm build:node && pnpm build:browser",
-    "build:browser": "esbuild src/report/browser/entry.browser.ts --bundle --format=iife --target=es2022 --outfile=dist/report/browser.js",
+    "build:browser": "esbuild src/report/browser/entry.browser.ts --bundle --format=esm --target=es2022 --outfile=dist/report/browser.js",
     "build:node": "tsc --project tsconfig.build.json",
     "checks": "pnpm format:fix && pnpm lint:fix && pnpm typecheck && pnpm test && pnpm build && pnpm test:browser && pnpm show-me",
     "clean": "rimraf dist",
