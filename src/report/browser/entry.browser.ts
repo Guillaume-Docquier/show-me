@@ -14,6 +14,7 @@ import Sigma from "sigma"
 import { createEdgeArrowProgram } from "sigma/rendering"
 import type { NodeDisplayData } from "sigma/types"
 import { PROJECT_ANALYSIS_SCHEMA_VERSION, type ProjectAnalysis } from "../../analysis/project-analysis.js"
+import { visibleDirectoryDepth } from "./directory-label-visibility.js"
 import { buildProjectStructure, type ProjectStructureEdge } from "./project-structure.js"
 import {
   activeLineCount,
@@ -47,6 +48,7 @@ type BrowserNodeAttributes = {
   readonly y: number
   readonly label?: string
   readonly forceLabel?: boolean
+  readonly directoryDepth?: number
 }
 
 type ReportViewState = {
@@ -109,6 +111,7 @@ let viewState: ReportViewState = {
   workspacePackages: new Set(presentation.workspacePackages.map((workspacePackage) => workspacePackage.path)),
 }
 let structureEdges: readonly ProjectStructureEdge[] = []
+let maximumVisibleDirectoryDepth = visibleDirectoryDepth(1)
 const renderer = new Sigma<BrowserNodeAttributes>(graph, graphContainer, {
   allowInvalidContainer: false,
   defaultEdgeType: "arrow",
@@ -121,7 +124,13 @@ const renderer = new Sigma<BrowserNodeAttributes>(graph, graphContainer, {
   // ForceAtlas2 and Sigma interpret node radii in the same graph-coordinate system.
   itemSizesReference: "positions",
   nodeReducer(node, attributes): Partial<NodeDisplayData> {
-    return node === selectedNodeId ? { ...attributes, color: "#f4c66a", highlighted: true, zIndex: 1 } : attributes
+    const directoryLabel =
+      attributes.directoryDepth === undefined || attributes.directoryDepth <= maximumVisibleDirectoryDepth
+        ? {}
+        : { label: null, forceLabel: false }
+    return node === selectedNodeId
+      ? { ...attributes, ...directoryLabel, color: "#f4c66a", highlighted: true, zIndex: 1 }
+      : { ...attributes, ...directoryLabel }
   },
   zIndex: true,
 })
@@ -130,6 +139,20 @@ const structureLayer = renderer.createCanvas("structure", {
   style: { pointerEvents: "none" },
 })
 const structureContext = requiredCanvasContext(structureLayer)
+const camera = renderer.getCamera()
+maximumVisibleDirectoryDepth = visibleDirectoryDepth(camera.getState().ratio)
+camera.on("updated", ({ ratio }) => {
+  const nextVisibleDepth = visibleDirectoryDepth(ratio)
+  if (nextVisibleDepth === maximumVisibleDirectoryDepth) {
+    return
+  }
+  maximumVisibleDirectoryDepth = nextVisibleDepth
+  updateDirectoryLabelDiagnostics()
+  renderer.refresh({
+    partialGraph: { nodes: graph.filterNodes((_node, attributes) => attributes.directoryDepth !== undefined) },
+    skipIndexation: true,
+  })
+})
 renderer.resize(true)
 renderer.on("afterRender", renderStructureLinks)
 
@@ -256,6 +279,7 @@ function applyReportView(nextState: ReportViewState): void {
       color: directory.depth === 0 ? "#79b8ff" : "#50677d",
       label: directory.label,
       forceLabel: true,
+      directoryDepth: directory.depth,
       x: 0,
       y: 0,
     })
@@ -320,12 +344,28 @@ function applyReportView(nextState: ReportViewState): void {
   graphContainer.dataset.structureEdgeWeight = String(STRUCTURE_EDGE_WEIGHT)
   graphContainer.dataset.dependencyEdgeWeight = String(DEPENDENCY_EDGE_WEIGHT)
   graphContainer.dataset.externalDependencyEdgeWeight = String(EXTERNAL_DEPENDENCY_EDGE_WEIGHT)
+  updateDirectoryLabelDiagnostics()
   graphContainer.dataset.visibleNodeColors = JSON.stringify(visibleNodes.map(({ id, color }) => ({ id, color })))
   graphContainer.dataset.layoutSignature = layoutSignature(visibleNodes.map(({ id, size }) => ({ id, size })))
   renderer.refresh()
   graphContainer.dataset.visibleNodePositions = JSON.stringify(
     visibleNodes.map(({ id }) => ({ id, ...renderer.graphToViewport(graph.getNodeAttributes(id)) })),
   )
+}
+
+function updateDirectoryLabelDiagnostics(): void {
+  const visibleDirectoryLabels: string[] = []
+  graph.forEachNode((_node, attributes) => {
+    if (
+      attributes.directoryDepth !== undefined &&
+      attributes.directoryDepth <= maximumVisibleDirectoryDepth &&
+      attributes.label !== undefined
+    ) {
+      visibleDirectoryLabels.push(attributes.label)
+    }
+  })
+  graphContainer.dataset.visibleDirectoryLabelDepth = String(maximumVisibleDirectoryDepth)
+  graphContainer.dataset.visibleDirectoryLabels = JSON.stringify(visibleDirectoryLabels)
 }
 
 function renderStructureLinks(): void {
