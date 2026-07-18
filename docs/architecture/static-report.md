@@ -35,9 +35,11 @@ The Pages artifact contains only the generated self-contained report as `index.h
 
 ## Coverage discovery
 
-When `--coverage` is absent, the CLI checks `<project-root>/coverage/coverage-final.json` and then `<project-root>/coverage/lcov.info` in that fixed order. The first existing report is selected exclusively; the CLI never parses or merges the second report. Missing automatic coverage is informational and analysis continues without it. A selected but unreadable or invalid automatic report is an expected fatal command error, and the CLI does not fall back to the lower-precedence format.
+When `--coverage` is absent, the CLI discovers coverage roots from the project root and the nearest `package.json` ancestor of every analyzed file. This recognizes package roots in pnpm workspaces and other JavaScript or TypeScript monorepos without coupling discovery to one workspace-file format. Roots are processed as the project root followed by package roots in deterministic project-relative order.
 
-When `--coverage` is supplied, its path is resolved from the invocation directory and read once. A first non-whitespace `{` selects the Istanbul parser, while a first non-empty `TN:` or `SF:` record selects LCOV. Any other prefix is unsupported. A missing, unreadable, unsupported, or invalid explicit file is an expected fatal command error with a useful message; parser failures never invoke the other parser.
+At each root, the CLI checks `<coverage-root>/coverage/coverage-final.json` and then `<coverage-root>/coverage/lcov.info`. The first existing report at that root is selected exclusively; the lower-precedence format is never parsed there. Reports selected at different roots are combined into one analysis, resolving relative source paths from the root that owns each report and retaining maximum hits for repeated executable lines. Missing automatic coverage everywhere is informational. A selected but unreadable or invalid report is an expected fatal command error and never falls back to the other format at that root.
+
+When `--coverage` is supplied, its path is resolved from the invocation directory and read once. A first non-whitespace `{` selects the Istanbul parser, while a first non-empty `TN:` or `SF:` record selects LCOV. Any other prefix is unsupported. A missing, unreadable, unsupported, or invalid explicit file is an expected fatal command error with a useful message; parser failures never invoke the other parser. The explicit option still accepts one report; configurable per-package locations and multiple explicit inputs remain [milestone 020](../tasks/020-configurable-coverage-locations.md).
 
 ## Report contents
 

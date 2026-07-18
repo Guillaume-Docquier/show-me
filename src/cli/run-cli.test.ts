@@ -43,7 +43,7 @@ describe("runCli", () => {
 
 Options:
   --output <path>    Write the report to this path
-  --coverage <path>  Read Istanbul or LCOV coverage
+  --coverage <path>  Read one explicit Istanbul or LCOV report
   -h, --help         Show this help
   -v, --version      Show the version
 `,
@@ -245,6 +245,44 @@ Options:
       const analysis = parseAnalysis(await readFile(join(currentDirectory, "show-me.html"), "utf8"))
       expect(exitCode).toBe(0)
       expect(analysis.files).toEqual(expect.arrayContaining([expect.objectContaining({ path: "index.ts", coverage: { lines: 100 } })]))
+      expect(captured.standardOutput.join("")).not.toContain("No coverage file found")
+      expect(captured.standardError).toEqual([])
+    })
+  })
+
+  it("automatically combines coverage from the project root and package roots", async () => {
+    await withTemporaryDirectory(async (currentDirectory) => {
+      // Arrange
+      const backendRoot = join(currentDirectory, "backend")
+      const frontendRoot = join(currentDirectory, "frontend")
+      await mkdir(join(currentDirectory, "coverage"))
+      await mkdir(join(backendRoot, "src"), { recursive: true })
+      await mkdir(join(backendRoot, "coverage"))
+      await mkdir(join(frontendRoot, "src"), { recursive: true })
+      await mkdir(join(frontendRoot, "coverage"))
+      await writeFile(join(currentDirectory, "index.ts"), "export const root = true")
+      await writeFile(join(backendRoot, "package.json"), '{"name":"backend"}', "utf8")
+      await writeFile(join(backendRoot, "src", "api.ts"), "export const api = true")
+      await writeFile(join(frontendRoot, "package.json"), '{"name":"frontend"}', "utf8")
+      await writeFile(join(frontendRoot, "src", "app.ts"), "export const app = true")
+      await writeFile(join(currentDirectory, "coverage", "coverage-final.json"), coverageFinal("index.ts", 1), "utf8")
+      await writeFile(join(backendRoot, "coverage", "lcov.info"), lcov("src/api.ts", 0), "utf8")
+      await writeFile(join(frontendRoot, "coverage", "coverage-final.json"), coverageFinal("src/app.ts", 1), "utf8")
+      const captured = captureOutput()
+
+      // Act
+      const exitCode = await runCli([], captured.output, { currentDirectory, browserBundle: TEST_BROWSER_BUNDLE })
+
+      // Assert
+      const analysis = parseAnalysis(await readFile(join(currentDirectory, "show-me.html"), "utf8"))
+      expect(exitCode).toBe(0)
+      expect(analysis.files).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ path: "index.ts", coverage: { lines: 100 } }),
+          expect.objectContaining({ path: "backend/src/api.ts", coverage: { lines: 0 } }),
+          expect.objectContaining({ path: "frontend/src/app.ts", coverage: { lines: 100 } }),
+        ]),
+      )
       expect(captured.standardOutput.join("")).not.toContain("No coverage file found")
       expect(captured.standardError).toEqual([])
     })

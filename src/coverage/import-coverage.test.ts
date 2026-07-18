@@ -246,7 +246,7 @@ describe("importDiscoveredCoverage", () => {
       // Assert
       expect(Result.isSuccess(result)).toBe(true)
       if (Result.isSuccess(result)) {
-        expect(result.value.coverageFile).toBe(join(projectRoot, "coverage", "lcov.info"))
+        expect(result.value.coverageFiles).toEqual([join(projectRoot, "coverage", "lcov.info")])
         expect(result.value.analysis.files[0]?.coverage).toEqual({ lines: 100 })
       }
     })
@@ -265,7 +265,7 @@ describe("importDiscoveredCoverage", () => {
       // Assert
       expect(Result.isSuccess(result)).toBe(true)
       if (Result.isSuccess(result)) {
-        expect(result.value.coverageFile).toBe(join(projectRoot, "coverage", "coverage-final.json"))
+        expect(result.value.coverageFiles).toEqual([join(projectRoot, "coverage", "coverage-final.json")])
         expect(result.value.analysis.files[0]?.coverage).toEqual({ lines: 0 })
       }
     })
@@ -301,12 +301,117 @@ describe("importDiscoveredCoverage", () => {
       const result = await importDiscoveredCoverage(analysis, projectRoot)
 
       // Assert
-      expect(result).toEqual(Result.Success({ analysis, coverageFile: undefined }))
+      expect(result).toEqual(Result.Success({ analysis, coverageFiles: [] }))
+    })
+  })
+
+  it("combines project-root and package-root reports with relative paths resolved from each root", async () => {
+    await withTemporaryDirectory(async (projectRoot) => {
+      // Arrange
+      const backendRoot = join(projectRoot, "backend")
+      const frontendRoot = join(projectRoot, "frontend")
+      await mkdir(join(projectRoot, "coverage"))
+      await mkdir(join(backendRoot, "coverage"), { recursive: true })
+      await mkdir(join(frontendRoot, "coverage"), { recursive: true })
+      await writeFile(join(backendRoot, "package.json"), "{}", "utf8")
+      await writeFile(join(frontendRoot, "package.json"), "{}", "utf8")
+      await writeFile(join(projectRoot, "coverage", "coverage-final.json"), coverageFinal("index.ts", 1), "utf8")
+      await writeFile(join(backendRoot, "coverage", "lcov.info"), "SF:src/api.ts\nDA:1,0\nend_of_record", "utf8")
+      await writeFile(join(frontendRoot, "coverage", "coverage-final.json"), coverageFinal("src/app.ts", 1), "utf8")
+      await writeFile(join(frontendRoot, "coverage", "lcov.info"), "invalid LCOV that must not be read", "utf8")
+      const analysis = analysisWithFiles("index.ts", "backend/src/api.ts", "frontend/src/app.ts")
+
+      // Act
+      const result = await importDiscoveredCoverage(analysis, projectRoot)
+
+      // Assert
+      expect(Result.isSuccess(result)).toBe(true)
+      if (Result.isSuccess(result)) {
+        expect(result.value.coverageFiles).toEqual([
+          join(projectRoot, "coverage", "coverage-final.json"),
+          join(backendRoot, "coverage", "lcov.info"),
+          join(frontendRoot, "coverage", "coverage-final.json"),
+        ])
+        expect(coverageByPath(result.value.analysis)).toEqual([
+          { path: "index.ts", coverage: 100 },
+          { path: "backend/src/api.ts", coverage: 0 },
+          { path: "frontend/src/app.ts", coverage: 100 },
+        ])
+      }
+    })
+  })
+
+  it("merges repeated lines across project-root and package-root reports using maximum hits", async () => {
+    await withTemporaryDirectory(async (projectRoot) => {
+      // Arrange
+      const frontendRoot = join(projectRoot, "frontend")
+      await mkdir(join(projectRoot, "coverage"))
+      await mkdir(join(frontendRoot, "coverage"), { recursive: true })
+      await writeFile(join(frontendRoot, "package.json"), "{}", "utf8")
+      await writeFile(join(projectRoot, "coverage", "lcov.info"), "SF:frontend/src/app.ts\nDA:1,0\nDA:2,0\nend_of_record", "utf8")
+      await writeFile(join(frontendRoot, "coverage", "lcov.info"), "SF:src/app.ts\nDA:1,2\nend_of_record", "utf8")
+
+      // Act
+      const result = await importDiscoveredCoverage(analysisWithOneFile("frontend/src/app.ts"), projectRoot)
+
+      // Assert
+      expect(Result.isSuccess(result)).toBe(true)
+      if (Result.isSuccess(result)) {
+        expect(result.value.analysis.files[0]?.coverage).toEqual({ lines: 50 })
+      }
+    })
+  })
+
+  it("fails on malformed selected package coverage without falling back to LCOV", async () => {
+    await withTemporaryDirectory(async (projectRoot) => {
+      // Arrange
+      const packageRoot = join(projectRoot, "package")
+      await mkdir(join(packageRoot, "coverage"), { recursive: true })
+      await writeFile(join(packageRoot, "package.json"), "{}", "utf8")
+      await writeFile(join(packageRoot, "coverage", "coverage-final.json"), "{", "utf8")
+      await writeFile(join(packageRoot, "coverage", "lcov.info"), "SF:src/app.ts\nDA:1,1\nend_of_record", "utf8")
+
+      // Act
+      const result = await importDiscoveredCoverage(analysisWithOneFile("package/src/app.ts"), projectRoot)
+
+      // Assert
+      expect(Result.isFailure(result)).toBe(true)
+      if (Result.isFailure(result)) {
+        expect(result.error).toMatchObject({
+          _tag: "CoverageReportInvalid",
+          coverageFile: join(packageRoot, "coverage", "coverage-final.json"),
+          format: "istanbul",
+        })
+      }
+    })
+  })
+
+  it("ignores nested conventional coverage when the directory is not a package root", async () => {
+    await withTemporaryDirectory(async (projectRoot) => {
+      // Arrange
+      const nestedRoot = join(projectRoot, "nested")
+      await mkdir(join(nestedRoot, "coverage"), { recursive: true })
+      await writeFile(join(nestedRoot, "coverage", "lcov.info"), "SF:src/app.ts\nDA:1,1\nend_of_record", "utf8")
+      const analysis = analysisWithOneFile("nested/src/app.ts")
+
+      // Act
+      const result = await importDiscoveredCoverage(analysis, projectRoot)
+
+      // Assert
+      expect(result).toEqual(Result.Success({ analysis, coverageFiles: [] }))
     })
   })
 })
 
 describe("normalizeCoverageFilePath", () => {
+  it("resolves a relative source path from its package coverage root", () => {
+    // Act
+    const result = normalizeCoverageFilePath("/repo/project", "/repo/project/frontend", "src/app.ts")
+
+    // Assert
+    expect(result).toEqual(Result.Success("frontend/src/app.ts"))
+  })
+
   it.each([
     ["POSIX absolute", "/repo/project", "/repo/project/src/app.ts", "src/app.ts"],
     ["POSIX relative", "/repo/project", "src/app.ts", "src/app.ts"],
@@ -316,7 +421,7 @@ describe("normalizeCoverageFilePath", () => {
     ["Windows relative with Windows separators", "C:\\repo\\project", "src\\app.ts", "src/app.ts"],
   ])("normalizes a %s path", (_name, projectRoot, coveragePath, expected) => {
     // Act
-    const result = normalizeCoverageFilePath(projectRoot, coveragePath)
+    const result = normalizeCoverageFilePath(projectRoot, projectRoot, coveragePath)
 
     // Assert
     expect(result).toEqual(Result.Success(expected))
@@ -329,7 +434,7 @@ describe("normalizeCoverageFilePath", () => {
     ["different Windows drive", "C:\\repo\\project", "D:\\repo\\project\\src\\app.ts"],
   ])("rejects a %s path outside the project root", (_name, projectRoot, coveragePath) => {
     // Act
-    const result = normalizeCoverageFilePath(projectRoot, coveragePath)
+    const result = normalizeCoverageFilePath(projectRoot, projectRoot, coveragePath)
 
     // Assert
     expect(result).toEqual(Result.Failure({ _tag: "CoveragePathOutsideProject", projectRoot, coveragePath }))
@@ -351,21 +456,26 @@ function coverageFinal(path: string, hits: number): string {
 }
 
 function analysisWithOneFile(path: string): ProjectAnalysis {
-  const projectFilePath = ProjectFilePath.parse(path)
-  if (Result.isFailure(projectFilePath)) {
-    throw new Error(`Invalid test project file path: ${path}`)
-  }
+  return analysisWithFiles(path)
+}
+
+function analysisWithFiles(...paths: readonly string[]): ProjectAnalysis {
+  const projectFilePaths = paths.map((path) => {
+    const projectFilePath = ProjectFilePath.parse(path)
+    if (Result.isFailure(projectFilePath)) {
+      throw new Error(`Invalid test project file path: ${path}`)
+    }
+    return projectFilePath.value
+  })
 
   return {
     ...emptyProjectAnalysis("path-casing"),
-    files: [
-      {
-        path: projectFilePath.value,
-        language: "typescript",
-        lines: { code: 1, comment: 0, blank: 0 },
-        coverage: undefined,
-      },
-    ],
+    files: projectFilePaths.map((path) => ({
+      path,
+      language: "typescript",
+      lines: { code: 1, comment: 0, blank: 0 },
+      coverage: undefined,
+    })),
   }
 }
 

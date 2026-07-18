@@ -81,6 +81,8 @@ Node size grows with the base-2 logarithm of the selected line count. This keeps
 
 Coverage parsers translate Istanbul `coverage-final.json` statement start lines or LCOV `lcov.info` `SF` and `DA` records into one internal contract of source paths and executable-line hit counts. LCOV function and branch records are ignored because analysis stores line coverage only. Repeated source records, repeated LCOV line entries, and multiple Istanbul statements on one line retain the maximum hit count. An Istanbul statement spanning multiple lines belongs to its start line. Percentages are truncated to two decimals, and a report entry with no executable lines is 100% covered.
 
-Coverage paths are normalized against the project root before matching discovered project files. Absolute and relative paths and Windows and POSIX separators are supported; outside-root and non-project entries are ignored.
+Coverage paths are normalized against the root that owns each report before matching discovered project files against the overall project root. This lets a package-local report use paths such as `src/app.ts` while analysis still identifies the file as `frontend/src/app.ts`. Absolute and relative paths and Windows and POSIX separators are supported; outside-project and non-project entries are ignored.
+
+When automatic discovery selects reports at multiple project or package roots, their format-neutral executable-line hits enrich one analysis. Repeated files and lines across reports retain the maximum hit count, matching the duplicate behavior within one report.
 
 A project file absent from a coverage report has unknown coverage, not zero coverage. Missing coverage is represented explicitly so the renderer can use a neutral color instead of red.

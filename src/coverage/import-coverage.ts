@@ -1,8 +1,9 @@
-import { readFile } from "node:fs/promises"
-import { resolve } from "node:path"
+import { readFile, stat } from "node:fs/promises"
+import { dirname, join, relative, resolve } from "node:path"
 import { isNodeJSError, Result } from "@guillaume-docquier/tools-ts"
 import type { ProjectAnalysis } from "../analysis/project-analysis.js"
-import { enrichAnalysisWithCoverage, type ParsedFileCoverage } from "./coverage-analysis.js"
+import { compareText } from "../text/compare-text.js"
+import { enrichAnalysisWithCoverage, type ParsedCoverageReport, type ParsedFileCoverage } from "./coverage-analysis.js"
 import { parseIstanbulCoverage } from "./parse-istanbul-coverage.js"
 import { parseLcovCoverage } from "./parse-lcov-coverage.js"
 
@@ -23,6 +24,11 @@ type CoverageReportReadFailed = {
 export type CoverageImportError =
   | CoverageReportReadFailed
   | {
+      readonly _tag: "CoveragePackageRootDiscoveryFailed"
+      readonly packageManifest: string
+      readonly cause: Error
+    }
+  | {
       readonly _tag: "CoverageFormatUnsupported"
       readonly coverageFile: string
     }
@@ -38,7 +44,7 @@ export type CoverageImportError =
  */
 export type DiscoveredCoverage = {
   readonly analysis: ProjectAnalysis
-  readonly coverageFile: string | undefined
+  readonly coverageFiles: readonly string[]
 }
 
 /**
@@ -83,9 +89,39 @@ export async function importDiscoveredCoverage(
   analysis: ProjectAnalysis,
   projectRoot: string,
 ): Promise<Result<DiscoveredCoverage, CoverageImportError>> {
+  const packageRoots = await discoverPackageCoverageRoots(analysis, projectRoot)
+  if (Result.isFailure(packageRoots)) {
+    return packageRoots
+  }
+
+  const coverageReports: ParsedCoverageReport[] = []
+  const coverageFiles: string[] = []
+
+  for (const coverageRoot of [projectRoot, ...packageRoots.value]) {
+    const coverageReport = await readDiscoveredCoverageReport(coverageRoot)
+    if (Result.isFailure(coverageReport)) {
+      return coverageReport
+    }
+    if (coverageReport.value === undefined) {
+      continue
+    }
+
+    coverageReports.push({ coverageRoot, files: coverageReport.value.files })
+    coverageFiles.push(coverageReport.value.coverageFile)
+  }
+
+  return Result.Success({
+    analysis: coverageReports.length === 0 ? analysis : enrichAnalysisWithCoverage(analysis, projectRoot, coverageReports),
+    coverageFiles,
+  })
+}
+
+async function readDiscoveredCoverageReport(
+  coverageRoot: string,
+): Promise<Result<{ readonly coverageFile: string; readonly files: readonly ParsedFileCoverage[] } | undefined, CoverageImportError>> {
   const candidates: ReadonlyArray<{ readonly coverageFile: string; readonly format: CoverageFormat }> = [
-    { coverageFile: resolve(projectRoot, "coverage", "coverage-final.json"), format: "istanbul" },
-    { coverageFile: resolve(projectRoot, "coverage", "lcov.info"), format: "lcov" },
+    { coverageFile: resolve(coverageRoot, "coverage", "coverage-final.json"), format: "istanbul" },
+    { coverageFile: resolve(coverageRoot, "coverage", "lcov.info"), format: "lcov" },
   ]
 
   for (const candidate of candidates) {
@@ -97,13 +133,62 @@ export async function importDiscoveredCoverage(
       return coverageContents
     }
 
-    const importedCoverage = importCoverageContents(analysis, projectRoot, candidate.coverageFile, coverageContents.value, candidate.format)
-    return Result.isFailure(importedCoverage)
-      ? importedCoverage
-      : Result.Success({ analysis: importedCoverage.value, coverageFile: candidate.coverageFile })
+    const parsedCoverage = parseCoverageContents(candidate.coverageFile, coverageContents.value, candidate.format)
+    return Result.isFailure(parsedCoverage)
+      ? parsedCoverage
+      : Result.Success({ coverageFile: candidate.coverageFile, files: parsedCoverage.value })
   }
 
-  return Result.Success({ analysis, coverageFile: undefined })
+  return Result.Success(undefined)
+}
+
+async function discoverPackageCoverageRoots(
+  analysis: ProjectAnalysis,
+  projectRoot: string,
+): Promise<Result<readonly string[], CoverageImportError>> {
+  const manifestStateByDirectory = new Map<string, boolean>()
+  const packageRoots = new Set<string>()
+
+  for (const file of analysis.files) {
+    let directory = dirname(resolve(projectRoot, file.path))
+
+    while (directory !== projectRoot) {
+      let hasPackageManifest = manifestStateByDirectory.get(directory)
+      if (hasPackageManifest === undefined) {
+        const packageManifest = join(directory, "package.json")
+        const manifestStats = await Result.tryCatch(stat(packageManifest))
+        if (Result.isFailure(manifestStats)) {
+          if (isNodeJSError(manifestStats.error) && (manifestStats.error.code === "ENOENT" || manifestStats.error.code === "ENOTDIR")) {
+            hasPackageManifest = false
+          } else {
+            return Result.Failure({
+              _tag: "CoveragePackageRootDiscoveryFailed",
+              packageManifest,
+              cause: manifestStats.error,
+            })
+          }
+        } else {
+          hasPackageManifest = manifestStats.value.isFile()
+        }
+        manifestStateByDirectory.set(directory, hasPackageManifest)
+      }
+
+      if (hasPackageManifest) {
+        packageRoots.add(directory)
+        break
+      }
+
+      const parentDirectory = dirname(directory)
+      if (parentDirectory === directory) {
+        break
+      }
+      directory = parentDirectory
+    }
+  }
+
+  return Result.Success(
+    [...packageRoots].sort((left, right) => compareText(projectRelativePath(projectRoot, left), projectRelativePath(projectRoot, right))),
+  )
 }
 
 async function readCoverageFile(coverageFile: string): Promise<Result<string, CoverageReportReadFailed>> {
@@ -135,6 +220,17 @@ function importCoverageContents(
   contents: string,
   format: CoverageFormat,
 ): Result<ProjectAnalysis, CoverageImportError> {
+  const parsedCoverage = parseCoverageContents(coverageFile, contents, format)
+  return Result.isFailure(parsedCoverage)
+    ? parsedCoverage
+    : Result.Success(enrichAnalysisWithCoverage(analysis, projectRoot, [{ coverageRoot: projectRoot, files: parsedCoverage.value }]))
+}
+
+function parseCoverageContents(
+  coverageFile: string,
+  contents: string,
+  format: CoverageFormat,
+): Result<readonly ParsedFileCoverage[], CoverageImportError> {
   const parsedCoverage: Result<readonly ParsedFileCoverage[], { readonly cause: Error }> =
     format === "istanbul" ? parseIstanbulCoverage(contents) : parseLcovCoverage(contents)
   if (Result.isFailure(parsedCoverage)) {
@@ -146,5 +242,9 @@ function importCoverageContents(
     })
   }
 
-  return Result.Success(enrichAnalysisWithCoverage(analysis, projectRoot, parsedCoverage.value))
+  return parsedCoverage
+}
+
+function projectRelativePath(projectRoot: string, path: string): string {
+  return relative(projectRoot, path).replaceAll("\\", "/")
 }

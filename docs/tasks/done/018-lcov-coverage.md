@@ -61,5 +61,6 @@ For an explicit `--coverage` path, read the file once and select exactly one par
 
 ## Discovered gaps
 
-- Recursive coverage-report discovery and merging multiple reports are intentionally out of scope. Add them only for a concrete multi-report workflow with explicit precedence and merge semantics.
+- [Milestone 019](./019-monorepo-coverage-discovery.md) adds constrained project/package-root discovery and merges one deterministically selected report per root. Arbitrary recursive discovery remains intentionally unsupported.
+- Configurable per-package locations and multiple explicit coverage inputs remain [milestone 020](../020-configurable-coverage-locations.md).
 - Branch and function coverage require analysis-model and visualization decisions beyond this line-coverage milestone.

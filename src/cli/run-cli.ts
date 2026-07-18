@@ -32,7 +32,7 @@ const HELP = `Usage: show-me [project-path] [options]
 
 Options:
   --output <path>    Write the report to this path
-  --coverage <path>  Read Istanbul or LCOV coverage
+  --coverage <path>  Read one explicit Istanbul or LCOV report
   -h, --help         Show this help
   -v, --version      Show the version
 `
@@ -81,8 +81,8 @@ export async function runCli(arguments_: readonly string[], output: CliOutput, o
       return 1
     }
     reportAnalysis = coveredAnalysis.value.analysis
-    if (coveredAnalysis.value.coverageFile === undefined) {
-      output.writeStandardOutput(`No coverage file found under ${resolve(projectRoot, "coverage")}; continuing without coverage.\n`)
+    if (coveredAnalysis.value.coverageFiles.length === 0) {
+      output.writeStandardOutput(`No coverage file found at ${projectRoot} or its package roots; continuing without coverage.\n`)
     }
   } else {
     const coverageFile = resolve(currentDirectory, command.value.coveragePath)
@@ -150,6 +150,8 @@ function formatCoverageImportError(error: CoverageImportError): string {
   switch (error._tag) {
     case "CoverageReportReadFailed":
       return `Could not read coverage file ${error.coverageFile}: ${error.cause.message}`
+    case "CoveragePackageRootDiscoveryFailed":
+      return `Could not inspect package manifest ${error.packageManifest} while discovering coverage: ${error.cause.message}`
     case "CoverageFormatUnsupported":
       return `Unsupported coverage format in ${error.coverageFile}; expected Istanbul JSON or LCOV.`
     case "CoverageReportInvalid":

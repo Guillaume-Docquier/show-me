@@ -12,6 +12,14 @@ export type ParsedFileCoverage = {
 }
 
 /**
+ * Format-neutral coverage parsed from one report at a known source root.
+ */
+export type ParsedCoverageReport = {
+  readonly coverageRoot: string
+  readonly files: readonly ParsedFileCoverage[]
+}
+
+/**
  * A coverage path that cannot identify a file below the analyzed project root.
  */
 export type CoveragePathOutsideProject = {
@@ -28,35 +36,39 @@ export type CoveragePathOutsideProject = {
  *
  * @param analysis - Existing language-neutral project analysis.
  * @param projectRoot - Absolute root of the analyzed project.
- * @param parsedCoverage - Format-neutral file paths and executable-line hits.
+ * @param parsedCoverageReports - Parsed reports with roots used to resolve relative source paths.
  * @returns The analysis with matching per-file line coverage.
  */
 export function enrichAnalysisWithCoverage(
   analysis: ProjectAnalysis,
   projectRoot: string,
-  parsedCoverage: readonly ParsedFileCoverage[],
+  parsedCoverageReports: readonly ParsedCoverageReport[],
 ): ProjectAnalysis {
   const lineHitsByProjectFile = new Map<ProjectFilePath, Map<number, number>>()
   const canonicalProjectPathByComparablePath = new Map(
     analysis.files.map((file) => [comparableProjectFilePath(projectRoot, file.path), file.path]),
   )
 
-  for (const fileCoverage of parsedCoverage) {
-    const projectFilePath = normalizeCoverageFilePath(projectRoot, fileCoverage.path)
-    if (Result.isFailure(projectFilePath)) {
-      continue
-    }
+  for (const report of parsedCoverageReports) {
+    for (const fileCoverage of report.files) {
+      const projectFilePath = normalizeCoverageFilePath(projectRoot, report.coverageRoot, fileCoverage.path)
+      if (Result.isFailure(projectFilePath)) {
+        continue
+      }
 
-    const canonicalProjectFilePath = canonicalProjectPathByComparablePath.get(comparableProjectFilePath(projectRoot, projectFilePath.value))
-    if (canonicalProjectFilePath === undefined) {
-      continue
-    }
+      const canonicalProjectFilePath = canonicalProjectPathByComparablePath.get(
+        comparableProjectFilePath(projectRoot, projectFilePath.value),
+      )
+      if (canonicalProjectFilePath === undefined) {
+        continue
+      }
 
-    const lineHits = lineHitsByProjectFile.get(canonicalProjectFilePath) ?? new Map<number, number>()
-    for (const [line, hits] of fileCoverage.lineHits) {
-      lineHits.set(line, Math.max(lineHits.get(line) ?? 0, hits))
+      const lineHits = lineHitsByProjectFile.get(canonicalProjectFilePath) ?? new Map<number, number>()
+      for (const [line, hits] of fileCoverage.lineHits) {
+        lineHits.set(line, Math.max(lineHits.get(line) ?? 0, hits))
+      }
+      lineHitsByProjectFile.set(canonicalProjectFilePath, lineHits)
     }
-    lineHitsByProjectFile.set(canonicalProjectFilePath, lineHits)
   }
 
   const coverageByProjectFile = new Map<ProjectFilePath, ProjectFileCoverage>()
@@ -77,14 +89,19 @@ export function enrichAnalysisWithCoverage(
  * Normalize a coverage source path against a project root on any host platform.
  *
  * @param projectRoot - Absolute project root using Windows or POSIX separators.
- * @param coveragePath - Absolute or project-relative path from a coverage report.
+ * @param coverageRoot - Root used to resolve relative paths from this coverage report.
+ * @param coveragePath - Absolute or coverage-root-relative path from a coverage report.
  * @returns A normalized project-file path, or an outside-root failure.
  */
-export function normalizeCoverageFilePath(projectRoot: string, coveragePath: string): Result<ProjectFilePath, CoveragePathOutsideProject> {
+export function normalizeCoverageFilePath(
+  projectRoot: string,
+  coverageRoot: string,
+  coveragePath: string,
+): Result<ProjectFilePath, CoveragePathOutsideProject> {
   const normalizedRoot = normalizeLexicalPath(projectRoot)
   const normalizedCoveragePath = isAbsolutePath(coveragePath)
     ? normalizeLexicalPath(coveragePath)
-    : normalizeLexicalPath(`${normalizedRoot}/${coveragePath}`)
+    : normalizeLexicalPath(`${normalizeLexicalPath(coverageRoot)}/${coveragePath}`)
   const caseInsensitive = /^[a-zA-Z]:\//u.test(normalizedRoot)
   const comparableRoot = caseInsensitive ? normalizedRoot.toLowerCase() : normalizedRoot
   const comparableCoveragePath = caseInsensitive ? normalizedCoveragePath.toLowerCase() : normalizedCoveragePath
