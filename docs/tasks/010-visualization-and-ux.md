@@ -6,30 +6,35 @@ Not started.
 
 ## Outcome
 
-The visualization remains understandable and accessible as graphs grow, with improved focus, grouping, and navigation.
+The report has a more ergonomic layout, a dedicated and searchable files tree, and graph interactions that reveal relationships without obscuring the information already encoded by node colors.
 
-## Candidate tasks
+## Tasks
 
-This milestone is intentionally broad. Select and refine work from observed usage rather than implementing every idea speculatively.
+### Report layout and files tree
 
-- [ ] Highlight incoming and outgoing dependency neighborhoods with clear direction semantics.
-- [ ] Explore directory clustering or other optional grouping without changing the analysis model.
-- [ ] Improve keyboard navigation, focus management, tooltip accessibility, and non-color cues.
-- [ ] Add search or focus modes when real navigation needs justify them.
-- [ ] Add additional layout strategies only when measured graph shapes require them.
-- [ ] Revisit report packaging only if single-file size or browser constraints become concrete problems.
+- [ ] Revisit the report layout to make it more ergonomic.
+- [ ] Give the files tree its own dedicated area instead of combining it with the selected-node details.
+- [ ] Move controls out of the top bar so it is no longer overcrowded.
+- [ ] Add a text search field that filters the files tree.
+- [ ] Bring a file node into view when its files-tree entry is hovered, without requiring a click.
+
+### Graph legibility and focus
+
+- [ ] Show labels over file nodes when the graph is zoomed in.
+- [ ] Keep directory labels readable on hover by providing sufficient foreground and background contrast.
+- [ ] Highlight a hovered node together with its direct consumers and dependencies.
+- [ ] Dim dependency edges by default so relationship highlighting is visually meaningful.
+- [ ] Highlight nodes with a border, glow, or another treatment that preserves their existing color.
+- [ ] Allow structure edges and dependency edges to be shown or hidden independently without changing the node layout.
 
 ## Required tests
 
-- [ ] Every selected UX change has interaction coverage at the browser seam.
-- [ ] Accessibility behavior is asserted with keyboard and semantic expectations, not screenshots alone.
-- [ ] Visual regression coverage is added only where semantic DOM or graph assertions cannot identify the failure.
-- [ ] Existing selection, filtering, sizing, and coverage behavior remains covered during UX changes.
+- [ ] Browser tests cover the dedicated files-tree area, its search filter, and hover-driven graph navigation.
+- [ ] Browser tests cover zoom-dependent file labels and readable directory-label hover styling.
+- [ ] Browser tests cover consumer and dependency highlighting while verifying that node colors remain unchanged.
+- [ ] Browser tests cover independent structure-edge and dependency-edge visibility without node-position changes.
+- [ ] Browser tests verify that dependency edges are dimmed outside the active hover neighborhood.
 
 ## Verification evidence
 
 Record commands and results here before completion.
-
-## Discovered gaps
-
-- Analysis retains recoverable parser and unresolved-dependency diagnostics, but the current CLI and report do not surface them. Choose warning/report presentation and accessibility behavior before implementation.
