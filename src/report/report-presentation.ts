@@ -75,7 +75,7 @@ export type ReportPresentation = {
  * Convert internal analysis into deterministic, renderer-neutral graph data.
  *
  * @param analysis - Language-neutral project analysis.
- * @returns Presentation data with deterministic node identities and coordinates.
+ * @returns Presentation data with deterministic identities, display metadata, and relationships.
  */
 export function buildReportPresentation(analysis: ProjectAnalysis): ReportPresentation {
   const importedNodeIdsBySource = new Map<string, string[]>()

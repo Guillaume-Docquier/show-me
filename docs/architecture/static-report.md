@@ -51,7 +51,7 @@ The report does not embed source file contents. Analysis JSON is an internal bou
 
 ## Initial visualization
 
-The renderer uses Sigma.js over a Graphology directed graph. A shared presentation-layer layout module runs ForceAtlas2 with a fixed seed, exact size-aware repulsion, and additional collision padding for both initial construction and interactive resizing. Barnes-Hut optimization remains disabled because the library's optimized path does not include individual node radii and allowed large nodes to cover their neighbors.
+The browser renderer uses Sigma.js over a Graphology directed graph. For the initial view and every interactive transition, it rebuilds the visible graph, assigns deterministic circular starting coordinates, and runs a synchronous 5,000-iteration ForceAtlas2 pass. Size adjustment keeps exact repulsion aware of rendered node radii. Barnes-Hut optimization remains disabled because the library's optimized path does not include individual node radii and allowed large nodes to cover their neighbors.
 
 The initial graph is flat:
 
@@ -60,21 +60,20 @@ The initial graph is flat:
 - project file node size grows logarithmically with code lines by default;
 - external-package nodes have one fixed size and a distinct non-coverage color and type label;
 - project files with coverage use a red-yellow-green scale while missing coverage remains neutral gray;
-- collision radii include spacing without changing rendered node area;
 - edges point from an importing file to the imported file;
 - pan, zoom, hover, and selection are supported.
 
-Sigma renders node size relative to layout positions. A custom bounding box includes the node radii and preserves a minimum layout span, so viewport fitting cannot reintroduce overlaps or magnify a tiny graph excessively. Layout geometry remains in the presentation and renderer layers; it does not enter project analysis.
+Sigma renders node size relative to layout positions so its radii use the same coordinate system as ForceAtlas2's size adjustment. Sigma fits the browser-owned coordinates from the current Graphology graph. The embedded presentation remains renderer-neutral and does not contain layout coordinates; layout geometry does not enter project analysis.
 
 ## Line-category controls
 
 An accessible checkbox group combines code, comment, and blank physical lines for node sizing. Code is selected by default. Every non-empty combination is valid; the only selected checkbox is disabled so the active metric cannot become empty.
 
-Changing the active categories recomputes node sizes, deterministic collision-safe layout, and the custom viewport bounding box through one browser report-view state transition. Selection remains active across relayout. Returning to an earlier category combination reproduces the same geometry exactly. Tooltips and the selected-file panel always show the complete three-category breakdown regardless of the sizing selection.
+Changing the active categories recomputes node sizes and browser layout through one report-view state transition. Selection remains active across relayout. Returning to an earlier category combination rebuilds the same ordered layout inputs. Tooltips and the selected-file panel always show the complete three-category breakdown regardless of the sizing selection.
 
 ## External-package control
 
-External-package nodes and their edges are hidden by default, so package facts do not perturb the initial file-only geometry or relationship counts. An accessible unchecked control reveals all canonical package roots. The same report-view transition rebuilds the visible Graphology subgraph, recomputes deterministic collision-safe layout, updates the bounding box, and combines package visibility with the active line categories.
+External-package nodes and their edges are hidden by default, so package facts do not perturb the initial file-only layout or relationship counts. An accessible unchecked control reveals all canonical package roots. The same report-view transition rebuilds and lays out the visible Graphology subgraph, combining package visibility with the active line categories.
 
 Package nodes use a fixed size and a distinct purple appearance. Color is not their only cue: the package list, tooltip, and selected-node panel all identify them as external packages. Package details show the project files that import the package and never fabricate line metrics, coverage, or installed-package contents. Hiding packages clears package hover or selection while preserving a selected project file.
 

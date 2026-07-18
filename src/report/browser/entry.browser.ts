@@ -1,3 +1,12 @@
+/**
+ * Browser bootstrap embedded in every self-contained report.
+ *
+ * The report builder creates the required DOM and assigns the renderer-neutral
+ * presentation to `window.showMePresentation` before this IIFE bundle runs. The
+ * presentation remains the immutable source of truth; Graphology holds the
+ * mutable visible projection, Sigma renders it and emits interactions, and the
+ * layout libraries assign browser-only coordinates.
+ */
 import { DirectedGraph } from "graphology"
 import { circular } from "graphology-layout"
 import forceAtlas2 from "graphology-layout-forceatlas2"
@@ -16,6 +25,7 @@ import {
 
 declare global {
   interface Window {
+    /** Internal handoff from the generated HTML shell, not a public browser API. */
     readonly showMePresentation: ReportPresentation
   }
 }
@@ -29,7 +39,9 @@ type BrowserNodeAttributes = {
 }
 
 type ReportViewState = {
+  /** Always non-empty; these categories affect project-file size, not the metrics displayed in details. */
   readonly lineCategories: readonly ReportLineCategory[]
+  /** Controls graph membership and therefore which relationships are visible. */
   readonly externalPackages: boolean
 }
 
@@ -59,6 +71,8 @@ const lineCategoryControls = REPORT_LINE_CATEGORIES.map((category) => ({
   input: requiredCheckbox("line-category-" + category),
 }))
 const projectFileDetailElements = document.querySelectorAll<HTMLElement>("[data-project-file-detail]")
+// This index covers the complete embedded presentation. The Graphology graph and
+// visibleNodeIds below contain only the projection selected by the current view.
 const nodeById = new Map(presentation.nodes.map((node) => [node.id, node]))
 const graph = new DirectedGraph<BrowserNodeAttributes>()
 let selectedNodeId: string | undefined
@@ -69,9 +83,14 @@ const renderer = new Sigma<BrowserNodeAttributes>(graph, graphContainer, {
   allowInvalidContainer: false,
   defaultEdgeType: "arrow",
   edgeProgramClasses: { arrow: createEdgeArrowProgram<BrowserNodeAttributes>() },
+  // Node names live in the accessible DOM lists, tooltip, and details panel rather than on the WebGL canvas.
   labelRenderedSizeThreshold: Number.POSITIVE_INFINITY,
+  // ForceAtlas2 and Sigma must interpret node radii in the same coordinate system for adjustSizes to prevent overlap.
   itemSizesReference: "positions",
   nodeReducer(node, attributes): Partial<NodeDisplayData> {
+    // Graphology announces new nodes before the layout assigns x/y. Temporary
+    // coordinates keep Sigma's display data valid; the spread lets real layout
+    // coordinates override them once present.
     return node === selectedNodeId
       ? { x: 0, y: 0, ...attributes, color: "#f4c66a", highlighted: true, zIndex: 1 }
       : { x: 0, y: 0, ...attributes }
@@ -125,8 +144,17 @@ for (const node of presentation.nodes) {
   }
 }
 applyReportView(viewState)
+// The graph and interaction state are initialized synchronously. Sigma may still
+// paint the resulting WebGL frame on the next animation frame.
 document.documentElement.dataset.showMeReady = "true"
 
+/**
+ * Apply the complete browser view transition from immutable presentation data.
+ *
+ * Rebuilding the visible graph keeps line sizing and package visibility
+ * composable and ensures hidden nodes and edges cannot affect layout,
+ * relationship counts, hover, or selection.
+ */
 function applyReportView(nextState: ReportViewState): void {
   graph.clear()
   viewState = nextState
@@ -163,12 +191,18 @@ function applyReportView(nextState: ReportViewState): void {
   externalPackageToggle.checked = viewState.externalPackages
   renderExternalPackageList()
   renderSelection()
+  // Expose otherwise canvas-only state to black-box Playwright tests. Runtime behavior never reads these attributes.
   document.documentElement.dataset.activeLineCategories = viewState.lineCategories.join(",")
   document.documentElement.dataset.externalPackages = viewState.externalPackages ? "visible" : "hidden"
   graphContainer.dataset.visibleNodeCount = String(visibleNodes.length)
   graphContainer.dataset.layoutSignature = layoutSignature(visibleNodes)
+  // Index the rebuilt graph while nodeReducer supplies temporary coordinates.
+  // The layout mutations below cause Sigma to schedule the final repaint.
   renderer.refresh()
 
+  // ForceAtlas2 requires non-degenerate starting coordinates. Circular layout is
+  // deterministic for the presentation's stable insertion order, then the
+  // synchronous ForceAtlas2 pass refines the visible graph before this transition returns.
   circular.assign(graph)
   forceAtlas2.assign(graph, {
     iterations: 5000,
@@ -262,6 +296,7 @@ function renderExternalPackageList(): void {
 }
 
 function nodeListItem(node: ReportNode): HTMLLIElement {
+  // DOM list buttons are keyboard-accessible navigation counterparts to the WebGL nodes.
   const item = document.createElement("li")
   const button = document.createElement("button")
   button.type = "button"
@@ -311,6 +346,7 @@ function showTooltip(node: ReportNode): void {
 }
 
 function visibleRelationships(nodeIds: readonly string[]): readonly string[] {
+  // Relationship facts cover the complete presentation, but counts and navigation describe the current visible subgraph.
   return nodeIds.filter((nodeId) => visibleNodeIds.has(nodeId))
 }
 
@@ -321,6 +357,8 @@ function clearHover(): void {
 }
 
 function positionTooltip(pointerX: number, pointerY: number): void {
+  // Sigma reports pointer coordinates relative to its container while the fixed
+  // tooltip uses viewport coordinates. Convert before flipping and clamping.
   const graphBounds = graphContainer.getBoundingClientRect()
   const tooltipBounds = tooltip.getBoundingClientRect()
   const pointerViewportX = graphBounds.left + pointerX
@@ -350,6 +388,7 @@ function selectedLineCategories(): readonly ReportLineCategory[] {
 }
 
 function requiredElement(id: string): HTMLElement {
+  // A missing element means the generated HTML shell and embedded browser bundle are incompatible, so fail during boot.
   const element = document.getElementById(id)
   if (element === null) {
     throw new Error(`Static report is missing #${id}.`)
@@ -365,6 +404,13 @@ function requiredCheckbox(id: string): HTMLInputElement {
   return element
 }
 
+/**
+ * Fingerprint the ordered visible-node descriptors for Playwright assertions.
+ *
+ * This non-cryptographic signature proves that layout inputs changed or were
+ * restored. It is not a signature of the ForceAtlas2 output and does not verify
+ * final coordinates or collision behavior.
+ */
 function layoutSignature(nodes: ReadonlyArray<{ readonly id: string; readonly size: number }>): string {
   let hash = 2_166_136_261
   for (const character of JSON.stringify(nodes)) {

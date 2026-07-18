@@ -12,6 +12,12 @@ Prefer the smallest real seam that proves user-visible behavior:
 
 Do not use module mocks. Tests should exercise production code through dependency injection, temporary directories, and deterministic fixture projects.
 
+## Test structure
+
+Use Arrange/Act/Assert for focused unit tests when the scenario has one readable setup, operation, and result.
+
+Playwright tests usually represent longer workflows with repeated interactions and observations. Group those workflows into awaited `test.step(...)` calls named for meaningful behavior phases. A step should keep an action with the assertions that describe its resulting state, so Playwright reports identify which part of the workflow failed. Prefer a few cohesive steps over either one global Arrange/Act/Assert sequence or one step per assertion.
+
 ## Fixture projects
 
 Example projects are durable product assets and regression inputs. Store them outside the root TypeScript compilation so they may represent different module modes, malformed files, unsupported syntax, or intentionally incomplete projects.
@@ -34,13 +40,13 @@ Assertions should optimize failure output:
 
 ## Determinism
 
-Tests must control path normalization, line endings, initial graph positions, and any randomness used by layout. Rendering fixtures should use a fixed seed and stable viewport dimensions where visual or browser assertions require them.
+Tests must control path normalization, line endings, graph insertion order, initial graph positions, and any randomness used by layout. Rendering fixtures should use deterministic layout inputs and stable viewport dimensions where visual or browser assertions require them.
 
-Line-classification fixtures use hand-written code, comment, and blank expectations. Algorithm tests cover LF, CRLF, lone CR, final separators, parser offsets, and syntax ambiguities, and assert that the three exclusive categories sum to the documented physical-line total. Browser sizing tests exercise every non-empty category combination, selection persistence, changed intermediate geometry, and exact deterministic geometry when toggling back.
+Line-classification fixtures use hand-written code, comment, and blank expectations. Algorithm tests cover LF, CRLF, lone CR, final separators, parser offsets, and syntax ambiguities, and assert that the three exclusive categories sum to the documented physical-line total. Browser sizing tests exercise every non-empty category combination, selection persistence, changed intermediate layout inputs, and exact input restoration when toggling back.
 
-External-package fixtures hand-write bare, subpath, scoped, repeated, and alias-lookalike requests. Filesystem integration proves package facts are available when uninstalled and that hostile `node_modules` contents never become project files, parser inputs, metrics, or diagnostics. Browser tests compare default geometry with an equivalent package-free presentation, then cover visibility, relationship filtering, selection clearing, accessible type cues, and combined line-metric transitions.
+External-package fixtures hand-write bare, subpath, scoped, repeated, and alias-lookalike requests. Filesystem integration proves package facts are available when uninstalled and that hostile `node_modules` contents never become project files, parser inputs, metrics, or diagnostics. Browser tests compare the default visible-node inputs with an equivalent package-free presentation, then cover visibility, relationship filtering, selection clearing, accessible type cues, and combined line-metric transitions.
 
-Canvas regressions should be split across observable seams: presentation tests assert geometry such as representative node sizes and circle intersections, while real-browser tests assert hover, tooltip placement, path visibility, selection, and navigation. Screenshots are reserved for failures that cannot be identified more precisely.
+Canvas regressions should be split across observable seams: presentation tests assert renderer-neutral inputs such as representative node sizes, while real-browser tests assert rendered behavior such as hover, tooltip placement, path visibility, selection, and navigation. A visible-node input signature can prove view-state reconstruction, but collision or coordinate behavior requires assertions against rendered geometry. Screenshots are reserved for failures that cannot be identified more precisely.
 
 ## Performance verification
 

@@ -101,7 +101,9 @@ Existing-file edits must still use apply-patch mode. Never substitute `Set-Conte
 
 ## Testing
 
-We use the Arrange/Act/Assert style.
+Use Arrange/Act/Assert for focused unit tests with one straightforward setup, operation, and result.
+
+For Playwright browser tests, use awaited `test.step(...)` calls to describe meaningful phases of the user workflow. Keep an action and the expectations for its resulting state in the same step. Do not force an interaction-heavy browser test into one global Arrange/Act/Assert sequence, and do not create a separate step for every assertion.
 
 We test the production code. We do not use `vitest.mock()`.
 

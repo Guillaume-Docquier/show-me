@@ -18,7 +18,7 @@ Use a stable Sigma.js release for browser rendering, Graphology for the directed
 
 Do not introduce React initially. Implement the constrained tooltip and selection side panel with browser APIs around Sigma.
 
-Keep Graphology nodes, layout coordinates, Sigma styles, and interaction state in the presentation and renderer layers. They do not belong in the language-neutral project analysis.
+Keep renderer-neutral node and edge facts in the presentation layer. Keep Graphology nodes, layout coordinates, Sigma styles, and interaction state in the browser renderer. None of them belong in the language-neutral project analysis.
 
 The initial graph is flat and has no persistent labels. Directory grouping, dependency-neighborhood emphasis, and richer focus controls are later UX work.
 
@@ -47,3 +47,11 @@ This keeps layout and interaction state in the presentation and renderer layers 
 External packages are embedded in the presentation but hidden initially. The browser report-view transition rebuilds one Graphology graph from only the currently visible typed nodes and edges before running the shared layout. Hidden package facts therefore cannot influence default project-file geometry, while enabling packages and changing line categories remain composable dimensions of the same deterministic state transition.
 
 Synthetic package nodes use a fixed collision and rendered size. The renderer clears package hover or selection when packages become hidden and exposes package identity through DOM text in addition to color. This extends the existing flat graph and application-control responsibility without changing the chosen rendering or layout libraries.
+
+### 2026-07-18 browser-layout simplification amendment
+
+The browser renderer now owns all layout coordinates. The embedded presentation contains deterministic node and edge facts but no positions or separate collision radii. On initial load and every report-view transition, the browser rebuilds the visible Graphology subgraph, uses circular layout to provide deterministic non-degenerate starting coordinates, then runs a synchronous 5,000-iteration ForceAtlas2 pass.
+
+Sigma interprets node sizes relative to layout positions, matching the coordinate system used by ForceAtlas2's size adjustment. Barnes-Hut remains disabled for radius-aware exact repulsion. Sigma now fits the resulting Graphology extent directly; the removed shared layout module, collision padding, fixed random seed, and custom radius-aware bounding box described by the earlier amendments are no longer part of the implementation.
+
+The browser's one report-view transition remains the ownership boundary for line-category sizing, package visibility, selection and hover reconciliation, relationship filtering, and layout. This amendment supersedes the earlier amendments only where they describe the removed shared layout implementation.
