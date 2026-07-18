@@ -6,7 +6,7 @@ This document describes the target architecture. The implementation is being bui
 
 ## Current implementation
 
-The initial end-to-end product is operational. The CLI discovers supported project files, excludes conventional test files by default, classifies code, comment, and blank physical lines, analyzes static runtime ESM imports and re-exports through Oxc, identifies external npm package roots without analyzing installed dependencies, optionally imports Istanbul line coverage, and writes a self-contained interactive graph report. The repository publishes its latest validated report through GitHub Pages.
+The initial end-to-end product is operational. The CLI discovers supported project files, excludes conventional test files by default, classifies code, comment, and blank physical lines, analyzes static runtime ESM imports and re-exports through Oxc, identifies external npm package roots without analyzing installed dependencies, optionally imports Istanbul or LCOV line coverage, and writes a self-contained interactive graph report. The repository publishes its latest validated report through GitHub Pages.
 
 Analysis, report packaging, browser presentation, CLI, build, and package boundaries have been consolidated and are covered through Node and real-browser tests. CLOC-style metrics, interactive line-category sizing, and optional external-package nodes are implemented. Workspace behavior and user-facing file-selection controls remain planned rather than partially implemented.
 
@@ -46,7 +46,7 @@ The current product:
 - excludes explicitly type-only imports and re-exports;
 - normalizes unaliased bare npm requests to one external-package root without discovering, reading, or parsing installed package code;
 - renders a flat, force-directed file graph with optional fixed-size external-package nodes and no persistent canvas labels;
-- optionally colors project file nodes using Istanbul line coverage; and
+- optionally colors project file nodes using format-neutral line coverage imported from Istanbul or LCOV; and
 - writes one offline HTML file.
 
 Analysis has a typed internal file-selection policy that can restore default-excluded tests without bypassing permanent discovery exclusions. CLI selection options and persistent configuration remain milestones 014 and 015.

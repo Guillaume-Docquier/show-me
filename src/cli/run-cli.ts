@@ -1,9 +1,9 @@
 import { writeFile } from "node:fs/promises"
 import { resolve } from "node:path"
-import { isNodeJSError, Result, Time, Timer, UnitOfTime } from "@guillaume-docquier/tools-ts"
+import { Result, Time, Timer, UnitOfTime } from "@guillaume-docquier/tools-ts"
 import packageMetadata from "../../package.json" with { type: "json" }
 import { analyzeProject, type AnalyzeProjectError } from "../analysis/analyze-project.js"
-import { importIstanbulCoverage, type IstanbulCoverageImportError } from "../coverage/import-istanbul-coverage.js"
+import { importCoverage, importDiscoveredCoverage, type CoverageImportError } from "../coverage/import-coverage.js"
 import { buildHtmlReport, loadBrowserBundle, type BrowserBundleReadError } from "../report/build-html-report.js"
 import { parseCliArguments } from "./parse-cli-arguments.js"
 
@@ -32,7 +32,7 @@ const HELP = `Usage: show-me [project-path] [options]
 
 Options:
   --output <path>    Write the report to this path
-  --coverage <path>  Read coverage from this path
+  --coverage <path>  Read Istanbul or LCOV coverage
   -h, --help         Show this help
   -v, --version      Show the version
 `
@@ -72,26 +72,25 @@ export async function runCli(arguments_: readonly string[], output: CliOutput, o
     return 1
   }
 
-  const coveragePath = command.value.coveragePath
-  const isAutomaticCoverage = coveragePath === undefined
-  const coverageFile =
-    coveragePath === undefined ? resolve(projectRoot, "coverage", "coverage-final.json") : resolve(currentDirectory, coveragePath)
-  const coveredAnalysis = await importIstanbulCoverage(analysis.value, projectRoot, coverageFile)
   let reportAnalysis = analysis.value
 
-  if (Result.isFailure(coveredAnalysis)) {
-    if (
-      isAutomaticCoverage &&
-      coveredAnalysis.error._tag === "CoverageFileReadFailed" &&
-      isNodeJSError(coveredAnalysis.error.cause) &&
-      coveredAnalysis.error.cause.code === "ENOENT"
-    ) {
-      output.writeStandardOutput(`No coverage file found at ${coverageFile}; continuing without coverage.\n`)
-    } else {
+  if (command.value.coveragePath === undefined) {
+    const coveredAnalysis = await importDiscoveredCoverage(analysis.value, projectRoot)
+    if (Result.isFailure(coveredAnalysis)) {
       output.writeStandardError(`${formatCoverageImportError(coveredAnalysis.error)}\n`)
       return 1
     }
+    reportAnalysis = coveredAnalysis.value.analysis
+    if (coveredAnalysis.value.coverageFile === undefined) {
+      output.writeStandardOutput(`No coverage file found under ${resolve(projectRoot, "coverage")}; continuing without coverage.\n`)
+    }
   } else {
+    const coverageFile = resolve(currentDirectory, command.value.coveragePath)
+    const coveredAnalysis = await importCoverage(analysis.value, projectRoot, coverageFile)
+    if (Result.isFailure(coveredAnalysis)) {
+      output.writeStandardError(`${formatCoverageImportError(coveredAnalysis.error)}\n`)
+      return 1
+    }
     reportAnalysis = coveredAnalysis.value
   }
 
@@ -147,11 +146,13 @@ function formatBrowserBundleError(error: BrowserBundleReadError): string {
   return `Could not read installed browser bundle ${error.browserBundlePath}: ${error.cause.message}`
 }
 
-function formatCoverageImportError(error: IstanbulCoverageImportError): string {
+function formatCoverageImportError(error: CoverageImportError): string {
   switch (error._tag) {
-    case "CoverageFileReadFailed":
+    case "CoverageReportReadFailed":
       return `Could not read coverage file ${error.coverageFile}: ${error.cause.message}`
-    case "CoverageFileInvalid":
-      return `Could not parse coverage file ${error.coverageFile}: ${error.cause.message}`
+    case "CoverageFormatUnsupported":
+      return `Unsupported coverage format in ${error.coverageFile}; expected Istanbul JSON or LCOV.`
+    case "CoverageReportInvalid":
+      return `Could not parse ${error.format === "istanbul" ? "Istanbul" : "LCOV"} coverage file ${error.coverageFile}: ${error.cause.message}`
   }
 }

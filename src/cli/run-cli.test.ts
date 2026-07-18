@@ -43,7 +43,7 @@ describe("runCli", () => {
 
 Options:
   --output <path>    Write the report to this path
-  --coverage <path>  Read coverage from this path
+  --coverage <path>  Read Istanbul or LCOV coverage
   -h, --help         Show this help
   -v, --version      Show the version
 `,
@@ -229,6 +229,27 @@ Options:
     })
   })
 
+  it("automatically imports LCOV when coverage-final.json is absent", async () => {
+    await withTemporaryDirectory(async (currentDirectory) => {
+      // Arrange
+      await writeFile(join(currentDirectory, "index.ts"), "export const value = 1")
+      const coverageDirectory = join(currentDirectory, "coverage")
+      await mkdir(coverageDirectory)
+      await writeFile(join(coverageDirectory, "lcov.info"), lcov("index.ts", 1), "utf8")
+      const captured = captureOutput()
+
+      // Act
+      const exitCode = await runCli([], captured.output, { currentDirectory, browserBundle: TEST_BROWSER_BUNDLE })
+
+      // Assert
+      const analysis = parseAnalysis(await readFile(join(currentDirectory, "show-me.html"), "utf8"))
+      expect(exitCode).toBe(0)
+      expect(analysis.files).toEqual(expect.arrayContaining([expect.objectContaining({ path: "index.ts", coverage: { lines: 100 } })]))
+      expect(captured.standardOutput.join("")).not.toContain("No coverage file found")
+      expect(captured.standardError).toEqual([])
+    })
+  })
+
   it("resolves an explicit relative coverage path from the invocation directory", async () => {
     await withTemporaryDirectory(async (currentDirectory) => {
       // Arrange
@@ -250,6 +271,29 @@ Options:
       const analysis = parseAnalysis(await readFile(join(currentDirectory, "show-me.html"), "utf8"))
       expect(exitCode).toBe(0)
       expect(analysis.files).toEqual(expect.arrayContaining([expect.objectContaining({ path: "src/app.ts", coverage: { lines: 0 } })]))
+      expect(captured.standardError).toEqual([])
+    })
+  })
+
+  it("recognizes explicit LCOV by content regardless of file extension", async () => {
+    await withTemporaryDirectory(async (currentDirectory) => {
+      // Arrange
+      const projectDirectory = join(currentDirectory, "project", "src")
+      await mkdir(projectDirectory, { recursive: true })
+      await writeFile(join(projectDirectory, "app.ts"), "export const app = true")
+      await writeFile(join(currentDirectory, "coverage.json"), lcov("src/app.ts", 1), "utf8")
+      const captured = captureOutput()
+
+      // Act
+      const exitCode = await runCli(["project", "--coverage", "coverage.json"], captured.output, {
+        currentDirectory,
+        browserBundle: TEST_BROWSER_BUNDLE,
+      })
+
+      // Assert
+      const analysis = parseAnalysis(await readFile(join(currentDirectory, "show-me.html"), "utf8"))
+      expect(exitCode).toBe(0)
+      expect(analysis.files).toEqual(expect.arrayContaining([expect.objectContaining({ path: "src/app.ts", coverage: { lines: 100 } })]))
       expect(captured.standardError).toEqual([])
     })
   })
@@ -308,7 +352,7 @@ Options:
 
       // Assert
       expect(exitCode).toBe(1)
-      expect(captured.standardError.join("")).toContain("Could not parse coverage file")
+      expect(captured.standardError.join("")).toContain("Could not parse Istanbul coverage file")
       await expect(readFile(join(currentDirectory, "show-me.html"), "utf8")).rejects.toMatchObject({ code: "ENOENT" })
     })
   })
@@ -327,7 +371,47 @@ Options:
 
       // Assert
       expect(exitCode).toBe(1)
-      expect(captured.standardError.join("")).toContain("Could not parse coverage file")
+      expect(captured.standardError.join("")).toContain("Could not parse Istanbul coverage file")
+      await expect(readFile(join(currentDirectory, "show-me.html"), "utf8")).rejects.toMatchObject({ code: "ENOENT" })
+    })
+  })
+
+  it("fails with an unsupported-format error for an unrecognized explicit file", async () => {
+    await withTemporaryDirectory(async (currentDirectory) => {
+      // Arrange
+      await writeFile(join(currentDirectory, "index.ts"), "export const value = 1")
+      await writeFile(join(currentDirectory, "coverage.txt"), "not coverage", "utf8")
+      const captured = captureOutput()
+
+      // Act
+      const exitCode = await runCli(["--coverage", "coverage.txt"], captured.output, {
+        currentDirectory,
+        browserBundle: TEST_BROWSER_BUNDLE,
+      })
+
+      // Assert
+      expect(exitCode).toBe(1)
+      expect(captured.standardError.join("")).toContain("Unsupported coverage format")
+      await expect(readFile(join(currentDirectory, "show-me.html"), "utf8")).rejects.toMatchObject({ code: "ENOENT" })
+    })
+  })
+
+  it("reports malformed selected LCOV without trying Istanbul", async () => {
+    await withTemporaryDirectory(async (currentDirectory) => {
+      // Arrange
+      await writeFile(join(currentDirectory, "index.ts"), "export const value = 1")
+      await writeFile(join(currentDirectory, "coverage.info"), "SF:index.ts\nDA:1,1", "utf8")
+      const captured = captureOutput()
+
+      // Act
+      const exitCode = await runCli(["--coverage", "coverage.info"], captured.output, {
+        currentDirectory,
+        browserBundle: TEST_BROWSER_BUNDLE,
+      })
+
+      // Assert
+      expect(exitCode).toBe(1)
+      expect(captured.standardError.join("")).toContain("Could not parse LCOV coverage file")
       await expect(readFile(join(currentDirectory, "show-me.html"), "utf8")).rejects.toMatchObject({ code: "ENOENT" })
     })
   })
@@ -350,6 +434,10 @@ function coverageFinal(path: string, hits: number): string {
       b: {},
     },
   })
+}
+
+function lcov(path: string, hits: number): string {
+  return `TN:\nSF:${path}\nDA:1,${hits}\nend_of_record\n`
 }
 
 type EmbeddedAnalysis = {

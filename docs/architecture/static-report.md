@@ -2,7 +2,7 @@
 
 Show Me produces one self-contained HTML file that can be opened locally without a server or network access.
 
-The static report, core CLI behavior, and optional Istanbul coverage import are implemented.
+The static report, core CLI behavior, and optional Istanbul or LCOV coverage import are implemented.
 
 ## CLI contract
 
@@ -13,6 +13,7 @@ show-me
 show-me path/to/project
 show-me --output reports/project.html
 show-me path/to/project --coverage path/to/coverage-final.json
+show-me path/to/project --coverage path/to/lcov.info
 ```
 
 Defaults and path rules:
@@ -34,9 +35,9 @@ The Pages artifact contains only the generated self-contained report as `index.h
 
 ## Coverage discovery
 
-When `--coverage` is absent, the CLI looks for `<project-root>/coverage/coverage-final.json`. Missing automatically discovered coverage is informational and analysis continues without it. A present but unreadable or invalid automatic coverage file is an expected fatal command error.
+When `--coverage` is absent, the CLI checks `<project-root>/coverage/coverage-final.json` and then `<project-root>/coverage/lcov.info` in that fixed order. The first existing report is selected exclusively; the CLI never parses or merges the second report. Missing automatic coverage is informational and analysis continues without it. A selected but unreadable or invalid automatic report is an expected fatal command error, and the CLI does not fall back to the lower-precedence format.
 
-When `--coverage` is supplied, its path is resolved from the invocation directory. A missing, unreadable, or invalid explicit file is an expected fatal command error with a useful message.
+When `--coverage` is supplied, its path is resolved from the invocation directory and read once. A first non-whitespace `{` selects the Istanbul parser, while a first non-empty `TN:` or `SF:` record selects LCOV. Any other prefix is unsupported. A missing, unreadable, unsupported, or invalid explicit file is an expected fatal command error with a useful message; parser failures never invoke the other parser.
 
 ## Report contents
 

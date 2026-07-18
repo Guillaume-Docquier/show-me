@@ -12,7 +12,6 @@ This directory tracks milestones, implementation progress, verification evidence
 | [011 Large-codebase performance](./011-large-codebase-performance.md) | Not started | Profile and optimize analysis and rendering for large projects.        |
 | [014 CLI file selection](./014-cli-file-selection.md)                 | Not started | Include default-excluded tests and add one-invocation ignore patterns. |
 | [015 Project configuration](./015-project-configuration.md)           | Not started | Persist file-selection settings with explicit CLI precedence.          |
-| [018 LCOV coverage](./018-lcov-coverage.md)                           | Not started | Import LCOV and deterministically select one discovered report.        |
 
 ## Done
 
@@ -31,6 +30,7 @@ Completed milestone files are retained under [`done/`](./done/) as implementatio
 | [013 Default test-file exclusions](./done/013-default-test-file-exclusions.md) | 2026-07-16 | Removes conventionally named test files from default analysis.      |
 | [016 Codebase consolidation](./done/016-codebase-consolidation.md)             | 2026-07-16 | Hardened analysis, report, CLI, build, and package boundaries.      |
 | [017 Browser-owned presentation](./done/017-browser-owned-presentation.md)     | 2026-07-18 | Embeds raw analysis and derives presentation in the browser.        |
+| [018 LCOV coverage](./done/018-lcov-coverage.md)                               | 2026-07-18 | Imports LCOV and deterministically selects one coverage report.     |
 
 ## Workflow
 

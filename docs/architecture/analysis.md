@@ -4,7 +4,7 @@ Analysis converts files on disk into an internal, language-neutral description t
 
 ## Current implementation
 
-Filesystem discovery, normalized project-file paths, CLOC-style physical-line categories, static runtime ESM project and external-package dependency analysis, and Istanbul line-coverage enrichment are implemented.
+Filesystem discovery, normalized project-file paths, CLOC-style physical-line categories, static runtime ESM project and external-package dependency analysis, and Istanbul or LCOV line-coverage enrichment are implemented.
 
 ## Project discovery
 
@@ -79,7 +79,7 @@ Node size grows with the base-2 logarithm of the selected line count. This keeps
 
 ## Coverage
 
-The coverage importer reads Istanbul `coverage-final.json` and derives executable-line coverage from statement start lines. Multiple statements on one line use their maximum hit count, a statement spanning multiple lines belongs to its start line, percentages are truncated to two decimals, and a file with no executable lines is 100% covered.
+Coverage parsers translate Istanbul `coverage-final.json` statement start lines or LCOV `lcov.info` `SF` and `DA` records into one internal contract of source paths and executable-line hit counts. LCOV function and branch records are ignored because analysis stores line coverage only. Repeated source records, repeated LCOV line entries, and multiple Istanbul statements on one line retain the maximum hit count. An Istanbul statement spanning multiple lines belongs to its start line. Percentages are truncated to two decimals, and a report entry with no executable lines is 100% covered.
 
 Coverage paths are normalized against the project root before matching discovered project files. Absolute and relative paths and Windows and POSIX separators are supported; outside-root and non-project entries are ignored.
 
