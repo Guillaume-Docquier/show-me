@@ -12,7 +12,7 @@ Show Me can analyze, generate, load, lay out, and interact with a project contai
 
 - [ ] Create a deterministic generated benchmark corpus with at least 1,000 files and at least 5,000 lines per file.
 - [ ] Make the corpus contain representative static imports, cycles, disconnected regions, file sizes, and coverage data rather than only isolated repeated files.
-- [ ] Instrument discovery, reading, line analysis, parsing, resolution, coverage, presentation-model construction, layout, HTML generation, and browser loading separately.
+- [ ] Instrument discovery, reading, line analysis, parsing, resolution, coverage, HTML packaging, browser presentation derivation, layout, and browser loading separately.
 - [ ] Record cold and warm CLI duration, peak memory, report size, browser load and layout time, and basic interaction responsiveness.
 - [ ] Profile the initial implementation and document the dominant bottlenecks before changing it.
 - [ ] Profile the collision-safe exact ForceAtlas2 path and evaluate size-aware optimized alternatives without reintroducing node intersections.
@@ -26,7 +26,7 @@ Show Me can analyze, generate, load, lay out, and interact with a project contai
 
 - [ ] The complete semantic and CLI regression suites pass before and after optimization.
 - [ ] The full target workload completes successfully and produces a usable report.
-- [ ] Repeated benchmark runs produce semantically identical analysis and presentation data.
+- [ ] Repeated benchmark runs produce semantically identical embedded analysis and browser-derived presentation data.
 - [ ] The automated sentinel fails on a meaningful regression without being dominated by normal timing noise.
 - [ ] Browser verification proves pan, zoom, hover, and selection remain responsive on the full target graph.
 - [ ] Geometry verification proves large nodes do not overlap smaller nodes before or after viewport fitting.

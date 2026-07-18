@@ -1,9 +1,9 @@
 /**
  * Browser bootstrap embedded in every self-contained report.
  *
- * The report builder creates the required DOM and assigns the renderer-neutral
- * presentation to `window.showMePresentation` before this IIFE bundle runs. The
- * presentation remains the immutable source of truth; Graphology holds the
+ * The report builder creates the required DOM and assigns the language-neutral
+ * analysis to `window.showMeAnalysis` before this prebuilt bundle runs. The browser
+ * derives immutable presentation facts from that analysis; Graphology holds the
  * mutable visible projection, Sigma renders it and emits interactions, and the
  * layout libraries assign browser-only coordinates.
  */
@@ -13,20 +13,21 @@ import forceAtlas2 from "graphology-layout-forceatlas2"
 import Sigma from "sigma"
 import { createEdgeArrowProgram } from "sigma/rendering"
 import type { NodeDisplayData } from "sigma/types"
+import { PROJECT_ANALYSIS_SCHEMA_VERSION, type ProjectAnalysis } from "../../analysis/project-analysis.js"
 import {
   activeLineCount,
+  buildBrowserPresentation,
   nodeSizeForLines,
   REPORT_LINE_CATEGORIES,
   type ReportLineCategory,
   type ReportNode,
-  type ReportPresentation,
   type ReportProjectFileNode,
-} from "../report-presentation.js"
+} from "./report-presentation.js"
 
 declare global {
   interface Window {
     /** Internal handoff from the generated HTML shell, not a public browser API. */
-    readonly showMePresentation: ReportPresentation
+    readonly showMeAnalysis: ProjectAnalysis
   }
 }
 
@@ -45,8 +46,14 @@ type ReportViewState = {
   readonly externalPackages: boolean
 }
 
-const presentation = window.showMePresentation
+const analysis = window.showMeAnalysis
+if (Number(analysis.schemaVersion) !== PROJECT_ANALYSIS_SCHEMA_VERSION) {
+  throw new Error("Unsupported project analysis schema version: " + String(analysis.schemaVersion) + ".")
+}
+const presentation = buildBrowserPresentation(analysis)
 const graphContainer = requiredElement("graph")
+const projectName = requiredElement("project-name")
+const projectFileCount = requiredElement("project-file-count")
 const tooltip = requiredElement("tooltip")
 const selectedHeading = requiredElement("selected-heading")
 const selectedEmpty = requiredElement("selected-empty")
@@ -71,7 +78,11 @@ const lineCategoryControls = REPORT_LINE_CATEGORIES.map((category) => ({
   input: requiredCheckbox("line-category-" + category),
 }))
 const projectFileDetailElements = document.querySelectorAll<HTMLElement>("[data-project-file-detail]")
-// This index covers the complete embedded presentation. The Graphology graph and
+document.title = `${presentation.projectName} · Show Me`
+projectName.textContent = presentation.projectName
+projectFileCount.textContent = `${analysis.files.length} project files`
+
+// This index covers the complete derived presentation. The Graphology graph and
 // visibleNodeIds below contain only the projection selected by the current view.
 const nodeById = new Map(presentation.nodes.map((node) => [node.id, node]))
 const graph = new DirectedGraph<BrowserNodeAttributes>()
@@ -149,7 +160,7 @@ applyReportView(viewState)
 document.documentElement.dataset.showMeReady = "true"
 
 /**
- * Apply the complete browser view transition from immutable presentation data.
+ * Apply the complete browser view transition from presentation data derived from immutable analysis.
  *
  * Rebuilding the visible graph keeps line sizing and package visibility
  * composable and ensures hidden nodes and edges cannot affect layout,
@@ -195,6 +206,8 @@ function applyReportView(nextState: ReportViewState): void {
   document.documentElement.dataset.activeLineCategories = viewState.lineCategories.join(",")
   document.documentElement.dataset.externalPackages = viewState.externalPackages ? "visible" : "hidden"
   graphContainer.dataset.visibleNodeCount = String(visibleNodes.length)
+  graphContainer.dataset.visibleEdgeCount = String(visibleEdges.length)
+  graphContainer.dataset.visibleNodeColors = JSON.stringify(visibleNodes.map(({ id, color }) => ({ id, color })))
   graphContainer.dataset.layoutSignature = layoutSignature(visibleNodes)
   // Index the rebuilt graph while nodeReducer supplies temporary coordinates.
   // The layout mutations below cause Sigma to schedule the final repaint.

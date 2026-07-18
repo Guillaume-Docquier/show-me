@@ -2,7 +2,6 @@ import { readFile } from "node:fs/promises"
 import { fileURLToPath } from "node:url"
 import { Result } from "@guillaume-docquier/tools-ts"
 import type { ProjectAnalysis } from "../analysis/project-analysis.js"
-import { buildReportPresentation, type ReportPresentation } from "./report-presentation.js"
 import { REPORT_STYLES } from "./report-styles.js"
 
 /**
@@ -22,32 +21,19 @@ export type BrowserBundleReadError = {
  * @returns A complete offline HTML document.
  */
 export function buildHtmlReport(analysis: ProjectAnalysis, browserBundle: string): string {
-  return createHtmlReport(buildReportPresentation(analysis), browserBundle)
-}
-
-/**
- * Create an HTML document from renderer-neutral presentation data.
- *
- * @param presentation - Graph data consumed by the browser renderer.
- * @param browserBundle - Prebuilt browser JavaScript to embed.
- * @returns A complete offline HTML document.
- */
-export function createHtmlReport(presentation: ReportPresentation, browserBundle: string): string {
-  const serializedPresentation = serializeForInlineScript(presentation)
-  const title = escapeHtml(presentation.projectName)
-  const projectFileCount = presentation.nodes.filter((node) => node.kind === "project-file").length
+  const serializedAnalysis = serializeForInlineScript(analysis)
 
   return `<!doctype html>
 <html lang="en" data-show-me-ready="false">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${title} · Show Me</title>
+<title>Show Me</title>
 <style>${REPORT_STYLES}</style>
 </head>
 <body>
 <header>
-  <div class="report-heading"><h1>${title}</h1><p>${projectFileCount} project files</p></div>
+  <div class="report-heading"><h1 id="project-name"></h1><p id="project-file-count"></p></div>
   <div class="report-controls">
     <fieldset id="line-category-controls">
       <legend>Size nodes by</legend>
@@ -92,7 +78,7 @@ export function createHtmlReport(presentation: ReportPresentation, browserBundle
   </aside>
 </main>
 <div id="tooltip" role="tooltip" hidden></div>
-<script>window.showMePresentation=${serializedPresentation};</script>
+<script>window.showMeAnalysis=${serializedAnalysis};</script>
 <script>${escapeBrowserBundle(browserBundle)}</script>
 </body>
 </html>`
@@ -118,7 +104,7 @@ export async function loadBrowserBundle(): Promise<Result<string, BrowserBundleR
   return browserBundle
 }
 
-function serializeForInlineScript(value: ReportPresentation): string {
+function serializeForInlineScript(value: ProjectAnalysis): string {
   return escapeInlineScript(JSON.stringify(value))
 }
 
@@ -133,8 +119,4 @@ function escapeInlineScript(value: string): string {
 
 function escapeBrowserBundle(browserBundle: string): string {
   return browserBundle.replace(/<\/script/giu, "<\\/script")
-}
-
-function escapeHtml(value: string): string {
-  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;")
 }

@@ -14,7 +14,7 @@ The target is a benchmark workload, not permission to make smaller projects slow
 - Do not add caches, concurrency, workers, streaming, or specialized data structures without measurements showing that they address a real bottleneck.
 - Keep per-file analysis isolated enough to permit bounded concurrency later.
 - Do not retain parser ASTs after their language-neutral analysis data has been produced unless profiling proves that retention is useful.
-- Keep discovery, reading, parsing, resolution, coverage, report building, layout, and browser rendering measurable as separate phases.
+- Keep discovery, reading, parsing, resolution, coverage, report packaging, browser presentation derivation, layout, and browser rendering measurable as separate phases.
 - Keep analysis ordering deterministic even if work is later parallelized.
 - Avoid contracts that require the entire implementation to remain single-threaded or that force the renderer to receive parser-specific data.
 - Treat memory consumption, generated report size, browser load time, layout time, and interaction responsiveness as part of performance, not only CLI duration.

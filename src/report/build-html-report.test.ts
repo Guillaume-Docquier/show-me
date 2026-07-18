@@ -1,172 +1,134 @@
-import { Result, TypeGuard } from "@guillaume-docquier/tools-ts"
+import { Result, TypeGuard, branded } from "@guillaume-docquier/tools-ts"
 import { expect, it } from "vitest"
 import { analyzeProject } from "../analysis/analyze-project.js"
-import { importIstanbulCoverage } from "../coverage/import-istanbul-coverage.js"
+import type { ExternalPackageName } from "../analysis/external-package-name.js"
+import { PROJECT_ANALYSIS_SCHEMA_VERSION, type ProjectAnalysis } from "../analysis/project-analysis.js"
+import { ProjectFilePath } from "../project-files/project-file-path.js"
 import { fixtureProjectPath } from "../testing/fixture-project.js"
-import { buildHtmlReport, createHtmlReport } from "./build-html-report.js"
-import { REPORT_PRESENTATION_SCHEMA_VERSION, type ReportPresentation } from "./report-presentation.js"
+import { buildHtmlReport } from "./build-html-report.js"
 
-it("builds one offline document without embedding source contents", async () => {
+it("embeds the complete project analysis without presentation-only data", async () => {
   // Arrange
-  const analysis = await analyzeProject({ projectRoot: fixtureProjectPath("minimal-javascript") })
+  const analysis = await analyzeProject({ projectRoot: fixtureProjectPath("external-packages") })
+  if (Result.isFailure(analysis)) {
+    throw new Error(`Fixture analysis failed: ${analysis.error._tag}`)
+  }
+  const diagnosticFile = parseProjectFilePath("src/entry.ts")
+  const enrichedAnalysis: ProjectAnalysis = {
+    ...analysis.value,
+    files: analysis.value.files.map((file, index) => (index === 0 ? { ...file, coverage: { lines: 50 } } : file)),
+    diagnostics: [{ code: "test-diagnostic", message: "Diagnostic detail", file: diagnosticFile }],
+  }
   const browserBundle = "document.documentElement.dataset.bundleMarker='embedded'"
 
-  if (Result.isFailure(analysis)) {
-    throw new Error(`Fixture analysis failed: ${analysis.error._tag}`)
-  }
-
   // Act
-  const html = buildHtmlReport(analysis.value, browserBundle)
+  const html = buildHtmlReport(enrichedAnalysis, browserBundle)
+  const embeddedAnalysis = embeddedProjectAnalysis(html)
 
   // Assert
+  expect(embeddedAnalysis).toEqual(JSON.parse(JSON.stringify(enrichedAnalysis)))
+  expect(embeddedAnalysis).toMatchObject({
+    schemaVersion: PROJECT_ANALYSIS_SCHEMA_VERSION,
+    project: analysis.value.project,
+    files: expect.arrayContaining([
+      expect.objectContaining({
+        path: analysis.value.files[0]?.path,
+        language: "typescript",
+        lines: expect.objectContaining({ code: expect.any(Number), comment: expect.any(Number), blank: expect.any(Number) }),
+        coverage: { lines: 50 },
+      }),
+    ]),
+    dependencies: analysis.value.dependencies,
+    externalPackages: analysis.value.externalPackages,
+    externalPackageDependencies: analysis.value.externalPackageDependencies,
+    diagnostics: [{ code: "test-diagnostic", message: "Diagnostic detail", file: "src/entry.ts" }],
+  })
+  expect(JSON.stringify(embeddedAnalysis)).not.toMatch(
+    /"(?:color|size|displayName|tooltipName|importedNodeIds|consumerNodeIds|nodes|edges|id)"/u,
+  )
   expect(html).toContain("<!doctype html>")
-  expect(html).toContain("index.js")
+  expect(html).toContain("<title>Show Me</title>")
+  expect(html).toContain('<h1 id="project-name"></h1><p id="project-file-count"></p>')
   expect(html).toContain(browserBundle)
-  expect(html).toContain('<fieldset id="line-category-controls">')
-  expect(html).toContain('<input id="line-category-code" type="checkbox" value="code" checked>')
-  expect(html).toContain('<input id="external-packages-toggle" type="checkbox">External packages')
-  expect(html).toContain("<dt data-project-file-detail>Code lines</dt>")
-  expect(html).toContain("<dt data-project-file-detail>Comment lines</dt>")
-  expect(html).toContain("<dt data-project-file-detail>Blank lines</dt>")
   expect(html).not.toContain('src="')
   expect(html).not.toMatch(/https?:\/\//u)
-  expect(html).not.toContain('export const message = "hello"')
 })
 
-it("escapes script-closing project data before embedding it", async () => {
+it("escapes hostile analysis and browser bundle text inside one offline document", () => {
   // Arrange
-  const analysis = await analyzeProject({ projectRoot: fixtureProjectPath("minimal-javascript") })
-  if (Result.isFailure(analysis)) {
-    throw new Error(`Fixture analysis failed: ${analysis.error._tag}`)
-  }
-  const unsafeAnalysis = {
-    ...analysis.value,
-    project: { name: "</script><script>unsafe()</script>" },
-  }
-
-  // Act
-  const html = buildHtmlReport(unsafeAnalysis, "window.bundleLoaded=true")
-
-  // Assert
-  expect(html).not.toContain("</script><script>unsafe()")
-  expect(html).toContain("\\u003c/script\\u003e")
-})
-
-it("escapes hostile report data and browser bundle script closings", () => {
-  // Arrange
-  const unsafeText = "</title><script>unsafe()</script>&" + String.fromCodePoint(0x20_28, 0x20_29)
-  const presentation: ReportPresentation = {
-    schemaVersion: REPORT_PRESENTATION_SCHEMA_VERSION,
-    projectName: unsafeText,
-    nodes: [
+  const unsafeText = "</script><script>unsafe()</script>&" + String.fromCodePoint(0x20_28, 0x20_29)
+  const unsafePath = parseProjectFilePath(`src/${unsafeText}.ts`)
+  // Deliberately bypass package parsing to keep the report boundary safe even if an upstream invariant regresses.
+  const unsafePackageName = branded<ExternalPackageName>(unsafeText)
+  const analysis: ProjectAnalysis = {
+    schemaVersion: PROJECT_ANALYSIS_SCHEMA_VERSION,
+    project: { name: unsafeText },
+    files: [
       {
-        id: unsafeText,
-        kind: "external-package",
-        displayName: unsafeText,
-        tooltipName: unsafeText,
-        packageName: unsafeText,
-        importedNodeIds: [],
-        consumerNodeIds: [],
-        color: "#c084fc",
-        size: 15,
+        path: unsafePath,
+        language: unsafeText,
+        lines: { code: 1, comment: 0, blank: 0 },
+        coverage: undefined,
       },
     ],
-    edges: [],
+    dependencies: [],
+    externalPackages: [{ name: unsafePackageName }],
+    externalPackageDependencies: [{ source: unsafePath, target: unsafePackageName, kind: "runtime" }],
+    diagnostics: [{ code: unsafeText, message: unsafeText, file: unsafePath }],
   }
   const browserBundle = 'window.bundleValue = "</ScRiPt><script>bundleUnsafe()</script>"'
 
   // Act
-  const html = createHtmlReport(presentation, browserBundle)
+  const html = buildHtmlReport(analysis, browserBundle)
 
   // Assert
   expect(html).not.toContain(unsafeText)
   expect(html).not.toContain("</ScRiPt>")
   expect(html).not.toContain("</script><script>bundleUnsafe()")
-  expect(html).toContain("&lt;/title&gt;&lt;script&gt;unsafe()&lt;/script&gt;&amp;")
-  expect(html).toContain("\\u003c/title\\u003e\\u003cscript\\u003eunsafe()\\u003c/script\\u003e\\u0026\\u2028\\u2029")
+  expect(html).toContain("\\u003c/script\\u003e\\u003cscript\\u003eunsafe()\\u003c/script\\u003e\\u0026\\u2028\\u2029")
   expect(html).toContain("<\\/script><script>bundleUnsafe()<\\/script>")
   expect(html.match(/<\/script>/gu)).toHaveLength(2)
 })
 
-it("keeps missing coverage neutral instead of treating it as zero coverage", async () => {
+it("does not embed project source contents", async () => {
   // Arrange
-  const projectRoot = fixtureProjectPath("coverage-project")
-  const analysis = await analyzeProject({ projectRoot })
+  const analysis = await analyzeProject({ projectRoot: fixtureProjectPath("minimal-javascript") })
   if (Result.isFailure(analysis)) {
     throw new Error(`Fixture analysis failed: ${analysis.error._tag}`)
   }
-  const coveredAnalysis = await importIstanbulCoverage(analysis.value, projectRoot, `${projectRoot}/coverage/coverage-final.json`)
-  if (Result.isFailure(coveredAnalysis)) {
-    throw new Error(`Fixture coverage import failed: ${coveredAnalysis.error._tag}`)
-  }
 
   // Act
-  const html = buildHtmlReport(coveredAnalysis.value, "window.bundleLoaded=true")
-  const nodes = embeddedReportPresentation(html).nodes
+  const html = buildHtmlReport(analysis.value, "window.bundleLoaded=true")
 
   // Assert
-  const absentNode = nodes.find((node) => TypeGuard.isRecord(node) && node.path === "src/absent.ts")
-  const uncoveredNode = nodes.find((node) => TypeGuard.isRecord(node) && node.path === "src/uncovered.ts")
-  expect(absentNode).toMatchObject({ path: "src/absent.ts", color: "#8fa3b8" })
-  expect(absentNode).not.toHaveProperty("coverage")
-  expect(uncoveredNode).toMatchObject({ path: "src/uncovered.ts", coverage: 0, color: "#dc2626" })
+  expect(html).toContain("index.js")
+  expect(html).not.toContain('export const message = "hello"')
 })
 
-it("omits default-excluded test files and their relationships from the report", async () => {
-  // Arrange
-  const projectRoot = fixtureProjectPath("test-file-exclusions")
-  const analysis = await analyzeProject({ projectRoot })
-  if (Result.isFailure(analysis)) {
-    throw new Error("Fixture analysis failed: " + analysis.error._tag)
-  }
-  const coveredAnalysis = await importIstanbulCoverage(analysis.value, projectRoot, projectRoot + "/coverage/coverage-final.json")
-  if (Result.isFailure(coveredAnalysis)) {
-    throw new Error("Fixture coverage import failed: " + coveredAnalysis.error._tag)
+function embeddedProjectAnalysis(html: string): unknown {
+  const serializedAnalysis = html.match(/<script>window\.showMeAnalysis=(.+);<\/script>/u)?.[1]
+  if (serializedAnalysis === undefined) {
+    throw new Error("Generated report did not embed its project analysis.")
   }
 
-  // Act
-  const html = buildHtmlReport(coveredAnalysis.value, "window.bundleLoaded=true")
-  const presentation = embeddedReportPresentation(html)
-
-  // Assert
-  expect(html).toContain("<p>11 project files</p>")
-  expect(
-    presentation.nodes.map((node) => {
-      if (!TypeGuard.isRecord(node)) {
-        throw new Error("Generated report contained an invalid node.")
-      }
-      return { path: node.path, coverage: node.coverage }
-    }),
-  ).toEqual([
-    { path: "src/__tests__/helper.ts", coverage: undefined },
-    { path: "src/app.ts", coverage: 100 },
-    { path: "src/aspect.ts", coverage: undefined },
-    { path: "src/contest.ts", coverage: undefined },
-    { path: "src/runtime.ts", coverage: 0 },
-    { path: "src/spec.ts", coverage: undefined },
-    { path: "src/suite.spec/helper.ts", coverage: undefined },
-    { path: "src/suite.test/helper.ts", coverage: undefined },
-    { path: "src/test.ts", coverage: undefined },
-    { path: "src/test/helper.ts", coverage: undefined },
-    { path: "src/tests/helper.ts", coverage: undefined },
-  ])
-  expect(presentation.edges).toEqual([
-    expect.objectContaining({
-      source: "project-file:src/app.ts",
-      target: "project-file:src/runtime.ts",
-    }),
-  ])
-})
-
-function embeddedReportPresentation(html: string): { readonly nodes: readonly unknown[]; readonly edges: readonly unknown[] } {
-  const serializedPresentation = html.match(/<script>window\.showMePresentation=(.+);<\/script>/u)?.[1]
-  if (serializedPresentation === undefined) {
-    throw new Error("Generated report did not embed its presentation model.")
+  const analysis: unknown = JSON.parse(serializedAnalysis)
+  if (
+    !TypeGuard.isRecord(analysis) ||
+    !TypeGuard.isArray(analysis.files) ||
+    !TypeGuard.isArray(analysis.dependencies) ||
+    !TypeGuard.isArray(analysis.externalPackages) ||
+    !TypeGuard.isArray(analysis.externalPackageDependencies) ||
+    !TypeGuard.isArray(analysis.diagnostics)
+  ) {
+    throw new Error("Generated report analysis did not contain the complete analysis collections.")
   }
+  return analysis
+}
 
-  const presentation: unknown = JSON.parse(serializedPresentation)
-  if (!TypeGuard.isRecord(presentation) || !TypeGuard.isArray(presentation.nodes) || !TypeGuard.isArray(presentation.edges)) {
-    throw new Error("Generated report presentation did not contain nodes and edges.")
+function parseProjectFilePath(input: string): ProjectFilePath {
+  const result = ProjectFilePath.parse(input)
+  if (Result.isFailure(result)) {
+    throw new Error(`Invalid test project file path: ${input}`)
   }
-  return { nodes: presentation.nodes, edges: presentation.edges }
+  return result.value
 }

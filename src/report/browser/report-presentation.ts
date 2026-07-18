@@ -1,4 +1,4 @@
-import type { ProjectAnalysis } from "../analysis/project-analysis.js"
+import type { ProjectAnalysis } from "../../analysis/project-analysis.js"
 
 const NODE_SIZE_SCALE = 3
 const DEFAULT_NODE_COLOR = "#8fa3b8"
@@ -6,14 +6,8 @@ const UNCOVERED_NODE_COLOR = "#dc2626"
 const PARTIALLY_COVERED_NODE_COLOR = "#eab308"
 const COVERED_NODE_COLOR = "#16a34a"
 const PATH_TRUNCATION_PREFIX = "..."
-
-/** Fixed renderer size for synthetic external-package nodes. */
-export const EXTERNAL_PACKAGE_NODE_SIZE = 8
-/** Accessible non-coverage color for synthetic external-package nodes. */
-export const EXTERNAL_PACKAGE_NODE_COLOR = "#c084fc"
-
-/** The schema version of the presentation embedded in a static report. */
-export const REPORT_PRESENTATION_SCHEMA_VERSION = 4
+const EXTERNAL_PACKAGE_NODE_SIZE = 8
+const EXTERNAL_PACKAGE_NODE_COLOR = "#c084fc"
 
 /** Line categories that report controls can combine for project-file sizing. */
 export const REPORT_LINE_CATEGORIES = ["code", "comment", "blank"] as const
@@ -21,7 +15,7 @@ export const REPORT_LINE_CATEGORIES = ["code", "comment", "blank"] as const
 /** One selectable project-file line category. */
 export type ReportLineCategory = (typeof REPORT_LINE_CATEGORIES)[number]
 
-/** Renderer-neutral line metrics for one project file. */
+/** Browser-derived line metrics for one project file. */
 export type ReportNodeLineMetrics = {
   readonly code: number
   readonly comment: number
@@ -38,7 +32,7 @@ type ReportNodeBase = {
   readonly size: number
 }
 
-/** Renderer-neutral data for one project-file node. */
+/** Browser-derived data for one project-file node. */
 export type ReportProjectFileNode = ReportNodeBase & {
   readonly kind: "project-file"
   readonly path: string
@@ -46,7 +40,7 @@ export type ReportProjectFileNode = ReportNodeBase & {
   readonly coverage: number | undefined
 }
 
-/** Renderer-neutral data for one synthetic external-package node. */
+/** Browser-derived data for one synthetic external-package node. */
 export type ReportExternalPackageNode = ReportNodeBase & {
   readonly kind: "external-package"
   readonly packageName: string
@@ -55,29 +49,26 @@ export type ReportExternalPackageNode = ReportNodeBase & {
 /** One selectable report entity. */
 export type ReportNode = ReportProjectFileNode | ReportExternalPackageNode
 
-/** Renderer-neutral data for one directed dependency edge. */
-export type ReportEdge = {
+type ReportEdge = {
   readonly id: string
   readonly kind: "project-file" | "external-package"
   readonly source: string
   readonly target: string
 }
 
-/** Complete data embedded in one static report. */
-export type ReportPresentation = {
-  readonly schemaVersion: typeof REPORT_PRESENTATION_SCHEMA_VERSION
+type BrowserPresentation = {
   readonly projectName: string
   readonly nodes: readonly ReportNode[]
   readonly edges: readonly ReportEdge[]
 }
 
 /**
- * Convert internal analysis into deterministic, renderer-neutral graph data.
+ * Derive deterministic, renderer-neutral browser presentation from the embedded analysis.
  *
- * @param analysis - Language-neutral project analysis.
- * @returns Presentation data with deterministic identities, display metadata, and relationships.
+ * @param analysis - Complete language-neutral project analysis.
+ * @returns Browser-owned identities, display metadata, and relationship indexes.
  */
-export function buildReportPresentation(analysis: ProjectAnalysis): ReportPresentation {
+export function buildBrowserPresentation(analysis: ProjectAnalysis): BrowserPresentation {
   const importedNodeIdsBySource = new Map<string, string[]>()
   const consumerNodeIdsByTarget = new Map<string, string[]>()
   const projectEdges: ReportEdge[] = analysis.dependencies.map((dependency, index) => ({
@@ -99,7 +90,7 @@ export function buildReportPresentation(analysis: ProjectAnalysis): ReportPresen
   }
 
   const nodes: ReportNode[] = [
-    ...analysis.files.map((file): Omit<ReportProjectFileNode, "x" | "y"> => {
+    ...analysis.files.map((file): ReportProjectFileNode => {
       const id = projectFileNodeId(file.path)
       return {
         id,
@@ -107,7 +98,7 @@ export function buildReportPresentation(analysis: ProjectAnalysis): ReportPresen
         displayName: file.path,
         tooltipName: truncatePathFromStart(file.path),
         path: file.path,
-        lineMetrics: { code: file.lines.code, comment: file.lines.comment, blank: file.lines.blank },
+        lineMetrics: file.lines,
         importedNodeIds: importedNodeIdsBySource.get(id) ?? [],
         consumerNodeIds: consumerNodeIdsByTarget.get(id) ?? [],
         coverage: file.coverage?.lines,
@@ -115,7 +106,7 @@ export function buildReportPresentation(analysis: ProjectAnalysis): ReportPresen
         size: nodeSizeForLines(file.lines.code),
       }
     }),
-    ...analysis.externalPackages.map((externalPackage): Omit<ReportExternalPackageNode, "x" | "y"> => {
+    ...analysis.externalPackages.map((externalPackage): ReportExternalPackageNode => {
       const id = externalPackageNodeId(externalPackage.name)
       return {
         id,
@@ -131,12 +122,7 @@ export function buildReportPresentation(analysis: ProjectAnalysis): ReportPresen
     }),
   ]
 
-  return {
-    schemaVersion: REPORT_PRESENTATION_SCHEMA_VERSION,
-    projectName: analysis.project.name,
-    nodes,
-    edges,
-  }
+  return { projectName: analysis.project.name, nodes, edges }
 }
 
 /**
@@ -150,7 +136,7 @@ export function nodeSizeForLines(lines: number): number {
 }
 
 /**
- * Sum the selected line categories for project-file sizing.
+ * Sum selected line categories for project-file sizing.
  *
  * @param metrics - Complete exclusive project-file line metrics.
  * @param categories - Non-empty active line categories.

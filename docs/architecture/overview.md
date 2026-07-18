@@ -8,7 +8,7 @@ This document describes the target architecture. The implementation is being bui
 
 The initial end-to-end product is operational. The CLI discovers supported project files, excludes conventional test files by default, classifies code, comment, and blank physical lines, analyzes static runtime ESM imports and re-exports through Oxc, identifies external npm package roots without analyzing installed dependencies, optionally imports Istanbul line coverage, and writes a self-contained interactive graph report. The repository publishes its latest validated report through GitHub Pages.
 
-Analysis, presentation, CLI, build, and package boundaries have been consolidated and are covered through Node and real-browser tests. CLOC-style metrics, interactive line-category sizing, and optional external-package nodes are implemented. Workspace behavior and user-facing file-selection controls remain planned rather than partially implemented.
+Analysis, report packaging, browser presentation, CLI, build, and package boundaries have been consolidated and are covered through Node and real-browser tests. CLOC-style metrics, interactive line-category sizing, and optional external-package nodes are implemented. Workspace behavior and user-facing file-selection controls remain planned rather than partially implemented.
 
 ## System flow
 
@@ -20,7 +20,8 @@ flowchart LR
     Coverage["Coverage importer"] --> Analysis
     Analysis --> Report["Report builder"]
     Report --> Html["Self-contained HTML"]
-    Html --> Renderer["Browser renderer"]
+    Html --> Presentation["Browser presentation"]
+    Presentation --> Renderer["Browser renderer"]
 ```
 
 The boundaries have different responsibilities:
@@ -29,8 +30,9 @@ The boundaries have different responsibilities:
 - Project scanning discovers candidate files without understanding their syntax.
 - A language module turns project files into language-neutral file metrics, runtime dependency references, and diagnostics.
 - Coverage importers translate supported coverage formats into language-neutral per-file coverage.
-- The report builder converts the analysis into a browser presentation model and embeds it with the browser assets.
-- The renderer consumes only the embedded presentation model. It does not parse source code, read the filesystem, or understand coverage formats.
+- The report builder safely embeds the complete analysis with the fixed HTML shell, styles, and prebuilt browser asset.
+- Browser presentation derives graph identities, display text, relationships, sizes, and colors from the embedded analysis.
+- The renderer consumes that browser-derived presentation. It does not parse source code, read the filesystem, or understand coverage formats.
 
 ## Current product scope
 
@@ -55,7 +57,7 @@ CommonJS, dynamic imports, pnpm workspace ownership, and richer visualization co
 
 The npm package is `@guillaume-docquier/show-me`. It exposes the `show-me` executable through its `bin` entry.
 
-The package has no programmatic JavaScript exports. Its analysis, presentation, and report-building modules remain internal.
+The package has no programmatic JavaScript exports. Its analysis, browser-presentation, and report-building modules remain internal.
 
 The repository remains one package until a concrete need justifies splitting it. Source directories should express the architectural boundaries without creating package-level ceremony.
 
@@ -65,7 +67,8 @@ The analysis model is the stable center of the application:
 
 - Language-specific code depends on and produces the analysis model.
 - Coverage-specific code depends on and enriches the analysis model.
-- Report generation depends on the analysis model.
+- Report generation packages the analysis model without deriving presentation state.
+- Browser presentation depends on the analysis model and derives renderer-neutral display facts.
 - The analysis model does not depend on Oxc, Sigma, Graphology, browser APIs, or CLI libraries.
 - The renderer does not depend on Oxc, Node filesystem APIs, or project configuration.
 

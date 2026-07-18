@@ -167,7 +167,7 @@ Options:
     })
   })
 
-  it("writes directed dependencies and side-panel counts into the report", async () => {
+  it("writes raw directed dependencies into the report", async () => {
     await withTemporaryDirectory(async (currentDirectory) => {
       // Arrange
       const outputPath = join(currentDirectory, "static-esm.html")
@@ -181,46 +181,30 @@ Options:
 
       // Assert
       const html = await readFile(outputPath, "utf8")
-      const serializedPresentation = html.match(/<script>window\.showMePresentation=(.+);<\/script>/u)?.[1]
-      if (serializedPresentation === undefined) {
-        throw new Error("Generated report did not embed its presentation model.")
-      }
-      const presentation: unknown = JSON.parse(serializedPresentation)
-      if (!TypeGuard.isRecord(presentation) || !TypeGuard.isArray(presentation.nodes) || !TypeGuard.isArray(presentation.edges)) {
-        throw new Error("Generated report presentation did not contain node and edge collections.")
-      }
+      const analysis = parseAnalysis(html)
 
       expect(exitCode).toBe(0)
-      expect(presentation.edges).toHaveLength(14)
-      expect(presentation.nodes).toEqual(
+      expect(analysis.dependencies).toHaveLength(13)
+      expect(analysis.files).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
-            id: "project-file:src/main.ts",
             path: "src/main.ts",
-            importedNodeIds: expect.arrayContaining(["external-package:external-package"]),
-            consumerNodeIds: [],
           }),
           expect.objectContaining({
-            id: "project-file:src/runtime.ts",
             path: "src/runtime.ts",
-            importedNodeIds: [],
-            consumerNodeIds: ["project-file:src/main.ts", "project-file:src/reexports.ts"],
-          }),
-          expect.objectContaining({
-            id: "external-package:external-package",
-            kind: "external-package",
-            packageName: "external-package",
           }),
         ]),
       )
-      expect(presentation.edges).toEqual(
+      expect(analysis.dependencies).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
-            source: "project-file:src/main.ts",
-            target: "project-file:src/runtime.ts",
+            source: "src/main.ts",
+            target: "src/runtime.ts",
           }),
         ]),
       )
+      expect(analysis.externalPackages).toEqual([{ name: "external-package" }])
+      expect(analysis.externalPackageDependencies).toEqual([{ source: "src/main.ts", target: "external-package", kind: "runtime" }])
     })
   })
 
@@ -237,9 +221,9 @@ Options:
       const exitCode = await runCli([], captured.output, { currentDirectory, browserBundle: TEST_BROWSER_BUNDLE })
 
       // Assert
-      const presentation = parsePresentation(await readFile(join(currentDirectory, "show-me.html"), "utf8"))
+      const analysis = parseAnalysis(await readFile(join(currentDirectory, "show-me.html"), "utf8"))
       expect(exitCode).toBe(0)
-      expect(presentation.nodes).toEqual(expect.arrayContaining([expect.objectContaining({ path: "index.ts", coverage: 100 })]))
+      expect(analysis.files).toEqual(expect.arrayContaining([expect.objectContaining({ path: "index.ts", coverage: { lines: 100 } })]))
       expect(captured.standardOutput.join("")).not.toContain("No coverage file found")
       expect(captured.standardError).toEqual([])
     })
@@ -263,9 +247,9 @@ Options:
       })
 
       // Assert
-      const presentation = parsePresentation(await readFile(join(currentDirectory, "show-me.html"), "utf8"))
+      const analysis = parseAnalysis(await readFile(join(currentDirectory, "show-me.html"), "utf8"))
       expect(exitCode).toBe(0)
-      expect(presentation.nodes).toEqual(expect.arrayContaining([expect.objectContaining({ path: "src/app.ts", coverage: 0 })]))
+      expect(analysis.files).toEqual(expect.arrayContaining([expect.objectContaining({ path: "src/app.ts", coverage: { lines: 0 } })]))
       expect(captured.standardError).toEqual([])
     })
   })
@@ -368,17 +352,35 @@ function coverageFinal(path: string, hits: number): string {
   })
 }
 
-function parsePresentation(html: string): { readonly nodes: readonly unknown[]; readonly edges: readonly unknown[] } {
-  const serializedPresentation = html.match(/<script>window\.showMePresentation=(.+);<\/script>/u)?.[1]
-  if (serializedPresentation === undefined) {
-    throw new Error("Generated report did not embed its presentation model.")
+type EmbeddedAnalysis = {
+  readonly files: readonly unknown[]
+  readonly dependencies: readonly unknown[]
+  readonly externalPackages: readonly unknown[]
+  readonly externalPackageDependencies: readonly unknown[]
+}
+
+function parseAnalysis(html: string): EmbeddedAnalysis {
+  const serializedAnalysis = html.match(/<script>window\.showMeAnalysis=(.+);<\/script>/u)?.[1]
+  if (serializedAnalysis === undefined) {
+    throw new Error("Generated report did not embed its project analysis.")
   }
 
-  const presentation: unknown = JSON.parse(serializedPresentation)
-  if (!TypeGuard.isRecord(presentation) || !TypeGuard.isArray(presentation.nodes) || !TypeGuard.isArray(presentation.edges)) {
-    throw new Error("Generated report presentation did not contain node and edge collections.")
+  const analysis: unknown = JSON.parse(serializedAnalysis)
+  if (
+    !TypeGuard.isRecord(analysis) ||
+    !TypeGuard.isArray(analysis.files) ||
+    !TypeGuard.isArray(analysis.dependencies) ||
+    !TypeGuard.isArray(analysis.externalPackages) ||
+    !TypeGuard.isArray(analysis.externalPackageDependencies)
+  ) {
+    throw new Error("Generated report analysis did not contain the expected collections.")
   }
-  return { nodes: presentation.nodes, edges: presentation.edges }
+  return {
+    files: analysis.files,
+    dependencies: analysis.dependencies,
+    externalPackages: analysis.externalPackages,
+    externalPackageDependencies: analysis.externalPackageDependencies,
+  }
 }
 
 function captureOutput(): CapturedOutput {

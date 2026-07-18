@@ -14,11 +14,11 @@ The unscoped `show-me` npm package name is already occupied. The package name an
 
 Publish the package as `@guillaume-docquier/show-me` and expose the `show-me` executable through the package `bin` entry.
 
-The package exposes no programmatic JavaScript API. Analysis, presentation, and report-building modules remain internal package implementation details until a later decision establishes a supported API.
+The package exposes no programmatic JavaScript API. Analysis, browser-presentation, and report-building modules remain internal package implementation details until a later decision establishes a supported API.
 
 The CLI accepts an optional project path that defaults to the invocation directory. It writes one self-contained HTML file, defaulting to `show-me.html` in the invocation directory. `--output` overrides that location, and an existing output file is overwritten without a force flag.
 
-The command embeds browser code, styles, and presentation data in the report. It does not embed project source contents. It never opens a browser and does not plan an `--open` option. On success it prints the resolved output path and total execution time.
+The command embeds the complete language-neutral `ProjectAnalysis`, browser code, and styles in the report. The browser derives presentation data when the file opens. The report does not embed project source contents. The command never opens a browser and does not plan an `--open` option. On success it prints the resolved output path and total execution time.
 
 A multi-file or hosted report mode is not planned until a concrete limitation requires it.
 
@@ -32,8 +32,12 @@ Browser assets and analysis data increase the size of every generated file. Bund
 
 ### 2026-07-15 build amendment
 
-Node-facing TypeScript is compiled with `tsc`. The browser renderer is bundled with esbuild into an IIFE during package build, and report generation embeds that prebuilt asset. The CLI never compiles browser code while analyzing a project.
+Node-facing TypeScript is compiled with `tsc`. The browser renderer is bundled with esbuild as one prebuilt ESM-format asset during package build, and report generation embeds that asset. The CLI never compiles browser code while analyzing a project.
 
 This keeps runtime report generation deterministic and avoids shipping a development server or runtime compiler. It introduces two explicit build targets and requires their outputs to be tested together through the packaged CLI workflow.
 
 The choice belongs to this ADR because it implements the accepted self-contained report boundary; it does not change the report format or add another deployment mode.
+
+### 2026-07-18 analysis-payload amendment
+
+The report builder now embeds `ProjectAnalysis` directly rather than a Node-derived presentation schema. It remains responsible for the fixed shell, styles, prebuilt browser asset, JSON serialization, and inline-script escaping. Project title, file count, graph identities, relationships, sizes, and colors are browser-derived presentation concerns.

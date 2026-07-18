@@ -11,7 +11,7 @@ The CLI imports line coverage from either Istanbul `coverage-final.json` or LCOV
 ## Dependencies
 
 - [Milestone 005](./done/005-coverage.md) established coverage path normalization, optional automatic discovery, strict explicit-file failures, and the format-agnostic per-file coverage stored in analysis.
-- [Milestone 017](./017-browser-owned-presentation.md) changes the embedded report boundary but not the coverage contract. Implementing this milestone after 017 avoids migrating report-facing coverage assertions twice.
+- [Milestone 017](./done/017-browser-owned-presentation.md) changed the embedded report boundary but not the coverage contract. Implementing this milestone after 017 avoids migrating report-facing coverage assertions twice.
 
 ## Deterministic selection
 

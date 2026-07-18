@@ -50,7 +50,7 @@ Synthetic package nodes use a fixed collision and rendered size. The renderer cl
 
 ### 2026-07-18 browser-layout simplification amendment
 
-The browser renderer now owns all layout coordinates. The embedded presentation contains deterministic node and edge facts but no positions or separate collision radii. On initial load and every report-view transition, the browser rebuilds the visible Graphology subgraph, uses circular layout to provide deterministic non-degenerate starting coordinates, then runs a synchronous 5,000-iteration ForceAtlas2 pass.
+The browser renderer now owns all layout coordinates. The embedded analysis contains deterministic project files and dependency facts; the browser derives presentation nodes and edges without positions or separate collision radii. On initial load and every report-view transition, the browser rebuilds the visible Graphology subgraph, uses circular layout to provide deterministic non-degenerate starting coordinates, then runs a synchronous 5,000-iteration ForceAtlas2 pass.
 
 Sigma interprets node sizes relative to layout positions, matching the coordinate system used by ForceAtlas2's size adjustment. Barnes-Hut remains disabled for radius-aware exact repulsion. Sigma now fits the resulting Graphology extent directly; the removed shared layout module, collision padding, fixed random seed, and custom radius-aware bounding box described by the earlier amendments are no longer part of the implementation.
 

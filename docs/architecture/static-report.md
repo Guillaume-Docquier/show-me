@@ -44,10 +44,10 @@ The report embeds:
 
 - the browser JavaScript bundle;
 - styles;
-- the presentation model derived from analysis;
+- the complete versioned `ProjectAnalysis`;
 - any other assets required for offline rendering.
 
-The report does not embed source file contents. Analysis JSON is an internal boundary and is not exposed as a separate CLI output.
+The report does not embed source file contents. The analysis handoff is an internal Node-to-browser boundary and is not exposed as a separate CLI output.
 
 ## Initial visualization
 
@@ -63,7 +63,7 @@ The initial graph is flat:
 - edges point from an importing file to the imported file;
 - pan, zoom, hover, and selection are supported.
 
-Sigma renders node size relative to layout positions so its radii use the same coordinate system as ForceAtlas2's size adjustment. Sigma fits the browser-owned coordinates from the current Graphology graph. The embedded presentation remains renderer-neutral and does not contain layout coordinates; layout geometry does not enter project analysis.
+Sigma renders node size relative to layout positions so its radii use the same coordinate system as ForceAtlas2's size adjustment. Sigma fits the browser-owned coordinates from the current Graphology graph. The embedded analysis contains no presentation identities or layout coordinates; the browser derives renderer-neutral presentation before creating Graphology and Sigma state.
 
 ## Line-category controls
 
