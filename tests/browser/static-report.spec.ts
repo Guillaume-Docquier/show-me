@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 import { promisify } from "node:util"
-import { Result } from "@guillaume-docquier/tools-ts"
+import { Assert } from "@guillaume-docquier/tools-ts"
 import { expect, test } from "@playwright/test"
 import { analyzeProject } from "../../src/analysis/analyze-project.js"
 import { importIstanbulCoverage } from "../../src/coverage/import-istanbul-coverage.js"
@@ -24,9 +24,7 @@ test("supports graph hover, selection, clearing, and side-panel navigation", asy
     await writeFile(join(sourceDirectory, "index.ts"), "// comment\n\nexport const message = 'hello'\n\n", "utf8")
 
     const analysis = await analyzeProject({ projectRoot: projectDirectory })
-    if (Result.isFailure(analysis)) {
-      throw new Error(`Fixture analysis failed: ${analysis.error._tag}`)
-    }
+    Assert.isSuccess(analysis)
     const browserBundle = await readFile(join(process.cwd(), "dist", "report", "browser.js"), "utf8")
     const reportPath = join(temporaryDirectory, "show-me.html")
     await writeFile(reportPath, buildHtmlReport(analysis.value, browserBundle), "utf8")
@@ -45,9 +43,7 @@ test("supports graph hover, selection, clearing, and side-panel navigation", asy
     })
     const graph = page.locator("#graph")
     const bounds = await graph.boundingBox()
-    if (bounds === null) {
-      throw new Error("Graph did not have browser bounds.")
-    }
+    Assert.isDefined(bounds)
     const centerX = bounds.x + bounds.width / 2
     const centerY = bounds.y + bounds.height / 2
     await page.mouse.move(centerX, centerY)
@@ -63,9 +59,7 @@ test("supports graph hover, selection, clearing, and side-panel navigation", asy
     await expect(tooltip.locator(".tooltip-metrics")).toContainText("Blank")
     expect(await tooltipPath.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
     const tooltipBounds = await tooltip.boundingBox()
-    if (tooltipBounds === null) {
-      throw new Error("Tooltip did not have browser bounds.")
-    }
+    Assert.isDefined(tooltipBounds)
     expect(Math.abs(tooltipBounds.x - (centerX + 14))).toBeLessThanOrEqual(1)
     expect(Math.abs(tooltipBounds.y - (centerY + 14))).toBeLessThanOrEqual(1)
 
@@ -135,9 +129,7 @@ test("keeps packages hidden by default and rebuilds one combined metric and pack
   await withTemporaryDirectory(async (temporaryDirectory) => {
     // Arrange
     const analysis = await analyzeProject({ projectRoot: fixtureProjectPath("external-packages") })
-    if (Result.isFailure(analysis)) {
-      throw new Error(`Fixture analysis failed: ${analysis.error._tag}`)
-    }
+    Assert.isSuccess(analysis)
     const browserBundle = await readFile(join(process.cwd(), "dist", "report", "browser.js"), "utf8")
     const reportPath = join(temporaryDirectory, "external-packages.html")
     const fileOnlyReportPath = join(temporaryDirectory, "file-only.html")
@@ -208,9 +200,7 @@ test("shows imported and consumer project files in the selected-node side panel"
   await withTemporaryDirectory(async (temporaryDirectory) => {
     // Arrange
     const analysis = await analyzeProject({ projectRoot: fixtureProjectPath("static-esm") })
-    if (Result.isFailure(analysis)) {
-      throw new Error(`Fixture analysis failed: ${analysis.error._tag}`)
-    }
+    Assert.isSuccess(analysis)
     const browserBundle = await readFile(join(process.cwd(), "dist", "report", "browser.js"), "utf8")
     const reportPath = join(temporaryDirectory, "show-me.html")
     await writeFile(reportPath, buildHtmlReport(analysis.value, browserBundle), "utf8")
@@ -261,13 +251,9 @@ test("shows numeric line coverage in the tooltip and selected-file side panel", 
       "utf8",
     )
     const analysis = await analyzeProject({ projectRoot: projectDirectory })
-    if (Result.isFailure(analysis)) {
-      throw new Error(`Fixture analysis failed: ${analysis.error._tag}`)
-    }
+    Assert.isSuccess(analysis)
     const coveredAnalysis = await importIstanbulCoverage(analysis.value, projectDirectory, coverageFile)
-    if (Result.isFailure(coveredAnalysis)) {
-      throw new Error(`Fixture coverage import failed: ${coveredAnalysis.error._tag}`)
-    }
+    Assert.isSuccess(coveredAnalysis)
     const browserBundle = await readFile(join(process.cwd(), "dist", "report", "browser.js"), "utf8")
     const reportPath = join(temporaryDirectory, "show-me.html")
     await writeFile(reportPath, buildHtmlReport(coveredAnalysis.value, browserBundle), "utf8")
@@ -285,9 +271,7 @@ test("shows numeric line coverage in the tooltip and selected-file side panel", 
       })
     })
     const graphBounds = await page.locator("#graph").boundingBox()
-    if (graphBounds === null) {
-      throw new Error("Graph did not have browser bounds.")
-    }
+    Assert.isDefined(graphBounds)
     const centerX = graphBounds.x + graphBounds.width / 2
     const centerY = graphBounds.y + graphBounds.height / 2
     await page.mouse.move(centerX, centerY)

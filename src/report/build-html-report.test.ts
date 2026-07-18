@@ -69,8 +69,6 @@ it("escapes hostile report data and browser bundle script closings", () => {
         consumerNodeIds: [],
         color: "#c084fc",
         size: 15,
-        x: 0,
-        y: 0,
       },
     ],
     edges: [],
