@@ -144,6 +144,7 @@ export async function discoverPnpmWorkspace(projectRoot: string): Promise<Result
   }
 
   return Result.Success({
+    // oxlint-disable-next-line unicorn/no-array-sort -- We're working on a controlled copy, we don't need another one
     packages: packages.sort((left, right) => {
       if (left.path === ".") {
         return -1
@@ -166,6 +167,7 @@ export async function discoverPnpmWorkspace(projectRoot: string): Promise<Result
 export function owningWorkspacePackagePath(workspace: PnpmWorkspace, projectFile: string): string {
   const nestedPackages = workspace.packages
     .filter((workspacePackage) => workspacePackage.path !== ".")
+    // oxlint-disable-next-line unicorn/no-array-sort -- We're working on a controlled copy, we don't need another one
     .sort((left, right) => {
       const depthComparison = right.path.length - left.path.length
       return depthComparison === 0 ? compareText(left.path, right.path) : depthComparison

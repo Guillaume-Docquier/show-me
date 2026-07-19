@@ -10,10 +10,10 @@
 import { DirectedGraph } from "graphology"
 import { circular } from "graphology-layout"
 import forceAtlas2 from "graphology-layout-forceatlas2"
-import Sigma from "sigma"
+import { Sigma } from "sigma"
 import { createEdgeArrowProgram } from "sigma/rendering"
 import type { NodeDisplayData } from "sigma/types"
-import { PROJECT_ANALYSIS_SCHEMA_VERSION, type ProjectAnalysis } from "../../analysis/project-analysis.js"
+import { type ProjectAnalysis } from "../../analysis/project-analysis.js"
 import { visibleDirectoryDepth } from "./directory-label-visibility.js"
 import { buildProjectStructure, type ProjectStructureEdge } from "./project-structure.js"
 import {
@@ -61,9 +61,6 @@ type ReportViewState = {
 }
 
 const analysis = window.showMeAnalysis
-if (Number(analysis.schemaVersion) !== PROJECT_ANALYSIS_SCHEMA_VERSION) {
-  throw new Error("Unsupported project analysis schema version: " + String(analysis.schemaVersion) + ".")
-}
 const presentation = buildBrowserPresentation(analysis)
 const graphContainer = requiredElement("graph")
 const projectName = requiredElement("project-name")

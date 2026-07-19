@@ -38,6 +38,7 @@ export function classifyJavaScriptTypeScriptLines(
   jsxCommentContainers: readonly JavaScriptTypeScriptJsxCommentContainerSpan[],
 ): ProjectFileLines {
   const lines = physicalLines(sourceText)
+  // oxlint-disable-next-line unicorn/no-array-sort -- We're working on a controlled copy, we don't need another one
   const effectiveCommentSpans = expandJsxCommentContainers(commentSpans, jsxCommentContainers).sort(
     (left, right) => left.start - right.start,
   )

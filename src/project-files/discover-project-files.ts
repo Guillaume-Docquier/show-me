@@ -98,6 +98,7 @@ async function walkDirectory(
     })
   }
 
+  // oxlint-disable-next-line unicorn/no-array-sort -- We're working on a controlled copy, we don't need another one
   const directoryEntries = directoryEntriesResult.value.sort((left, right) => compareText(left.name, right.name))
   const localIgnoreContextResult = await readLocalIgnoreContext(
     absoluteDirectory,

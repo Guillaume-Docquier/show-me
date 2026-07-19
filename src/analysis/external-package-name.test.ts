@@ -23,6 +23,7 @@ describe("ExternalPackageName", () => {
       return parsed.value
     })
 
+    // oxlint-disable-next-line unicorn/no-array-sort -- We're working on a controlled copy, we don't need another one
     expect(names.sort((left, right) => ExternalPackageName.compare(left, right))).toEqual(["B-package", "a-package", "z-package"])
   })
 })

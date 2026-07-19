@@ -50,9 +50,11 @@ test("supports graph hover, selection, clearing, and side-panel navigation", asy
       Assert.isDefined(bounds)
       const serializedNodePositions = await graph.getAttribute("data-visible-node-positions")
       Assert.isDefined(serializedNodePositions)
-      const nodePosition = (
-        JSON.parse(serializedNodePositions) as Array<{ readonly id: string; readonly x: number; readonly y: number }>
-      ).find(({ id }) => id === report.longPathNodeId)
+      const nodePosition =
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- It's a test, if the cast is wrong, we'll know soon enough
+        (JSON.parse(serializedNodePositions) as Array<{ readonly id: string; readonly x: number; readonly y: number }>).find(
+          ({ id }) => id === report.longPathNodeId,
+        )
       Assert.isDefined(nodePosition)
       const pointerX = bounds.x + nodePosition.x
       const pointerY = bounds.y + nodePosition.y

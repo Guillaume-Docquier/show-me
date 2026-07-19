@@ -48,6 +48,8 @@
     "yaml": "^2.9.0"
   },
   "devDependencies": {
+    "@guillaume-docquier/oxfmt": "^1.0.3",
+    "@guillaume-docquier/oxlint": "^1.2.1",
     "@playwright/test": "^1.61.1",
     "@types/node": "^26.1.1",
     "@vitest/coverage-v8": "^4.1.10",
@@ -55,7 +57,7 @@
     "esbuild": "^0.28.1",
     "husky": "^9.1.7",
     "lint-staged": "^17.0.8",
-    "oxfmt": "^0.57.0",
+    "oxfmt": ">=0.59.0",
     "oxlint": "^1.74.0",
     "oxlint-tsgolint": "^0.24.0",
     "rimraf": "^6.1.3",

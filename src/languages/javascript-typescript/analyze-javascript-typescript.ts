@@ -162,6 +162,7 @@ export function analyzeJavaScriptTypeScript(
     dependencies: [...dependencyByKey.values()].sort(compareDependencies),
     externalPackages: [...externalPackageNames].sort((left, right) => ExternalPackageName.compare(left, right)).map((name) => ({ name })),
     externalPackageDependencies: [...externalPackageDependencyByKey.values()].sort(compareExternalPackageDependencies),
+    // oxlint-disable-next-line unicorn/no-array-sort -- We're working on a controlled copy, we don't need another one
     diagnostics: diagnostics.sort(compareDiagnostics),
   })
 }

@@ -4,7 +4,10 @@ allowBuilds:
   tree-sitter-python: false
   tree-sitter-typescript: false
 
+minimumReleaseAgeStrict: true
 minimumReleaseAgeExclude:
   - "@guillaume-docquier/tools-ts"
+  - "@guillaume-docquier/oxfmt"
+  - "@guillaume-docquier/oxlint"
 
 strictPeerDependencies: true
