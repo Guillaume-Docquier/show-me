@@ -52,8 +52,8 @@ const panels = new ReportPanels({
     focusNode: (nodeId): void => {
       graph.focusNode(nodeId)
     },
-    clearHover: (): void => {
-      graph.clearHover()
+    clearHover: (nodeId): void => {
+      graph.clearHover(nodeId)
     },
     centerNode: (nodeId): void => {
       graph.centerNode(nodeId)

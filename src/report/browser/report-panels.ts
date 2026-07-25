@@ -2,12 +2,12 @@ import { buildProjectFileTree, type ProjectFileTreeEntry, type ProjectFileTreeFi
 import type { ReportPanelElements } from "./report-elements.js"
 import type { ReportInteractionState } from "./report-interaction.js"
 import type { BrowserPresentation, ReportNode, ReportProjectFileNode } from "./report-presentation.js"
-import { visibleRelationships, type ReportView } from "./report-view.js"
+import { visibleRelationships, type ReportView, type ReportViewDirectory } from "./report-view.js"
 
 export type ReportPanelActions = {
   readonly selectNode: (nodeId: string) => void
   readonly focusNode: (nodeId: string) => void
-  readonly clearHover: () => void
+  readonly clearHover: (nodeId: string) => void
   readonly centerNode: (nodeId: string) => void
 }
 
@@ -18,6 +18,8 @@ export class ReportPanels {
   readonly #nodeById: ReadonlyMap<string, ReportNode>
   readonly #actions: ReportPanelActions
   readonly #collapsedDirectoryPaths = new Set<string>()
+  #directoryById = new Map<string, ReportViewDirectory>()
+  #directoryByPath = new Map<string, ReportViewDirectory>()
   #view: ReportView | undefined
   #interaction: ReportInteractionState
 
@@ -46,6 +48,8 @@ export class ReportPanels {
   /** Render all panel content affected by a new visible report projection. */
   public renderView(view: ReportView): void {
     this.#view = view
+    this.#directoryById = new Map(view.directories.map((directory) => [directory.id, directory]))
+    this.#directoryByPath = new Map(view.directories.map((directory) => [directory.path, directory]))
     this.#renderProjectFileList()
     this.#renderExternalPackageList()
     this.#renderSelection()
@@ -89,13 +93,24 @@ export class ReportPanels {
     button.textContent = entry.name
     button.title = entry.path
     button.dataset.directoryPath = entry.path
+    const directory = this.#requiredDirectoryByPath(entry.path)
+    button.dataset.nodeId = directory.id
+    button.setAttribute("aria-current", directory.id === this.#interaction.selectedNodeId ? "true" : "false")
     const children = reportDocument.createElement("ol")
     children.className = "file-tree-children"
     children.append(...entry.children.map((child) => this.#projectFileTreeItem(child)))
     const expanded = !this.#collapsedDirectoryPaths.has(entry.path)
     button.setAttribute("aria-expanded", String(expanded))
     children.hidden = !expanded
+    button.addEventListener("pointerenter", () => {
+      this.#actions.focusNode(directory.id)
+    })
+    button.addEventListener("pointerleave", () => {
+      this.#actions.clearHover(directory.id)
+    })
     button.addEventListener("click", () => {
+      this.#actions.selectNode(directory.id)
+      this.#actions.centerNode(directory.id)
       if (this.#collapsedDirectoryPaths.has(entry.path)) {
         this.#collapsedDirectoryPaths.delete(entry.path)
       } else {
@@ -120,7 +135,9 @@ export class ReportPanels {
     button.addEventListener("pointerenter", () => {
       this.#actions.focusNode(node.id)
     })
-    button.addEventListener("pointerleave", this.#actions.clearHover)
+    button.addEventListener("pointerleave", () => {
+      this.#actions.clearHover(node.id)
+    })
     button.addEventListener("click", () => {
       this.#actions.centerNode(node.id)
     })
@@ -152,17 +169,32 @@ export class ReportPanels {
 
     const nodeIdToDisplay = this.#interaction.hoveredNodeId ?? this.#interaction.selectedNodeId
     const node = nodeIdToDisplay === undefined ? undefined : this.#nodeById.get(nodeIdToDisplay)
-    this.#elements.selectedEmpty.hidden = node !== undefined
-    this.#elements.selectedDetails.hidden = node === undefined
-    if (node === undefined) {
+    const directory = nodeIdToDisplay === undefined ? undefined : this.#directoryById.get(nodeIdToDisplay)
+    const entityExists = node !== undefined || directory !== undefined
+    this.#elements.selectedEmpty.hidden = entityExists
+    this.#elements.selectedDetails.hidden = !entityExists
+    if (!entityExists) {
       return
     }
 
-    const projectFile = node.kind === "project-file"
-    this.#elements.selectedNodeType.textContent = projectFile ? "Project file" : "External package"
-    this.#elements.selectedPath.textContent = node.displayName
+    const projectFile = node?.kind === "project-file"
+    this.#elements.selectedNodeType.textContent = directory !== undefined ? "Directory" : projectFile ? "Project file" : "External package"
+    this.#elements.selectedPath.textContent = directory === undefined ? (node?.displayName ?? "") : this.#directoryDisplayName(directory)
     for (const element of this.#elements.projectFileDetails) {
       element.hidden = !projectFile
+    }
+    for (const element of this.#elements.dependencyDetails) {
+      element.hidden = directory !== undefined
+    }
+    for (const element of this.#elements.directoryDetails) {
+      element.hidden = directory === undefined
+    }
+    if (directory !== undefined) {
+      this.#showDirectoryDetails(directory)
+      return
+    }
+    if (node === undefined) {
+      throw new Error(`Selected report entity ${nodeIdToDisplay ?? ""} is unavailable.`)
     }
     if (projectFile) {
       this.#showProjectFileDetails(node)
@@ -182,19 +214,45 @@ export class ReportPanels {
     this.#elements.selectedCoverage.textContent = node.coverage === undefined ? "Not available" : `${node.coverage}%`
   }
 
+  #showDirectoryDetails(directory: ReportViewDirectory): void {
+    this.#elements.selectedParentDirectory.replaceChildren()
+    if (directory.parentDirectoryId === undefined) {
+      this.#elements.selectedParentDirectory.append(this.#emptyListItem("None"))
+    } else {
+      const parent = this.#requiredDirectoryById(directory.parentDirectoryId)
+      this.#elements.selectedParentDirectory.append(this.#directoryListItem(parent, this.#directoryDisplayName(parent)))
+    }
+
+    this.#elements.selectedDirectoryChildren.replaceChildren()
+    if (directory.childNodeIds.length === 0) {
+      this.#elements.selectedDirectoryChildren.append(this.#emptyListItem("None"))
+      return
+    }
+    for (const childNodeId of directory.childNodeIds) {
+      const childDirectory = this.#directoryById.get(childNodeId)
+      if (childDirectory !== undefined) {
+        this.#elements.selectedDirectoryChildren.append(this.#directoryListItem(childDirectory, childDirectory.label))
+        continue
+      }
+      const childNode = this.#nodeById.get(childNodeId)
+      if (childNode?.kind === "project-file") {
+        const item = this.#nodeListItem(childNode, childNode.path.split("/").at(-1) ?? childNode.path, "Project file")
+        item.querySelector("button")?.setAttribute("aria-label", childNode.path)
+        this.#elements.selectedDirectoryChildren.append(item)
+      }
+    }
+  }
+
   #renderRelatedNodes(container: HTMLElement, relatedNodeIds: readonly string[]): void {
     container.replaceChildren()
     if (relatedNodeIds.length === 0) {
-      const empty = container.ownerDocument.createElement("li")
-      empty.className = "relationship-empty"
-      empty.textContent = "None"
-      container.append(empty)
+      container.append(this.#emptyListItem("None"))
       return
     }
     for (const nodeId of relatedNodeIds) {
       const node = this.#nodeById.get(nodeId)
       if (node !== undefined) {
-        container.append(this.#nodeListItem(node))
+        container.append(this.#nodeListItem(node, node.displayName))
       }
     }
   }
@@ -211,27 +269,28 @@ export class ReportPanels {
     }
     for (const { reportNode } of view.nodes) {
       if (reportNode.kind === "external-package") {
-        this.#elements.externalPackageList.append(this.#nodeListItem(reportNode))
+        this.#elements.externalPackageList.append(this.#nodeListItem(reportNode, reportNode.displayName))
       }
     }
   }
 
-  #nodeListItem(node: ReportNode): HTMLLIElement {
+  #nodeListItem(node: ReportNode, label: string, kindLabel?: string): HTMLLIElement {
     // DOM list buttons are keyboard-accessible navigation counterparts to the WebGL nodes.
     const item = this.#elements.fileList.ownerDocument.createElement("li")
-    item.append(this.#nodeListButton(node, node.displayName))
+    item.append(this.#nodeListButton(node, label, kindLabel))
     return item
   }
 
-  #nodeListButton(node: ReportNode, label: string): HTMLButtonElement {
+  #nodeListButton(node: ReportNode, label: string, kindLabel?: string): HTMLButtonElement {
     const reportDocument = this.#elements.fileList.ownerDocument
     const button = reportDocument.createElement("button")
     button.type = "button"
     button.append(reportDocument.createTextNode(label))
-    if (node.kind === "external-package") {
+    const displayedKind = kindLabel ?? (node.kind === "external-package" ? "External package" : undefined)
+    if (displayedKind !== undefined) {
       const kind = reportDocument.createElement("span")
       kind.className = "node-kind-label"
-      kind.textContent = "External package"
+      kind.textContent = displayedKind
       button.append(kind)
     }
     button.title = node.displayName
@@ -241,5 +300,53 @@ export class ReportPanels {
       this.#actions.selectNode(node.id)
     })
     return button
+  }
+
+  #directoryListItem(directory: ReportViewDirectory, label: string): HTMLLIElement {
+    const reportDocument = this.#elements.fileList.ownerDocument
+    const item = reportDocument.createElement("li")
+    const button = reportDocument.createElement("button")
+    button.type = "button"
+    button.append(reportDocument.createTextNode(label))
+    const kind = reportDocument.createElement("span")
+    kind.className = "node-kind-label"
+    kind.textContent = "Directory"
+    button.append(kind)
+    button.title = this.#directoryDisplayName(directory)
+    button.dataset.nodeId = directory.id
+    button.setAttribute("aria-label", this.#directoryDisplayName(directory))
+    button.setAttribute("aria-current", directory.id === this.#interaction.selectedNodeId ? "true" : "false")
+    button.addEventListener("click", () => {
+      this.#actions.selectNode(directory.id)
+    })
+    item.append(button)
+    return item
+  }
+
+  #emptyListItem(text: string): HTMLLIElement {
+    const empty = this.#elements.fileList.ownerDocument.createElement("li")
+    empty.className = "relationship-empty"
+    empty.textContent = text
+    return empty
+  }
+
+  #requiredDirectoryByPath(path: string): ReportViewDirectory {
+    const directory = this.#directoryByPath.get(path)
+    if (directory === undefined) {
+      throw new Error(`Files tree references missing project directory ${path}.`)
+    }
+    return directory
+  }
+
+  #requiredDirectoryById(id: string): ReportViewDirectory {
+    const directory = this.#directoryById.get(id)
+    if (directory === undefined) {
+      throw new Error(`Directory details reference missing project directory ${id}.`)
+    }
+    return directory
+  }
+
+  #directoryDisplayName(directory: ReportViewDirectory): string {
+    return directory.path === "" ? this.#presentation.projectName : directory.path
   }
 }

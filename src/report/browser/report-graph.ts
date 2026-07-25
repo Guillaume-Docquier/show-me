@@ -53,6 +53,7 @@ export class ReportGraph {
   #interaction: ReportInteractionState
   #edgeVisibility: EdgeVisibilityState
   #dependencyFocus: DependencyFocus | undefined
+  #structureFocusNodeId: string | undefined
   #cameraResetAwaitingSettledRender = false
 
   public constructor({
@@ -175,13 +176,13 @@ export class ReportGraph {
       },
     })
 
-    if (this.#interaction.selectedNodeId !== undefined && !view.nodeIds.has(this.#interaction.selectedNodeId)) {
+    if (this.#interaction.selectedNodeId !== undefined && !view.graphNodeIds.has(this.#interaction.selectedNodeId)) {
       this.#interaction = { ...this.#interaction, selectedNodeId: undefined }
     }
-    if (this.#interaction.hoveredNodeId !== undefined && !view.nodeIds.has(this.#interaction.hoveredNodeId)) {
+    if (this.#interaction.hoveredNodeId !== undefined && !view.graphNodeIds.has(this.#interaction.hoveredNodeId)) {
       this.#interaction = { ...this.#interaction, hoveredNodeId: undefined }
     }
-    this.#synchronizeDependencyFocus()
+    this.#synchronizeEdgeFocus()
     this.#updateViewDiagnostics()
     this.#emitInteraction()
     this.#renderer.refresh()
@@ -204,33 +205,35 @@ export class ReportGraph {
   public selectNode(nodeId: string | undefined): void {
     const visibleNodeId = nodeId === undefined || this.#graph.hasNode(nodeId) ? nodeId : undefined
     this.#interaction = { ...this.#interaction, selectedNodeId: visibleNodeId }
-    this.#synchronizeDependencyFocus()
+    this.#synchronizeEdgeFocus()
     this.#emitInteraction()
     this.#renderer.refresh()
   }
 
-  /** Apply hover focus to a visible presentation node. */
+  /** Apply hover focus to a visible graph node. */
   public focusNode(nodeId: string): void {
-    const node = this.#nodeById.get(nodeId)
-    if (node === undefined || this.#view?.nodeIds.has(nodeId) !== true) {
+    if (!this.#graph.hasNode(nodeId)) {
       return
     }
-    this.#interaction = { ...this.#interaction, hoveredNodeId: node.id }
-    this.#synchronizeDependencyFocus()
+    if (this.#graph.getNodeAttribute(nodeId, "nodeKind") === "directory") {
+      this.#labelVisibility.hoverDirectory(nodeId)
+    }
+    this.#interaction = { ...this.#interaction, hoveredNodeId: nodeId }
+    this.#synchronizeEdgeFocus()
     this.#emitInteraction()
     this.#refreshDependencyEdges()
   }
 
   /** Clear node and directory hover effects. */
-  public clearHover(): void {
-    const previousDependencyFocusNodeId = this.#dependencyFocus?.nodeId
+  public clearHover(nodeId?: string): void {
+    if (nodeId !== undefined && this.#interaction.hoveredNodeId !== nodeId) {
+      return
+    }
     this.#interaction = { ...this.#interaction, hoveredNodeId: undefined }
-    this.#synchronizeDependencyFocus()
+    this.#synchronizeEdgeFocus()
     this.#labelVisibility.clearDirectoryHover()
     this.#emitInteraction()
-    if (previousDependencyFocusNodeId !== this.#dependencyFocus?.nodeId) {
-      this.#refreshDependencyEdges()
-    }
+    this.#refreshDependencyEdges()
   }
 
   /** Animate the camera center to one visible node. */
@@ -269,7 +272,12 @@ export class ReportGraph {
       this.#labelVisibility.markDirty()
     })
     this.#renderer.on("afterRender", () => {
-      this.#overlays.renderStructureLinks(this.#view?.structureEdges ?? [], this.#edgeVisibility.structureEdges, this.#hasDependencyFocus())
+      this.#overlays.renderStructureLinks(
+        this.#view?.structureEdges ?? [],
+        this.#edgeVisibility.structureEdges,
+        this.#hasEdgeFocus(),
+        this.#structureFocusNodeId,
+      )
       this.#overlays.renderDependencyFocus(this.#dependencyFocus)
       this.#diagnostics.writeDependencyEdges(this.#dependencyEdgeIds(), this.#edgeVisibility.dependencyEdges)
       const labelRefreshScheduled = this.#labelVisibility.synchronizeAfterRender()
@@ -281,15 +289,10 @@ export class ReportGraph {
       }
     })
     this.#renderer.on("enterNode", ({ node }) => {
-      const attributes = this.#graph.getNodeAttributes(node)
-      if (attributes.nodeKind === "directory") {
-        this.#labelVisibility.hoverDirectory(node)
-        return
-      }
       this.focusNode(node)
     })
-    this.#renderer.on("leaveNode", () => {
-      this.clearHover()
+    this.#renderer.on("leaveNode", ({ node }) => {
+      this.clearHover(node)
     })
     this.#renderer.on("clickNode", ({ node }) => {
       this.selectNode(node)
@@ -314,7 +317,7 @@ export class ReportGraph {
     if (relationship === "consumer") {
       return { ...attributes, color: CONSUMER_FOCUS_COLOR, size: CONSUMER_FOCUS_EDGE_SIZE, zIndex: 1 }
     }
-    if (this.#hasDependencyFocus()) {
+    if (this.#hasEdgeFocus()) {
       return {
         ...attributes,
         color: attributes.dependencyKind === "external-package" ? DIMMED_EXTERNAL_DEPENDENCY_EDGE_COLOR : DIMMED_DEPENDENCY_EDGE_COLOR,
@@ -335,11 +338,11 @@ export class ReportGraph {
   }
 
   #emitInteraction(): void {
-    const selectedNode = this.#interaction.selectedNodeId === undefined ? undefined : this.#nodeById.get(this.#interaction.selectedNodeId)
-    if (selectedNode === undefined) {
+    const selectedNodeId = this.#interaction.selectedNodeId
+    if (selectedNodeId === undefined || !this.#graph.hasNode(selectedNodeId)) {
       delete this.#root.dataset.selectedNode
     } else {
-      this.#root.dataset.selectedNode = selectedNode.id
+      this.#root.dataset.selectedNode = selectedNodeId
     }
     if (this.#interaction.hoveredNodeId === undefined) {
       delete this.#root.dataset.hoveredNode
@@ -437,13 +440,19 @@ export class ReportGraph {
     }
   }
 
-  #hasDependencyFocus(): boolean {
-    return this.#dependencyFocus !== undefined
+  #hasEdgeFocus(): boolean {
+    return this.#dependencyFocus !== undefined || this.#structureFocusNodeId !== undefined
   }
 
-  #synchronizeDependencyFocus(): void {
+  #synchronizeEdgeFocus(): void {
     const focusedNodeId = this.#interaction.hoveredNodeId ?? this.#interaction.selectedNodeId
     const focusedNode = focusedNodeId === undefined ? undefined : this.#nodeById.get(focusedNodeId)
+    this.#structureFocusNodeId =
+      focusedNodeId !== undefined &&
+      this.#graph.hasNode(focusedNodeId) &&
+      this.#graph.getNodeAttribute(focusedNodeId, "nodeKind") === "directory"
+        ? focusedNodeId
+        : undefined
     this.#dependencyFocus =
       focusedNode?.kind === "project-file" && this.#view?.nodeIds.has(focusedNode.id) === true
         ? this.#dependencyFocusFor(focusedNode)

@@ -77,7 +77,7 @@ main {
 .report-controls h2 { margin: 0; padding-right: 18px; border-right: 1px solid #25303b; white-space: nowrap; }
 #details h3 { margin: 16px 0 7px; font-size: 11px; color: #8fa3b8; }
 #selected-empty { color: #6f8295; line-height: 1.5; }
-#selected-details[hidden], #external-package-section[hidden], [data-project-file-detail][hidden] { display: none; }
+#selected-details[hidden], #external-package-section[hidden], [data-project-file-detail][hidden], [data-dependency-detail][hidden], [data-directory-detail][hidden] { display: none; }
 .node-type { color: #c9a7f5; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .node-type { margin-bottom: 6px; }
 .detail-path { overflow-wrap: anywhere; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; line-height: 1.45; }

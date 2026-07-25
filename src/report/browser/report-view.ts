@@ -36,6 +36,7 @@ export type ReportView = {
   readonly state: ReportViewState
   readonly nodes: readonly ReportViewNode[]
   readonly nodeIds: ReadonlySet<string>
+  readonly graphNodeIds: ReadonlySet<string>
   readonly dependencyEdges: readonly ReportEdge[]
   readonly directories: readonly ReportViewDirectory[]
   readonly structureEdges: readonly ProjectStructureEdge[]
@@ -102,11 +103,13 @@ export function buildReportView(presentation: BrowserPresentation, state: Report
       descendantProjectFileCount: visibleProjectFiles.filter(({ path }) => isProjectFileInDirectory(path, directory.path)).length,
     }),
   )
+  const graphNodeIds = new Set([...nodeIds, ...directories.map(({ id }) => id)])
 
   return {
     state,
     nodes,
     nodeIds,
+    graphNodeIds,
     dependencyEdges,
     directories,
     structureEdges: structure.edges,

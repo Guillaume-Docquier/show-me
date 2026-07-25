@@ -10,6 +10,8 @@ export type ProjectDirectoryNode = {
   readonly path: string
   readonly label: string
   readonly depth: number
+  readonly parentDirectoryId: string | undefined
+  readonly childNodeIds: readonly string[]
 }
 
 /** One parent-to-child structural relationship. */
@@ -40,12 +42,25 @@ export function buildProjectStructure(files: readonly ProjectStructureFile[], pr
     }
   }
 
-  const directories = [...directoryPaths].sort(compareDirectoryPaths).map(
+  const sortedDirectoryPaths = [...directoryPaths].sort(compareDirectoryPaths)
+  const sortedFiles = [...files].sort((left, right) => left.path.localeCompare(right.path))
+  const childNodeIdsByDirectoryPath = new Map<string, string[]>()
+  for (const path of sortedDirectoryPaths) {
+    if (path !== "") {
+      appendChildNodeId(childNodeIdsByDirectoryPath, parentDirectoryPath(path), directoryNodeId(path))
+    }
+  }
+  for (const file of sortedFiles) {
+    appendChildNodeId(childNodeIdsByDirectoryPath, parentDirectoryPath(file.path), file.id)
+  }
+  const directories = sortedDirectoryPaths.map(
     (path): ProjectDirectoryNode => ({
       id: directoryNodeId(path),
       path,
       label: path === "" ? projectName : (path.split("/").at(-1) ?? path),
       depth: path === "" ? 0 : path.split("/").length,
+      parentDirectoryId: path === "" ? undefined : directoryNodeId(parentDirectoryPath(path)),
+      childNodeIds: childNodeIdsByDirectoryPath.get(path) ?? [],
     }),
   )
   const directoryEdges = directories
@@ -57,15 +72,13 @@ export function buildProjectStructure(files: readonly ProjectStructureFile[], pr
         target: directory.id,
       }),
     )
-  const fileEdges = [...files]
-    .sort((left, right) => left.path.localeCompare(right.path))
-    .map(
-      (file): ProjectStructureEdge => ({
-        id: `structure-file:${file.id}`,
-        source: directoryNodeId(parentDirectoryPath(file.path)),
-        target: file.id,
-      }),
-    )
+  const fileEdges = sortedFiles.map(
+    (file): ProjectStructureEdge => ({
+      id: `structure-file:${file.id}`,
+      source: directoryNodeId(parentDirectoryPath(file.path)),
+      target: file.id,
+    }),
+  )
 
   return { directories, edges: [...directoryEdges, ...fileEdges] }
 }
@@ -74,7 +87,8 @@ function directorySegments(filePath: string): readonly string[] {
   return filePath.split("/").slice(0, -1)
 }
 
-function directoryNodeId(path: string): string {
+/** Return the collision-proof browser identity for one project directory. */
+export function directoryNodeId(path: string): string {
   return `directory:${path === "" ? "." : path}`
 }
 
@@ -90,4 +104,13 @@ function compareDirectoryPaths(left: string, right: string): number {
 
 function directoryDepth(path: string): number {
   return path === "" ? 0 : path.split("/").length
+}
+
+function appendChildNodeId(childNodeIdsByDirectoryPath: Map<string, string[]>, directoryPath: string, childNodeId: string): void {
+  const childNodeIds = childNodeIdsByDirectoryPath.get(directoryPath)
+  if (childNodeIds === undefined) {
+    childNodeIdsByDirectoryPath.set(directoryPath, [childNodeId])
+  } else {
+    childNodeIds.push(childNodeId)
+  }
 }

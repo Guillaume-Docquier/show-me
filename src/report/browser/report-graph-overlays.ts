@@ -9,6 +9,7 @@ export const CONSUMER_FOCUS_COLOR = "#ff9b71"
 const HOVERED_NODE_FOCUS_COLOR = "#f5f9ff"
 const STRUCTURE_EDGE_COLOR = "rgba(111, 130, 149, 0.68)"
 const DIMMED_STRUCTURE_EDGE_COLOR = "rgba(111, 130, 149, 0.38)"
+const FOCUSED_STRUCTURE_EDGE_COLOR = "rgba(121, 184, 255, 0.95)"
 const FOCUS_RING_OFFSET = 5
 const FOCUS_RING_SEPARATION = 5
 const FOCUS_RING_WIDTH = 3
@@ -59,34 +60,42 @@ export class ReportGraphOverlays {
   }
 
   /** Draw or clear the project structure layer without changing graph inputs. */
-  public renderStructureLinks(edges: readonly ProjectStructureEdge[], visible: boolean, dimmed: boolean): void {
+  public renderStructureLinks(
+    edges: readonly ProjectStructureEdge[],
+    visible: boolean,
+    dimmed: boolean,
+    focusedDirectoryNodeId: string | undefined,
+  ): void {
     this.#resizeCanvas(this.#structureLayer)
     const pixelRatio = this.#devicePixelRatio()
     this.#structureContext.setTransform(1, 0, 0, 1, 0, 0)
     this.#structureContext.clearRect(0, 0, this.#structureLayer.width, this.#structureLayer.height)
     this.#structureContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0)
-    this.#structureContext.beginPath()
-    let renderedEdgeCount = 0
-    if (visible) {
-      for (const edge of edges) {
-        if (!this.#graph.hasNode(edge.source) || !this.#graph.hasNode(edge.target)) {
-          continue
-        }
-        const sourceViewport = this.#renderer.graphToViewport(this.#graph.getNodeAttributes(edge.source))
-        const targetViewport = this.#renderer.graphToViewport(this.#graph.getNodeAttributes(edge.target))
-        this.#structureContext.moveTo(sourceViewport.x, sourceViewport.y)
-        this.#structureContext.lineTo(targetViewport.x, targetViewport.y)
-        renderedEdgeCount += 1
-      }
-    }
+    const renderableEdges = visible ? edges.filter(({ source, target }) => this.#graph.hasNode(source) && this.#graph.hasNode(target)) : []
+    const focusedEdges =
+      focusedDirectoryNodeId === undefined
+        ? []
+        : renderableEdges.filter(({ source, target }) => source === focusedDirectoryNodeId || target === focusedDirectoryNodeId)
+    const unfocusedEdges =
+      focusedDirectoryNodeId === undefined
+        ? renderableEdges
+        : renderableEdges.filter(({ source, target }) => source !== focusedDirectoryNodeId && target !== focusedDirectoryNodeId)
 
-    this.#structureContext.setLineDash([2, 4])
-    this.#structureContext.lineWidth = 2
-    this.#structureContext.strokeStyle = dimmed ? DIMMED_STRUCTURE_EDGE_COLOR : STRUCTURE_EDGE_COLOR
-    this.#structureContext.stroke()
+    this.#strokeStructureEdges(
+      unfocusedEdges,
+      focusedDirectoryNodeId !== undefined || dimmed ? DIMMED_STRUCTURE_EDGE_COLOR : STRUCTURE_EDGE_COLOR,
+      2,
+    )
+    this.#strokeStructureEdges(focusedEdges, FOCUSED_STRUCTURE_EDGE_COLOR, 3.2)
     this.#structureContext.setLineDash([])
     this.#container.dataset.structureEdges = visible ? "visible" : "hidden"
-    this.#container.dataset.renderedStructureEdgeCount = String(renderedEdgeCount)
+    this.#container.dataset.renderedStructureEdgeCount = String(renderableEdges.length)
+    this.#container.dataset.focusedStructureEdgeCount = String(focusedEdges.length)
+    if (focusedDirectoryNodeId === undefined) {
+      delete this.#container.dataset.structureFocus
+    } else {
+      this.#container.dataset.structureFocus = focusedDirectoryNodeId
+    }
   }
 
   /** Draw direct dependency-neighborhood rings without replacing node colors. */
@@ -136,6 +145,20 @@ export class ReportGraphOverlays {
     this.#dependencyFocusContext.arc(node.x, node.y, radius, 0, Math.PI * 2)
     this.#dependencyFocusContext.stroke()
     return 1
+  }
+
+  #strokeStructureEdges(edges: readonly ProjectStructureEdge[], color: string, lineWidth: number): void {
+    this.#structureContext.beginPath()
+    for (const edge of edges) {
+      const sourceViewport = this.#renderer.graphToViewport(this.#graph.getNodeAttributes(edge.source))
+      const targetViewport = this.#renderer.graphToViewport(this.#graph.getNodeAttributes(edge.target))
+      this.#structureContext.moveTo(sourceViewport.x, sourceViewport.y)
+      this.#structureContext.lineTo(targetViewport.x, targetViewport.y)
+    }
+    this.#structureContext.setLineDash([2, 4])
+    this.#structureContext.lineWidth = lineWidth
+    this.#structureContext.strokeStyle = color
+    this.#structureContext.stroke()
   }
 
   #resizeCanvas(canvas: HTMLCanvasElement): void {

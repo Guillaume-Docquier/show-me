@@ -106,7 +106,7 @@ test("navigates a collapsible and searchable project-files tree", async ({ page 
       const search = page.getByRole("searchbox", { name: "Search files" })
       await search.fill("DIRECTORY/INDEX")
       await expect(page.locator('#file-list button[data-node-id="project-file:src/directory/index.ts"]')).toBeVisible()
-      await expect(page.locator("#file-list button[data-node-id]")).toHaveCount(1)
+      await expect(page.locator('#file-list button[data-node-id^="project-file:"]')).toHaveCount(1)
       await expect(page.locator('[data-directory-path="src/directory"]')).toBeVisible()
       await expect(page.locator("#project-file-count")).toHaveText(`${report.fileCount} / ${report.fileCount} project files`)
 
@@ -116,7 +116,7 @@ test("navigates a collapsible and searchable project-files tree", async ({ page 
 
       await search.fill("")
       await expect(page.locator("#file-tree-empty")).toBeHidden()
-      await expect(page.locator("#file-list button[data-node-id]")).toHaveCount(report.fileCount)
+      await expect(page.locator('#file-list button[data-node-id^="project-file:"]')).toHaveCount(report.fileCount)
     })
 
     await test.step("Preview a hovered file without moving the camera, then center it when selected", async () => {
@@ -606,6 +606,49 @@ test("uses weighted folder nodes as the primary force graph under dependency arr
       await expect(graph).not.toHaveAttribute("data-rendered-file-labels", "[]")
       const resizedLabels = await readJsonAttribute<readonly DirectoryLabelDiagnostic[]>(graph, "data-visible-directory-label-rectangles")
       expectDirectoryLabelsNotToOverlap(resizedLabels)
+    })
+
+    await test.step("Select directories from the graph and explorer, preview their contents, and focus their structure edges", async () => {
+      await page.reload()
+      await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
+      const graph = page.locator("#graph")
+      const graphBounds = await graph.boundingBox()
+      Assert.isDefined(graphBounds)
+      const circles = await readJsonAttribute<readonly NodeCircleDiagnostic[]>(graph, "data-visible-node-positions")
+      const accounts = circles.find(({ id }) => id === "directory:src/features/accounts")
+      Assert.isDefined(accounts)
+
+      await page.mouse.click(graphBounds.x + accounts.x, graphBounds.y + accounts.y)
+      await expect(page.locator("html")).toHaveAttribute("data-selected-node", accounts.id)
+      await expect(page.locator("#selected-node-type")).toHaveText("Directory")
+      await expect(page.locator("#selected-path")).toHaveText("src/features/accounts")
+      await expect(page.locator("#selected-parent-directory button")).toHaveAttribute("aria-label", "src/features")
+      await expect(page.locator("#selected-directory-children button")).toHaveCount(2)
+      expect(
+        await page
+          .locator("#selected-directory-children button")
+          .evaluateAll((buttons) => buttons.map((button) => button.getAttribute("aria-label"))),
+      ).toEqual(["src/features/accounts/workflows", "src/features/accounts/create.ts"])
+      await expect(graph).toHaveAttribute("data-structure-focus", accounts.id)
+      await expect(graph).toHaveAttribute("data-focused-structure-edge-count", "3")
+      expect(await readJsonAttribute<readonly DependencyEdgeDiagnostic[]>(graph, "data-rendered-dependency-edges")).toEqual([
+        { id: "project-dependency-0", color: "rgba(98, 139, 181, 0.18)", size: 2.4 },
+      ])
+
+      const platformDirectory = page.locator('[data-directory-path="src/platform"]')
+      await platformDirectory.hover()
+      await expect(page.locator("html")).toHaveAttribute("data-hovered-node", "directory:src/platform")
+      await expect(page.locator("html")).toHaveAttribute("data-selected-node", accounts.id)
+      await expect(page.locator("#selected-path")).toHaveText("src/platform")
+      await expect(graph).toHaveAttribute("data-structure-focus", "directory:src/platform")
+      await expect(graph).toHaveAttribute("data-focused-structure-edge-count", "2")
+
+      await platformDirectory.click()
+      await expect(page.locator("html")).toHaveAttribute("data-selected-node", "directory:src/platform")
+      await expect(page.locator("#selected-path")).toHaveText("src/platform")
+      await expect(page.locator("#selected-parent-directory button")).toHaveAttribute("aria-label", "src")
+      await expect(page.locator("#selected-directory-children button")).toHaveAttribute("aria-label", "src/platform/database")
+      await expect(platformDirectory).toHaveAttribute("aria-current", "true")
     })
   })
 })
@@ -1122,7 +1165,7 @@ test("renders and filters one complete pnpm workspace without mutating its analy
       await expect(page.locator("#workspace-package-controls input:checked")).toHaveCount(4)
       await expect(page.locator("#graph")).toHaveAttribute("data-visible-node-count", "8")
       await expect(page.locator("#graph")).toHaveAttribute("data-visible-edge-count", "6")
-      await expect(page.locator("#file-list button[data-node-id]")).toHaveCount(8)
+      await expect(page.locator('#file-list button[data-node-id^="project-file:"]')).toHaveCount(8)
     })
 
     await test.step("Scope to backend and retain only its external packages", async () => {
@@ -1132,7 +1175,7 @@ test("renders and filters one complete pnpm workspace without mutating its analy
       await expect(page.locator("#graph")).toHaveAttribute("data-visible-node-count", "2")
       await expect(page.locator("#graph")).toHaveAttribute("data-visible-edge-count", "1")
       await expect(page.locator("#project-file-count")).toHaveText("2 / 8 project files")
-      await expect(page.locator("#file-list button[data-node-id]")).toHaveCount(2)
+      await expect(page.locator('#file-list button[data-node-id^="project-file:"]')).toHaveCount(2)
       await expect(page.getByRole("button", { name: "apps/frontend/src/main.ts", exact: true })).toHaveCount(0)
       await page.getByRole("checkbox", { name: "External packages" }).check()
       await expect(page.locator("#graph")).toHaveAttribute("data-visible-node-count", "3")
@@ -1143,7 +1186,7 @@ test("renders and filters one complete pnpm workspace without mutating its analy
 
     await test.step("Fit the current filtered graph after explorer hover and zoom without undoing filters", async () => {
       const graph = page.locator("#graph")
-      const file = page.locator("#file-list button[data-node-id]").first()
+      const file = page.locator('#file-list button[data-node-id^="project-file:"]').first()
       const hoveredNodeId = await file.getAttribute("data-node-id")
       const settledCamera = await graph.getAttribute("data-camera-state")
       Assert.isDefined(hoveredNodeId)
@@ -1203,7 +1246,7 @@ test("renders and filters one complete pnpm workspace without mutating its analy
       await expect(page.locator("#graph")).toHaveAttribute("data-visible-node-count", "8")
       await expect(page.locator("#graph")).toHaveAttribute("data-visible-edge-count", "6")
       await expect(page.locator("#project-file-count")).toHaveText("8 / 8 project files")
-      await expect(page.locator("#file-list button[data-node-id]")).toHaveCount(8)
+      await expect(page.locator('#file-list button[data-node-id^="project-file:"]')).toHaveCount(8)
     })
   })
 })
@@ -1233,7 +1276,7 @@ test("opens an empty report generated by the built CLI and real browser bundle",
       await expect(page.locator("header p")).toHaveText("0 / 0 project files")
       await expect(page.locator("#selected-empty")).toBeVisible()
       await expect(page.locator("#file-tree-empty")).toHaveText("This report contains no project files.")
-      await expect(page.locator("#file-list button[data-node-id]")).toHaveCount(0)
+      await expect(page.locator('#file-list button[data-node-id^="project-file:"]')).toHaveCount(0)
 
       const graph = page.locator("#graph")
       await page.getByRole("button", { name: "Fit current graph" }).click()

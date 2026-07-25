@@ -16,11 +16,46 @@ it("derives a deterministic directory tree and file containment edges", () => {
   // Assert
   expect(firstStructure).toEqual(secondStructure)
   expect(firstStructure.directories).toEqual([
-    { id: "directory:.", path: "", label: "example", depth: 0 },
-    { id: "directory:src", path: "src", label: "src", depth: 1 },
-    { id: "directory:src/features", path: "src/features", label: "features", depth: 2 },
-    { id: "directory:src/platform", path: "src/platform", label: "platform", depth: 2 },
-    { id: "directory:src/features/accounts", path: "src/features/accounts", label: "accounts", depth: 3 },
+    {
+      id: "directory:.",
+      path: "",
+      label: "example",
+      depth: 0,
+      parentDirectoryId: undefined,
+      childNodeIds: ["directory:src", "project-file:README.md"],
+    },
+    {
+      id: "directory:src",
+      path: "src",
+      label: "src",
+      depth: 1,
+      parentDirectoryId: "directory:.",
+      childNodeIds: ["directory:src/features", "directory:src/platform"],
+    },
+    {
+      id: "directory:src/features",
+      path: "src/features",
+      label: "features",
+      depth: 2,
+      parentDirectoryId: "directory:src",
+      childNodeIds: ["directory:src/features/accounts"],
+    },
+    {
+      id: "directory:src/platform",
+      path: "src/platform",
+      label: "platform",
+      depth: 2,
+      parentDirectoryId: "directory:src",
+      childNodeIds: ["project-file:src/platform/database.ts"],
+    },
+    {
+      id: "directory:src/features/accounts",
+      path: "src/features/accounts",
+      label: "accounts",
+      depth: 3,
+      parentDirectoryId: "directory:src/features",
+      childNodeIds: ["project-file:src/features/accounts/create.ts"],
+    },
   ])
   expect(firstStructure.edges).toEqual([
     { id: "structure-directory:src", source: "directory:.", target: "directory:src" },
@@ -51,7 +86,16 @@ it("keeps one labeled root directory for an empty project", () => {
 
   // Assert
   expect(structure).toEqual({
-    directories: [{ id: "directory:.", path: "", label: "empty", depth: 0 }],
+    directories: [
+      {
+        id: "directory:.",
+        path: "",
+        label: "empty",
+        depth: 0,
+        parentDirectoryId: undefined,
+        childNodeIds: [],
+      },
+    ],
     edges: [],
   })
 })

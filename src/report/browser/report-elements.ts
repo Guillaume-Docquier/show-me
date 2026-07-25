@@ -36,7 +36,11 @@ export type ReportPanelElements = {
   readonly selectedCoverage: HTMLElement
   readonly selectedDependencyNodes: HTMLElement
   readonly selectedConsumerNodes: HTMLElement
+  readonly selectedParentDirectory: HTMLElement
+  readonly selectedDirectoryChildren: HTMLElement
   readonly projectFileDetails: NodeListOf<HTMLElement>
+  readonly dependencyDetails: NodeListOf<HTMLElement>
+  readonly directoryDetails: NodeListOf<HTMLElement>
 }
 
 /** Complete generated-report DOM organized by the module that owns it. */
@@ -93,7 +97,11 @@ export function getReportElements(reportDocument: Document): ReportElements {
       selectedCoverage: requiredElement(reportDocument, "selected-coverage"),
       selectedDependencyNodes: requiredElement(reportDocument, "selected-dependency-nodes"),
       selectedConsumerNodes: requiredElement(reportDocument, "selected-consumer-files"),
+      selectedParentDirectory: requiredElement(reportDocument, "selected-parent-directory"),
+      selectedDirectoryChildren: requiredElement(reportDocument, "selected-directory-children"),
       projectFileDetails: reportDocument.querySelectorAll<HTMLElement>("[data-project-file-detail]"),
+      dependencyDetails: reportDocument.querySelectorAll<HTMLElement>("[data-dependency-detail]"),
+      directoryDetails: reportDocument.querySelectorAll<HTMLElement>("[data-directory-detail]"),
     },
   }
 }

@@ -86,14 +86,18 @@ export function buildHtmlReport(analysis: ProjectAnalysis, browserBundle: string
         <dt data-project-file-detail>Code lines</dt><dd id="selected-code-lines" data-project-file-detail></dd>
         <dt data-project-file-detail>Comment lines</dt><dd id="selected-comment-lines" data-project-file-detail></dd>
         <dt data-project-file-detail>Blank lines</dt><dd id="selected-blank-lines" data-project-file-detail></dd>
-        <dt>Dependencies</dt><dd id="selected-dependencies"></dd>
-        <dt>Consumers</dt><dd id="selected-consumers"></dd>
+        <dt data-dependency-detail>Dependencies</dt><dd id="selected-dependencies" data-dependency-detail></dd>
+        <dt data-dependency-detail>Consumers</dt><dd id="selected-consumers" data-dependency-detail></dd>
         <dt data-project-file-detail>Coverage</dt><dd id="selected-coverage" data-project-file-detail></dd>
       </dl>
-      <h3>Dependencies</h3>
-      <ol id="selected-dependency-nodes" class="file-list relationship-list"></ol>
-      <h3>Consumers</h3>
-      <ol id="selected-consumer-files" class="file-list relationship-list"></ol>
+      <h3 data-dependency-detail>Dependencies</h3>
+      <ol id="selected-dependency-nodes" class="file-list relationship-list" data-dependency-detail></ol>
+      <h3 data-dependency-detail>Consumers</h3>
+      <ol id="selected-consumer-files" class="file-list relationship-list" data-dependency-detail></ol>
+      <h3 data-directory-detail>Parent directory</h3>
+      <ol id="selected-parent-directory" class="file-list relationship-list" data-directory-detail></ol>
+      <h3 data-directory-detail>Child directories and files</h3>
+      <ol id="selected-directory-children" class="file-list relationship-list" data-directory-detail></ol>
     </section>
   </aside>
 </main>

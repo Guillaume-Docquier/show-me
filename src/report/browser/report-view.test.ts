@@ -99,8 +99,21 @@ it("creates the default view from every workspace package without external packa
     path: "apps/frontend",
     label: "frontend",
     depth: 2,
+    parentDirectoryId: "directory:apps",
+    childNodeIds: ["project-file:apps/frontend/main.ts"],
     descendantProjectFileCount: 1,
   })
+  expect(view.graphNodeIds).toEqual(
+    new Set([
+      "project-file:root.ts",
+      "project-file:apps/frontend/main.ts",
+      "project-file:apps/backend/server.ts",
+      "directory:.",
+      "directory:apps",
+      "directory:apps/backend",
+      "directory:apps/frontend",
+    ]),
+  )
 })
 
 it("composes workspace filtering, external-package visibility, and line sizing in one transition", () => {

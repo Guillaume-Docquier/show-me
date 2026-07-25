@@ -90,9 +90,9 @@ Package filters compose with line-category sizing and external-package visibilit
 
 ## Hover and selection
 
-Hovering a project file or external package temporarily shows that node's complete information in the right-hand details panel without changing click selection. Project-file details include the complete path, code, comment, and blank line breakdown, visible dependency count, consumer count, and coverage when available. Package details show the canonical package root, explicit entity type, and visible relationships. Moving the pointer away restores the selected node's details or the empty state when no node is selected. The graph does not render a pointer-following tooltip.
+Hovering a project file, external package, or directory temporarily shows that node's complete information in the right-hand details panel without changing click selection. Project-file details include the complete path, code, comment, and blank line breakdown, visible dependency count, consumer count, and coverage when available. Package details show the canonical package root, explicit entity type, and visible relationships. Directory details show its parent directory and direct child directories and project files. Moving the pointer away restores the selected node's details or the empty state when no node is selected. The graph does not render a pointer-following tooltip.
 
-Clicking a project file node selects and visually highlights only that node. Selection opens a side panel containing:
+Clicking a project file, external package, or directory node selects and visually highlights that node. Project-file selection opens a side panel containing:
 
 - the complete path;
 - line metrics;
@@ -100,6 +100,6 @@ Clicking a project file node selects and visually highlights only that node. Sel
 - visible project-file and external-package dependencies;
 - consumer project files.
 
-Visible file and package entries in the side panel select their corresponding nodes. Clicking empty graph space or the clear-selection control clears selection.
+Directory selection shows its direct parent and children as selectable navigation entries. Selecting or hovering a directory emphasizes its incident structure edges and dims unrelated structure and dependency edges. Visible directory, file, and package entries in the side panels select their corresponding nodes. Clicking empty graph space clears selection.
 
 Dependency-neighborhood highlighting, direction-specific emphasis, directory clustering, and focus modes belong to a later visualization and UX milestone.
