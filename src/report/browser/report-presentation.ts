@@ -61,14 +61,16 @@ export type ReportExternalPackageNode = ReportNodeBase & {
 /** One selectable report entity. */
 export type ReportNode = ReportProjectFileNode | ReportExternalPackageNode
 
-type ReportEdge = {
+/** One browser-derived dependency between presentation nodes. */
+export type ReportEdge = {
   readonly id: string
   readonly kind: "project-file" | "external-package"
   readonly source: string
   readonly target: string
 }
 
-type BrowserPresentation = {
+/** Immutable browser-owned facts from which report views are derived. */
+export type BrowserPresentation = {
   readonly projectName: string
   readonly workspacePackages: ProjectAnalysis["workspacePackages"]
   readonly nodes: readonly ReportNode[]

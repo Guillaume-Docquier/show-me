@@ -56,6 +56,8 @@ The report does not embed source file contents. The analysis handoff is an inter
 
 The browser renderer uses Sigma.js over a Graphology directed graph. For the initial view and every interactive transition, it rebuilds the visible graph, assigns deterministic circular starting coordinates, and runs a synchronous 5,000-iteration ForceAtlas2 pass. Size adjustment keeps exact repulsion aware of rendered node radii. Barnes-Hut optimization remains disabled because the library's optimized path does not include individual node radii and allowed large nodes to cover their neighbors.
 
+The browser entrypoint is a composition root. It parses the fixed report DOM, creates the current view and edge-visibility state, and connects controls, panels, and the graph controller. Renderer-neutral visibility and sizing decisions live in the pure report-view transition. Controls own input creation and event binding, panels own the searchable tree and details DOM, and the graph controller owns Graphology, Sigma, layout, camera, and graph interaction state. Its internal modules separately contain Canvas overlays, zoom-aware label eligibility, drawing functions, renderer types, and browser-test diagnostics. This keeps the timeline visible in the entrypoint without exposing shared ambient state across browser features.
+
 The initial graph is flat:
 
 - directories do not create group nodes or visual containers;
