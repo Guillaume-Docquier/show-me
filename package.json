@@ -1,6 +1,10 @@
 {
   "name": "@guillaume-docquier/show-me",
   "version": "0.0.0-semantically-released",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Guillaume-Docquier/show-me.git"
+  },
   "bin": {
     "show-me": "./dist/cli/entry.cli.js"
   },
