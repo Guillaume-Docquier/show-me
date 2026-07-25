@@ -421,10 +421,12 @@ test("uses weighted folder nodes as the primary force graph under dependency arr
       return path
     })
 
-    await test.step("Inspect the structural graph, force weights, and overlaid dependency", async () => {
+    const settledGraphState = await test.step("Inspect the structural graph, force weights, and dimmed dependency", async () => {
       await page.goto(pathToFileURL(reportPath).href)
       await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
       const graph = page.locator("#graph")
+      await expect(page.getByRole("checkbox", { name: "Structure edges" })).toBeChecked()
+      await expect(page.getByRole("checkbox", { name: "Dependency edges" })).toBeChecked()
       await expect(graph).toHaveAttribute("data-visible-node-count", "3")
       await expect(graph).toHaveAttribute("data-visible-edge-count", "1")
       await expect(graph).toHaveAttribute("data-graph-node-count", "11")
@@ -432,6 +434,13 @@ test("uses weighted folder nodes as the primary force graph under dependency arr
       await expect(graph).toHaveAttribute("data-structure-edge-count", "10")
       await expect(graph).toHaveAttribute("data-structure-edge-weight", "6")
       await expect(graph).toHaveAttribute("data-dependency-edge-weight", "0.25")
+      await expect(graph).toHaveAttribute("data-structure-edges", "visible")
+      await expect(graph).toHaveAttribute("data-dependency-edges", "visible")
+      await expect(graph).toHaveAttribute("data-rendered-structure-edge-count", "10")
+      await expect(graph).toHaveAttribute("data-rendered-dependency-edge-count", "1")
+      expect(await readJsonAttribute<readonly DependencyEdgeDiagnostic[]>(graph, "data-rendered-dependency-edges")).toEqual([
+        { id: "project-dependency-0", color: "rgba(98, 139, 181, 0.32)", size: 2.4 },
+      ])
       const structureCanvas = graph.locator("canvas.sigma-structure")
       await expect(structureCanvas).toHaveCount(1)
       expect(
@@ -444,6 +453,83 @@ test("uses weighted folder nodes as the primary force graph under dependency arr
           )
         }),
       ).toBe(true)
+      await expect(graph).toHaveAttribute("data-visible-node-positions", /.+/u)
+      await expect(graph).toHaveAttribute("data-camera-state", /.+/u)
+      const nodePositions = await graph.getAttribute("data-visible-node-positions")
+      const cameraState = await graph.getAttribute("data-camera-state")
+      Assert.isDefined(nodePositions)
+      Assert.isDefined(cameraState)
+      return { nodePositions, cameraState }
+    })
+
+    await test.step("Toggle each edge layer independently without moving nodes", async () => {
+      const graph = page.locator("#graph")
+      const structureEdges = page.getByRole("checkbox", { name: "Structure edges" })
+      const dependencyEdges = page.getByRole("checkbox", { name: "Dependency edges" })
+      const expectStableGraph = async (): Promise<void> => {
+        await expect(graph).toHaveAttribute("data-visible-node-positions", settledGraphState.nodePositions)
+        await expect(graph).toHaveAttribute("data-camera-state", settledGraphState.cameraState)
+        await expect(graph).toHaveAttribute("data-visible-node-count", "3")
+        await expect(graph).toHaveAttribute("data-visible-edge-count", "1")
+      }
+
+      await structureEdges.uncheck()
+      await expect(graph).toHaveAttribute("data-structure-edges", "hidden")
+      await expect(graph).toHaveAttribute("data-rendered-structure-edge-count", "0")
+      await expect(graph).toHaveAttribute("data-rendered-dependency-edge-count", "1")
+      await expectStableGraph()
+      const nodePositions = await readJsonAttribute<readonly NodeCircleDiagnostic[]>(graph, "data-visible-node-positions")
+      const source = nodePositions.find(({ id }) => id === "project-file:src/features/accounts/create.ts")
+      const target = nodePositions.find(({ id }) => id === "project-file:src/platform/database/query.ts")
+      Assert.isDefined(source)
+      Assert.isDefined(target)
+      const visibleDependencyScreenshot = await graph.screenshot()
+
+      await dependencyEdges.uncheck()
+      await expect(graph).toHaveAttribute("data-dependency-edges", "hidden")
+      await expect(graph).toHaveAttribute("data-rendered-structure-edge-count", "0")
+      await expect(graph).toHaveAttribute("data-rendered-dependency-edge-count", "0")
+      await expect(graph).toHaveAttribute("data-rendered-dependency-edges", "[]")
+      await expectStableGraph()
+      const hiddenDependencyScreenshot = await graph.screenshot()
+
+      await dependencyEdges.check()
+      await expect(graph).toHaveAttribute("data-dependency-edges", "visible")
+      await expect(graph).toHaveAttribute("data-rendered-dependency-edge-count", "1")
+      await expectStableGraph()
+      const restoredDependencyScreenshot = await graph.screenshot()
+      const dependencyPixels = await sampleDependencySegmentPixels(
+        graph,
+        source,
+        target,
+        visibleDependencyScreenshot,
+        hiddenDependencyScreenshot,
+        restoredDependencyScreenshot,
+      )
+      const graphBackground = { red: 13, green: 17, blue: 23, alpha: 255 }
+      const dimmedDependency = { red: 40, green: 56, blue: 74, alpha: 255 }
+      const opaqueDependency = { red: 98, green: 139, blue: 181, alpha: 255 }
+      expect(dependencyPixels.matchingPixelCount).toBeGreaterThan(0)
+      expect(rgbDistance(dependencyPixels.visible, dimmedDependency)).toBeLessThanOrEqual(16)
+      expect(rgbDistance(dependencyPixels.hidden, graphBackground)).toBeLessThanOrEqual(4)
+      expect(rgbDistance(dependencyPixels.restored, dependencyPixels.visible)).toBeLessThanOrEqual(4)
+      expect(rgbDistance(dependencyPixels.visible, graphBackground)).toBeGreaterThan(35)
+      expect(rgbDistance(dependencyPixels.visible, graphBackground)).toBeLessThan(rgbDistance(opaqueDependency, graphBackground) * 0.5)
+
+      await dependencyEdges.uncheck()
+      await expect(graph).toHaveAttribute("data-dependency-edges", "hidden")
+      await expect(graph).toHaveAttribute("data-rendered-dependency-edge-count", "0")
+      await structureEdges.check()
+      await expect(graph).toHaveAttribute("data-structure-edges", "visible")
+      await expect(graph).toHaveAttribute("data-rendered-structure-edge-count", "10")
+      await expect(graph).toHaveAttribute("data-rendered-dependency-edge-count", "0")
+      await expectStableGraph()
+
+      await dependencyEdges.check()
+      await expect(graph).toHaveAttribute("data-dependency-edges", "visible")
+      await expect(graph).toHaveAttribute("data-rendered-structure-edge-count", "10")
+      await expect(graph).toHaveAttribute("data-rendered-dependency-edge-count", "1")
+      await expectStableGraph()
     })
 
     await test.step("Reveal directory and project-file labels progressively while zooming", async () => {
@@ -886,6 +972,22 @@ type NodeCircleDiagnostic = {
   readonly radius: number
 }
 
+type DependencyEdgeDiagnostic = {
+  readonly id: string
+  readonly color: string
+  readonly size: number
+}
+
+type DependencyEdgePixelDiagnostic = {
+  readonly matchingPixelCount: number
+  readonly sampledPixelCount: number
+  readonly x: number
+  readonly y: number
+  readonly visible: RgbDiagnostic
+  readonly hidden: RgbDiagnostic
+  readonly restored: RgbDiagnostic
+}
+
 type RgbDiagnostic = {
   readonly red: number
   readonly green: number
@@ -1013,6 +1115,137 @@ async function sampleDirectoryHoverPixels(
   )
 }
 
+async function sampleDependencySegmentPixels(
+  graph: Locator,
+  source: NodeCircleDiagnostic,
+  target: NodeCircleDiagnostic,
+  visibleScreenshot: Buffer,
+  hiddenScreenshot: Buffer,
+  restoredScreenshot: Buffer,
+): Promise<DependencyEdgePixelDiagnostic> {
+  return await graph.evaluate(
+    async (container, diagnostic): Promise<DependencyEdgePixelDiagnostic> => {
+      const loadScreenshot = async (screenshotBase64: string): Promise<CanvasRenderingContext2D> => {
+        const image = new Image()
+        image.src = `data:image/png;base64,${screenshotBase64}`
+        await image.decode()
+        const canvas = document.createElement("canvas")
+        canvas.width = image.naturalWidth
+        canvas.height = image.naturalHeight
+        const context = canvas.getContext("2d", { willReadFrequently: true })
+        if (context === null) {
+          throw new Error("Dependency-edge screenshot is not readable.")
+        }
+        context.drawImage(image, 0, 0)
+        return context
+      }
+      const [visible, hidden, restored] = await Promise.all([
+        loadScreenshot(diagnostic.visibleScreenshotBase64),
+        loadScreenshot(diagnostic.hiddenScreenshotBase64),
+        loadScreenshot(diagnostic.restoredScreenshotBase64),
+      ])
+      if (
+        container.clientWidth === 0 ||
+        container.clientHeight === 0 ||
+        visible.canvas.width !== hidden.canvas.width ||
+        visible.canvas.height !== hidden.canvas.height ||
+        visible.canvas.width !== restored.canvas.width ||
+        visible.canvas.height !== restored.canvas.height
+      ) {
+        throw new Error("Dependency-edge screenshots do not share one stable viewport.")
+      }
+
+      const scaleX = visible.canvas.width / container.clientWidth
+      const scaleY = visible.canvas.height / container.clientHeight
+      const pixelAt = (context: CanvasRenderingContext2D, x: number, y: number): RgbDiagnostic => {
+        const pixel = context.getImageData(
+          Math.max(0, Math.min(context.canvas.width - 1, Math.round(x * scaleX))),
+          Math.max(0, Math.min(context.canvas.height - 1, Math.round(y * scaleY))),
+          1,
+          1,
+        ).data
+        return { red: pixel[0] ?? 0, green: pixel[1] ?? 0, blue: pixel[2] ?? 0, alpha: pixel[3] ?? 0 }
+      }
+      const colorDistance = (left: RgbDiagnostic, right: readonly [number, number, number]): number =>
+        Math.hypot(left.red - right[0], left.green - right[1], left.blue - right[2])
+      const expectedDimmed = [40, 56, 74] as const
+      const graphBackground = [13, 17, 23] as const
+      const deltaX = diagnostic.target.x - diagnostic.source.x
+      const deltaY = diagnostic.target.y - diagnostic.source.y
+      const segmentLength = Math.hypot(deltaX, deltaY)
+      if (segmentLength === 0) {
+        throw new Error("Dependency endpoints occupy the same viewport position.")
+      }
+      const perpendicularX = -deltaY / segmentLength
+      const perpendicularY = deltaX / segmentLength
+      const sampledCoordinates = new Set<string>()
+      let matchingPixelCount = 0
+      let best:
+        | {
+            readonly x: number
+            readonly y: number
+            readonly visible: RgbDiagnostic
+            readonly hidden: RgbDiagnostic
+            readonly restored: RgbDiagnostic
+            readonly score: number
+          }
+        | undefined
+
+      // Inspect only the middle of the straight edge body, away from both node discs and the target arrowhead.
+      for (let step = 0; step <= 70; step += 1) {
+        const progress = 0.3 + (step / 70) * 0.35
+        for (let offset = -3; offset <= 3; offset += 0.5) {
+          const x = diagnostic.source.x + deltaX * progress + perpendicularX * offset
+          const y = diagnostic.source.y + deltaY * progress + perpendicularY * offset
+          const pixelX = Math.round(x * scaleX)
+          const pixelY = Math.round(y * scaleY)
+          const coordinate = `${pixelX},${pixelY}`
+          if (sampledCoordinates.has(coordinate)) {
+            continue
+          }
+          sampledCoordinates.add(coordinate)
+          const visiblePixel = pixelAt(visible, x, y)
+          const hiddenPixel = pixelAt(hidden, x, y)
+          const restoredPixel = pixelAt(restored, x, y)
+          const visibleDistance = colorDistance(visiblePixel, expectedDimmed)
+          const hiddenDistance = colorDistance(hiddenPixel, graphBackground)
+          const restoredDistance = Math.hypot(
+            restoredPixel.red - visiblePixel.red,
+            restoredPixel.green - visiblePixel.green,
+            restoredPixel.blue - visiblePixel.blue,
+          )
+          if (visibleDistance <= 16 && hiddenDistance <= 4 && restoredDistance <= 4) {
+            matchingPixelCount += 1
+          }
+          const score = visibleDistance + hiddenDistance + restoredDistance
+          if (best === undefined || score < best.score) {
+            best = { x: pixelX, y: pixelY, visible: visiblePixel, hidden: hiddenPixel, restored: restoredPixel, score }
+          }
+        }
+      }
+      if (best === undefined) {
+        throw new Error("Dependency segment produced no sample coordinates.")
+      }
+      return {
+        matchingPixelCount,
+        sampledPixelCount: sampledCoordinates.size,
+        x: best.x,
+        y: best.y,
+        visible: best.visible,
+        hidden: best.hidden,
+        restored: best.restored,
+      }
+    },
+    {
+      source,
+      target,
+      visibleScreenshotBase64: visibleScreenshot.toString("base64"),
+      hiddenScreenshotBase64: hiddenScreenshot.toString("base64"),
+      restoredScreenshotBase64: restoredScreenshot.toString("base64"),
+    },
+  )
+}
+
 function expectRgbNear(actual: RgbDiagnostic, expected: string): void {
   const channels = [1, 3, 5].map((offset) => Number.parseInt(expected.slice(offset, offset + 2), 16))
   const [red, green, blue] = channels
@@ -1022,6 +1255,10 @@ function expectRgbNear(actual: RgbDiagnostic, expected: string): void {
   expect(Math.abs(actual.red - red)).toBeLessThanOrEqual(2)
   expect(Math.abs(actual.green - green)).toBeLessThanOrEqual(2)
   expect(Math.abs(actual.blue - blue)).toBeLessThanOrEqual(2)
+}
+
+function rgbDistance(left: RgbDiagnostic, right: RgbDiagnostic): number {
+  return Math.hypot(left.red - right.red, left.green - right.green, left.blue - right.blue)
 }
 
 function rgbHex(color: RgbDiagnostic): string {

@@ -45,7 +45,7 @@ header p { margin: 0; color: #8fa3b8; font-size: 12px; }
 .graph-key { gap: 12px; color: #8fa3b8; }
 .graph-edge-swatch { display: inline-block; width: 18px; }
 .structure-edge-swatch { height: 0; border-top: 1px dashed #6f8295; }
-.dependency-edge-swatch { height: 2px; background: #628bb5; }
+.dependency-edge-swatch { height: 2px; background: rgba(98, 139, 181, 0.32); }
 .coverage-legend, .coverage-legend-scale, .coverage-legend-entry { display: flex; align-items: center; }
 .coverage-legend { gap: 8px; color: #8fa3b8; font-size: 11px; }
 .coverage-legend-title { color: #8fa3b8; }

@@ -62,6 +62,8 @@ export function buildHtmlReport(analysis: ProjectAnalysis, browserBundle: string
       </fieldset>
       <fieldset id="graph-content-controls">
         <legend>Show</legend>
+        <label><input id="structure-edges-toggle" type="checkbox" checked>Structure edges</label>
+        <label><input id="dependency-edges-toggle" type="checkbox" checked>Dependency edges</label>
         <label><input id="external-packages-toggle" type="checkbox">External packages</label>
       </fieldset>
       <fieldset id="workspace-package-fieldset" hidden>

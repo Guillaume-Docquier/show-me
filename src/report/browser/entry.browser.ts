@@ -12,7 +12,7 @@ import { circular } from "graphology-layout"
 import forceAtlas2 from "graphology-layout-forceatlas2"
 import { Sigma } from "sigma"
 import { createEdgeArrowProgram, drawDiscNodeHover, type NodeHoverDrawingFunction } from "sigma/rendering"
-import type { NodeDisplayData } from "sigma/types"
+import type { EdgeDisplayData, NodeDisplayData } from "sigma/types"
 import { type ProjectAnalysis } from "../../analysis/project-analysis.js"
 import {
   fileLabelsAreVisible,
@@ -48,6 +48,8 @@ const ROOT_DIRECTORY_NODE_SIZE = 15
 const STRUCTURE_EDGE_WEIGHT = 6
 const DEPENDENCY_EDGE_WEIGHT = 0.25
 const EXTERNAL_DEPENDENCY_EDGE_WEIGHT = 1.2
+const DEPENDENCY_EDGE_COLOR = "rgba(98, 139, 181, 0.32)"
+const EXTERNAL_DEPENDENCY_EDGE_COLOR = "rgba(154, 104, 193, 0.38)"
 const LABEL_FONT = "ui-monospace, SFMono-Regular, Consolas, monospace"
 const LABEL_SIZE = 11
 const LABEL_WEIGHT = "500"
@@ -69,7 +71,16 @@ type BrowserNodeAttributes = {
   readonly descendantProjectFileCount?: number
 }
 
-type BrowserNodeHoverDrawingFunction = NodeHoverDrawingFunction<BrowserNodeAttributes>
+type BrowserNodeHoverDrawingFunction = NodeHoverDrawingFunction<BrowserNodeAttributes, BrowserEdgeAttributes>
+
+type BrowserEdgeAttributes = {
+  readonly edgeKind: "structure" | "dependency"
+  readonly weight: number
+  readonly color?: string
+  readonly hidden?: boolean
+  readonly size?: number
+  readonly type?: string
+}
 
 type GraphNodeCircle = {
   readonly id: string
@@ -85,6 +96,13 @@ type ReportViewState = {
   readonly externalPackages: boolean
   /** Workspace packages whose owned project files participate in the visible graph. */
   readonly workspacePackages: ReadonlySet<string>
+}
+
+type EdgeVisibilityState = {
+  /** Render-only visibility; structure edges remain layout inputs even while hidden. */
+  readonly structureEdges: boolean
+  /** Render-only visibility; dependency edges remain graph members even while hidden. */
+  readonly dependencyEdges: boolean
 }
 
 const analysis = window.showMeAnalysis
@@ -115,6 +133,8 @@ const fileList = requiredElement("file-list")
 const externalPackageSection = requiredElement("external-package-section")
 const externalPackageList = requiredElement("external-package-list")
 const externalPackageToggle = requiredCheckbox("external-packages-toggle")
+const structureEdgesToggle = requiredCheckbox("structure-edges-toggle")
+const dependencyEdgesToggle = requiredCheckbox("dependency-edges-toggle")
 const workspacePackageFieldset = requiredElement("workspace-package-fieldset")
 const workspacePackageControls = requiredElement("workspace-package-controls")
 const lineCategoryControls = REPORT_LINE_CATEGORIES.map((category) => ({
@@ -129,7 +149,7 @@ renderCoverageLegend()
 // This index covers the complete derived presentation. The Graphology graph and
 // visibleNodeIds below contain only the projection selected by the current view.
 const nodeById = new Map(presentation.nodes.map((node) => [node.id, node]))
-const graph = new DirectedGraph<BrowserNodeAttributes>()
+const graph = new DirectedGraph<BrowserNodeAttributes, BrowserEdgeAttributes>()
 let selectedNodeId: string | undefined
 let hoveredNodeId: string | undefined
 let hoveredDirectoryNodeId: string | undefined
@@ -140,6 +160,10 @@ let viewState: ReportViewState = {
   externalPackages: false,
   workspacePackages: new Set(presentation.workspacePackages.map((workspacePackage) => workspacePackage.path)),
 }
+let edgeVisibilityState: EdgeVisibilityState = {
+  structureEdges: true,
+  dependencyEdges: true,
+}
 let structureEdges: readonly ProjectStructureEdge[] = []
 let maximumVisibleDirectoryDepth = visibleDirectoryDepth(1)
 let showFileLabels = fileLabelsAreVisible(1)
@@ -147,10 +171,13 @@ let visibleDirectoryLabels: readonly DirectoryLabelCandidate[] = []
 let visibleDirectoryLabelIds = new Set<string>()
 let graphLabelVisibilityDirty = true
 let cameraResetAwaitingSettledRender = false
-const renderer = new Sigma<BrowserNodeAttributes>(graph, graphContainer, {
+const renderer = new Sigma<BrowserNodeAttributes, BrowserEdgeAttributes>(graph, graphContainer, {
   allowInvalidContainer: false,
   defaultEdgeType: "arrow",
-  edgeProgramClasses: { arrow: createEdgeArrowProgram<BrowserNodeAttributes>() },
+  edgeProgramClasses: { arrow: createEdgeArrowProgram<BrowserNodeAttributes, BrowserEdgeAttributes>() },
+  edgeReducer(_edge, attributes): Partial<EdgeDisplayData> {
+    return attributes.edgeKind === "dependency" && !edgeVisibilityState.dependencyEdges ? { ...attributes, hidden: true } : attributes
+  },
   labelColor: { color: "#aebdca" },
   defaultDrawNodeHover: drawNodeHover,
   labelFont: LABEL_FONT,
@@ -186,6 +213,7 @@ renderer.resize(true)
 renderer.on("resize", markGraphLabelVisibilityDirty)
 renderer.on("afterRender", () => {
   renderStructureLinks()
+  updateDependencyEdgeDiagnostics()
   const labelRefreshScheduled = synchronizeGraphLabelVisibilityAfterRender()
   updateCameraDiagnostics()
   if (!labelRefreshScheduled) {
@@ -207,6 +235,18 @@ for (const control of lineCategoryControls) {
 }
 externalPackageToggle.addEventListener("change", () => {
   applyReportView({ ...viewState, externalPackages: externalPackageToggle.checked })
+})
+structureEdgesToggle.addEventListener("change", () => {
+  edgeVisibilityState = { ...edgeVisibilityState, structureEdges: structureEdgesToggle.checked }
+  renderer.scheduleRender()
+})
+dependencyEdgesToggle.addEventListener("change", () => {
+  edgeVisibilityState = { ...edgeVisibilityState, dependencyEdges: dependencyEdgesToggle.checked }
+  renderer.refresh({
+    partialGraph: { edges: dependencyEdgeIds() },
+    schedule: true,
+    skipIndexation: true,
+  })
 })
 const workspacePackageInputs = presentation.workspacePackages.map((workspacePackage, index) => {
   const label = document.createElement("label")
@@ -287,11 +327,12 @@ applyReportView(viewState)
 document.documentElement.dataset.showMeReady = "true"
 
 /**
- * Apply the complete browser view transition from presentation data derived from immutable analysis.
+ * Apply a graph-membership or node-sizing transition from presentation data derived from immutable analysis.
  *
  * Rebuilding the visible graph keeps line sizing and package visibility
  * composable and ensures hidden nodes and edges cannot affect layout,
- * relationship counts, hover, or selection.
+ * relationship counts, hover, or selection. Render-only edge visibility is
+ * intentionally managed separately so toggling it never rebuilds or lays out the graph.
  */
 function applyReportView(nextState: ReportViewState): void {
   graph.clear()
@@ -366,6 +407,7 @@ function applyReportView(nextState: ReportViewState): void {
   }
   for (const edge of structureEdges) {
     graph.addDirectedEdgeWithKey(edge.id, edge.source, edge.target, {
+      edgeKind: "structure",
       hidden: true,
       weight: STRUCTURE_EDGE_WEIGHT,
     })
@@ -373,8 +415,9 @@ function applyReportView(nextState: ReportViewState): void {
   for (const edge of visibleEdges) {
     const externalPackage = edge.kind === "external-package"
     graph.addDirectedEdgeWithKey(edge.id, edge.source, edge.target, {
+      edgeKind: "dependency",
       type: "arrow",
-      color: externalPackage ? "#9a68c1" : "#628bb5",
+      color: externalPackage ? EXTERNAL_DEPENDENCY_EDGE_COLOR : DEPENDENCY_EDGE_COLOR,
       size: externalPackage ? 2 : 2.4,
       weight: externalPackage ? EXTERNAL_DEPENDENCY_EDGE_WEIGHT : DEPENDENCY_EDGE_WEIGHT,
     })
@@ -613,16 +656,20 @@ function renderStructureLinks(): void {
   structureContext.clearRect(0, 0, structureLayer.width, structureLayer.height)
   structureContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0)
   structureContext.beginPath()
-  for (const edge of structureEdges) {
-    if (!graph.hasNode(edge.source) || !graph.hasNode(edge.target)) {
-      continue
+  let renderedEdgeCount = 0
+  if (edgeVisibilityState.structureEdges) {
+    for (const edge of structureEdges) {
+      if (!graph.hasNode(edge.source) || !graph.hasNode(edge.target)) {
+        continue
+      }
+      const source = graph.getNodeAttributes(edge.source)
+      const target = graph.getNodeAttributes(edge.target)
+      const sourceViewport = renderer.graphToViewport(source)
+      const targetViewport = renderer.graphToViewport(target)
+      structureContext.moveTo(sourceViewport.x, sourceViewport.y)
+      structureContext.lineTo(targetViewport.x, targetViewport.y)
+      renderedEdgeCount += 1
     }
-    const source = graph.getNodeAttributes(edge.source)
-    const target = graph.getNodeAttributes(edge.target)
-    const sourceViewport = renderer.graphToViewport(source)
-    const targetViewport = renderer.graphToViewport(target)
-    structureContext.moveTo(sourceViewport.x, sourceViewport.y)
-    structureContext.lineTo(targetViewport.x, targetViewport.y)
   }
 
   structureContext.setLineDash([2, 4])
@@ -630,6 +677,22 @@ function renderStructureLinks(): void {
   structureContext.strokeStyle = "rgba(111, 130, 149, 0.68)"
   structureContext.stroke()
   structureContext.setLineDash([])
+  graphContainer.dataset.structureEdges = edgeVisibilityState.structureEdges ? "visible" : "hidden"
+  graphContainer.dataset.renderedStructureEdgeCount = String(renderedEdgeCount)
+}
+
+function updateDependencyEdgeDiagnostics(): void {
+  const renderedEdges = dependencyEdgeIds().flatMap((edge) => {
+    const displayData = renderer.getEdgeDisplayData(edge)
+    return displayData === undefined || displayData.hidden ? [] : [{ id: edge, color: displayData.color, size: displayData.size }]
+  })
+  graphContainer.dataset.dependencyEdges = edgeVisibilityState.dependencyEdges ? "visible" : "hidden"
+  graphContainer.dataset.renderedDependencyEdgeCount = String(renderedEdges.length)
+  graphContainer.dataset.renderedDependencyEdges = JSON.stringify(renderedEdges)
+}
+
+function dependencyEdgeIds(): string[] {
+  return graph.filterEdges((_edge, attributes) => attributes.edgeKind === "dependency")
 }
 
 function drawNodeHover(
