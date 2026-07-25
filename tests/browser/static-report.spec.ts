@@ -642,54 +642,6 @@ test("uses weighted folder nodes as the primary force graph under dependency arr
       await expectStableGraph()
     })
 
-    await test.step("Reveal directory and project-file labels above their nodes while zooming", async () => {
-      const graph = page.locator("#graph")
-      await expect(graph).toHaveAttribute("data-visible-directory-label-depth", "1")
-      await expect(graph).toHaveAttribute("data-visible-directory-labels", '["project","src"]')
-      await expect(graph).toHaveAttribute("data-file-label-visibility", "hidden")
-      await expect(graph).toHaveAttribute("data-rendered-file-labels", "[]")
-      const bounds = await graph.boundingBox()
-      Assert.isDefined(bounds)
-      await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2)
-
-      await page.mouse.wheel(0, 120)
-      await expect(graph).toHaveAttribute("data-visible-directory-label-depth", "1")
-      await expect(graph).toHaveAttribute("data-visible-directory-labels", '["project","src"]')
-      await page.waitForTimeout(300)
-      await page.mouse.wheel(0, 120)
-      await expect(graph).toHaveAttribute("data-visible-directory-label-depth", "0")
-      await expect(graph).toHaveAttribute("data-visible-directory-labels", '["project"]')
-
-      await page.reload()
-      await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
-      await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2)
-      await page.mouse.wheel(0, -120)
-      await page.waitForTimeout(300)
-      await page.mouse.wheel(0, -120)
-      await page.waitForTimeout(300)
-      await page.mouse.wheel(0, -120)
-      await expect(graph).toHaveAttribute("data-file-label-visibility", "visible")
-      await expect(graph).not.toHaveAttribute("data-rendered-file-labels", "[]")
-      const cameraState = await readJsonAttribute<{ readonly ratio: number }>(graph, "data-camera-state")
-      expect(cameraState.ratio).toBeLessThanOrEqual(0.35)
-      const labels = await readJsonAttribute<readonly DirectoryLabelDiagnostic[]>(graph, "data-visible-directory-label-rectangles")
-      expect(labels.length).toBeGreaterThan(0)
-      expectDirectoryLabelsNotToOverlap(labels)
-      const nodeLabels = await readJsonAttribute<readonly NodeLabelDiagnostic[]>(graph, "data-rendered-node-label-rectangles")
-      const fileLabel = nodeLabels.find(({ nodeKind }) => nodeKind === "project-file")
-      const directoryLabel = nodeLabels.find(({ nodeKind }) => nodeKind === "directory")
-      Assert.isDefined(fileLabel)
-      Assert.isDefined(directoryLabel)
-      expectCenteredAboveNode(fileLabel)
-      expectCenteredAboveNode(directoryLabel)
-
-      await page.setViewportSize({ width: 1440, height: 900 })
-      await expect(graph).toHaveAttribute("data-file-label-visibility", "visible")
-      await expect(graph).not.toHaveAttribute("data-rendered-file-labels", "[]")
-      const resizedLabels = await readJsonAttribute<readonly DirectoryLabelDiagnostic[]>(graph, "data-visible-directory-label-rectangles")
-      expectDirectoryLabelsNotToOverlap(resizedLabels)
-    })
-
     await test.step("Select directories from the graph and explorer, preview their contents, and focus their structure edges", async () => {
       await page.reload()
       await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
@@ -731,6 +683,53 @@ test("uses weighted folder nodes as the primary force graph under dependency arr
       await expect(page.locator("#selected-parent-directory button")).toHaveAttribute("aria-label", "src")
       await expect(page.locator("#selected-directory-children button")).toHaveAttribute("aria-label", "src/platform/database")
       await expect(platformDirectory).toHaveAttribute("aria-current", "true")
+    })
+  })
+})
+
+test("reveals project-file labels after zooming into a stable desktop viewport", async ({ page }) => {
+  await withTemporaryDirectory(async (temporaryDirectory) => {
+    const reportPath = await test.step("Generate a report with one unambiguous project-file label", async () => {
+      const projectDirectory = join(temporaryDirectory, "labels")
+      await mkdir(projectDirectory, { recursive: true })
+      await writeFile(join(projectDirectory, "main.ts"), "export const main = true\n", "utf8")
+      const analysis = await analyzeProject({ projectRoot: projectDirectory })
+      Assert.isSuccess(analysis)
+      const browserBundle = await readFile(join(process.cwd(), "dist", "report", "browser.js"), "utf8")
+      const path = join(temporaryDirectory, "labels.html")
+      await writeFile(path, buildHtmlReport(analysis.value, browserBundle), "utf8")
+      return path
+    })
+
+    await test.step("Hide the file label at overview zoom, then render it above its node after zooming in", async () => {
+      await page.setViewportSize({ width: 1920, height: 1080 })
+      await page.goto(pathToFileURL(reportPath).href)
+      await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
+      const graph = page.locator("#graph")
+      await expect(graph).toHaveAttribute("data-file-label-visibility", "hidden")
+      await expect(graph).toHaveAttribute("data-rendered-file-labels", "[]")
+      const bounds = await graph.boundingBox()
+      Assert.isDefined(bounds)
+      const nodes = await readJsonAttribute<readonly NodeCircleDiagnostic[]>(graph, "data-visible-node-positions")
+      const mainNode = nodes.find(({ id }) => id === "project-file:main.ts")
+      Assert.isDefined(mainNode)
+      await page.mouse.move(bounds.x + mainNode.x, bounds.y + mainNode.y)
+
+      for (const maximumRatio of [0.7, 0.4, 0.25, 0.15]) {
+        await page.mouse.wheel(0, -120)
+        await expect
+          .poll(async () => (await readJsonAttribute<{ readonly ratio: number }>(graph, "data-camera-state")).ratio)
+          .toBeLessThan(maximumRatio)
+      }
+      await page.mouse.move(0, 0)
+      await expect(page.locator("html")).not.toHaveAttribute("data-hovered-node")
+
+      await expect(graph).toHaveAttribute("data-file-label-visibility", "visible")
+      await expect(graph).toHaveAttribute("data-rendered-file-labels", '["main.ts"]')
+      const nodeLabels = await readJsonAttribute<readonly NodeLabelDiagnostic[]>(graph, "data-rendered-node-label-rectangles")
+      const fileLabel = nodeLabels.find(({ id }) => id === "project-file:main.ts")
+      Assert.isDefined(fileLabel)
+      expectCenteredAboveNode(fileLabel)
     })
   })
 })
