@@ -24,12 +24,13 @@ Defaults and path rules:
 - The report defaults to `show-me.html` in the directory where the command is invoked.
 - A relative `--output` path is resolved from the invocation directory.
 - The analyzed project root may contain one automatically discovered `show-me.config.json` JSONC file.
+- Relative configured `output` and `coverage` paths are resolved from the analyzed project root.
 - Repeatable `--exclude` patterns replace the built-in `*.test.*` and `*.spec.*` exclusions for that invocation.
 - The output file is overwritten without requiring a force flag.
 - The command never opens a browser and no browser-opening option is planned.
 - Success prints the resolved output path and total execution time, then exits.
 
-The CLI surface contains the optional project path, `--output`, `--coverage`, repeatable `--exclude`, `--help`, and `--version`. Exclusion patterns use the project-relative semantics documented in [analysis architecture](./analysis.md). Project configuration supplies the same complete pattern set when the CLI option is absent; CLI values replace configured values, configured values replace built-in defaults, and defined arrays are never additive.
+The CLI surface contains the optional project path, `--output`, `--coverage`, repeatable `--exclude`, `--help`, and `--version`. Project configuration can supply `output`, `coverage`, and the same complete exclusion-pattern set when the corresponding CLI option is absent. Precedence is applied independently per value: CLI, then project configuration, then the existing default. Exclusion patterns use the project-relative semantics documented in [analysis architecture](./analysis.md), and defined arrays are never additive.
 
 ## Published repository report
 
@@ -39,11 +40,11 @@ The Pages artifact contains only the generated self-contained report as `index.h
 
 ## Coverage discovery
 
-When `--coverage` is absent, the CLI discovers coverage roots from the project root and the nearest `package.json` ancestor of every analyzed file. This recognizes package roots in pnpm workspaces and other JavaScript or TypeScript monorepos without coupling discovery to one workspace-file format. Roots are processed as the project root followed by package roots in deterministic project-relative order.
+When neither CLI nor project configuration supplies coverage, the CLI discovers coverage roots from the project root and the nearest `package.json` ancestor of every analyzed file. This recognizes package roots in pnpm workspaces and other JavaScript or TypeScript monorepos without coupling discovery to one workspace-file format. Roots are processed as the project root followed by package roots in deterministic project-relative order.
 
 At each root, the CLI checks `<coverage-root>/coverage/coverage-final.json` and then `<coverage-root>/coverage/lcov.info`. The first existing report at that root is selected exclusively; the lower-precedence format is never parsed there. Reports selected at different roots are combined into one analysis, resolving relative source paths from the root that owns each report and retaining maximum hits for repeated executable lines. Missing automatic coverage everywhere is informational. A selected but unreadable or invalid report is an expected fatal command error and never falls back to the other format at that root.
 
-When `--coverage` is supplied, its path is resolved from the invocation directory and read once. A first non-whitespace `{` selects the Istanbul parser, while a first non-empty `TN:` or `SF:` record selects LCOV. Any other prefix is unsupported. A missing, unreadable, unsupported, or invalid explicit file is an expected fatal command error with a useful message; parser failures never invoke the other parser. The explicit option still accepts one report; configurable per-package locations and multiple explicit inputs remain [milestone 020](../tasks/020-configurable-coverage-locations.md).
+When `--coverage` or configured `coverage` is supplied, the effective path is read once. CLI paths resolve from the invocation directory; configured paths resolve from the project root. A first non-whitespace `{` selects the Istanbul parser, while a first non-empty `TN:` or `SF:` record selects LCOV. Any other prefix is unsupported. A missing, unreadable, unsupported, or invalid explicit file is an expected fatal command error with a useful message; parser failures never invoke the other parser. The command still accepts one explicit report; configurable per-package locations and multiple explicit inputs remain [milestone 020](../tasks/020-configurable-coverage-locations.md).
 
 ## Report contents
 

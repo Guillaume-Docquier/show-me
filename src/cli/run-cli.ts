@@ -89,8 +89,12 @@ export async function runCli(arguments_: readonly string[], output: CliOutput, o
   }
 
   let reportAnalysis = analysis.value
+  const coverageFile =
+    command.value.coveragePath === undefined
+      ? projectConfiguration.value.coveragePath
+      : resolve(currentDirectory, command.value.coveragePath)
 
-  if (command.value.coveragePath === undefined) {
+  if (coverageFile === undefined) {
     const importDiscovered = async (): ReturnType<typeof importDiscoveredCoverage> =>
       await importDiscoveredCoverage(analysis.value, projectRoot)
     const coveredAnalysis =
@@ -106,7 +110,6 @@ export async function runCli(arguments_: readonly string[], output: CliOutput, o
       output.writeStandardOutput(`No coverage file found at ${projectRoot} or its package roots; continuing without coverage.\n`)
     }
   } else {
-    const coverageFile = resolve(currentDirectory, command.value.coveragePath)
     const importExplicit = async (): ReturnType<typeof importCoverage> => await importCoverage(analysis.value, projectRoot, coverageFile)
     const coveredAnalysis =
       options.performanceProfiler === undefined
@@ -133,7 +136,10 @@ export async function runCli(arguments_: readonly string[], output: CliOutput, o
     options.performanceProfiler === undefined
       ? buildHtmlReport(reportAnalysis, browserBundle)
       : options.performanceProfiler.measure("html-packaging", () => buildHtmlReport(reportAnalysis, browserBundle))
-  const outputPath = resolve(currentDirectory, command.value.outputPath ?? "show-me.html")
+  const outputPath =
+    command.value.outputPath === undefined
+      ? (projectConfiguration.value.outputPath ?? resolve(currentDirectory, "show-me.html"))
+      : resolve(currentDirectory, command.value.outputPath)
   const writeReport = async (): ReturnType<typeof writeFile> => {
     await writeFile(outputPath, html, "utf8")
   }

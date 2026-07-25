@@ -14,10 +14,10 @@ it("treats an absent root configuration as an absent file-selection value", asyn
   const result = await loadProjectConfiguration(projectRoot)
 
   // Assert
-  expect(result).toEqual(Result.Success({ fileSelection: undefined }))
+  expect(result).toEqual(Result.Success({ outputPath: undefined, coveragePath: undefined, fileSelection: undefined }))
 })
 
-it("parses comments and trailing commas into the typed file-selection input", async () => {
+it("parses comments and trailing commas into project-root-based application inputs", async () => {
   // Arrange
   const projectRoot = fixtureProjectPath("project-configuration-valid")
 
@@ -27,6 +27,8 @@ it("parses comments and trailing commas into the typed file-selection input", as
   // Assert
   expect(result).toEqual(
     Result.Success({
+      outputPath: join(projectRoot, "reports", "configured.html"),
+      coveragePath: join(projectRoot, "inputs", "coverage.json"),
       fileSelection: {
         exclusionPatterns: ["*.generated.*"],
       },
@@ -70,16 +72,17 @@ it("returns typed schema issues for configuration values rejected by Zod", async
   // Assert
   expect(Result.isFailure(result)).toBe(true)
   if (Result.isFailure(result)) {
-    expect(result.error).toEqual({
-      _tag: "ProjectConfigurationSchemaInvalid",
-      configurationFile: join(projectRoot, PROJECT_CONFIGURATION_FILE_NAME),
-      issues: [
-        {
-          path: "exclude",
-          message: expect.stringContaining("array"),
-        },
-      ],
-    })
+    expect(result.error).toEqual(
+      expect.objectContaining({
+        _tag: "ProjectConfigurationSchemaInvalid",
+        configurationFile: join(projectRoot, PROJECT_CONFIGURATION_FILE_NAME),
+        issues: expect.arrayContaining([
+          expect.objectContaining({ path: "output", message: expect.stringContaining("string") }),
+          expect.objectContaining({ path: "coverage", message: expect.stringContaining("string") }),
+          expect.objectContaining({ path: "exclude", message: expect.stringContaining("array") }),
+        ]),
+      }),
+    )
   }
 })
 

@@ -6,7 +6,7 @@ Complete.
 
 ## Outcome
 
-A project can persist Show Me file-selection settings in a commented `show-me.config.json` file at the analyzed project root, with CLI options taking precedence through the same discovery matcher.
+A project can persist Show Me output, coverage, and file-selection settings in a commented `show-me.config.json` file at the analyzed project root, with CLI options taking precedence independently per value.
 
 ## Dependencies
 
@@ -16,11 +16,12 @@ A project can persist Show Me file-selection settings in a commented `show-me.co
 
 - [x] Automatically discover only `show-me.config.json` at the root of the directory being analyzed.
 - [x] Parse the file as JSONC so project configuration can contain comments, then validate and parse the resulting value with Zod.
-- [x] Keep the accepted configuration surface aligned with persistable CLI options. This milestone initially supports only the repeatable CLI `--exclude` option, represented as an `exclude` array:
+- [x] Keep the accepted configuration surface aligned with persistable CLI options: `output` and `coverage` paths plus the complete repeatable CLI `--exclude` value represented as an `exclude` array:
 
   ```jsonc
   {
-    // Replace the built-in test and spec exclusions.
+    "output": "reports/dependencies.html",
+    "coverage": "coverage/lcov.info",
     "exclude": ["*.test.*", "*.spec.*", "*.generated.*"],
   }
   ```
@@ -44,11 +45,12 @@ A project can persist Show Me file-selection settings in a commented `show-me.co
 - [x] Precedence tests prove a defined `exclude` array fully replaces the lower-precedence array, including when it is explicitly empty.
 - [x] Equivalence tests prove the same selection supplied through CLI and configuration produces identical analysis.
 - [x] CLI-to-report tests prove persisted selection affects files, metrics, coverage, and relationships consistently.
+- [x] CLI-to-report tests prove configured output and coverage paths resolve from the project root and CLI paths override them from the invocation directory.
 
 ## Verification evidence
 
-- Focused configuration and CLI Vitest suite: 4 files and 62 tests passed.
-- `pnpm checks`: formatting and zero-warning lint passed, type checking passed, all 26 Vitest files and 254 tests passed, both builds passed, all 14 Chromium scenarios passed, the performance sentinel passed, and the built CLI generated the dogfood report.
+- Focused configuration and CLI Vitest suite: 4 files and 64 tests passed.
+- `pnpm checks`: formatting and zero-warning lint passed, type checking passed, all 26 Vitest files and 256 tests passed, both builds passed, all 14 Chromium scenarios passed, the performance sentinel passed, and the built CLI generated the dogfood report.
 
 ## Discovered gaps
 

@@ -58,16 +58,16 @@ Show Me writes the report but does not open it automatically.
 
 ## Command options
 
-| Argument or option    | Description                                                    | Default                                            |
-| --------------------- | -------------------------------------------------------------- | -------------------------------------------------- |
-| `[project-path]`      | Project directory to analyze.                                  | Current directory                                  |
-| `--output <path>`     | HTML report path, relative to the invocation directory.        | `show-me.html` in the invocation directory         |
-| `--coverage <path>`   | One Istanbul JSON or LCOV report.                              | Automatically discover conventional coverage files |
-| `--exclude <pattern>` | Replace all file exclusion patterns. Repeat for more patterns. | `*.test.*` and `*.spec.*`                          |
-| `-h`, `--help`        | Print command help.                                            |                                                    |
-| `-v`, `--version`     | Print the installed version.                                   |                                                    |
+| Argument or option    | Description                                                    | When omitted                                         |
+| --------------------- | -------------------------------------------------------------- | ---------------------------------------------------- |
+| `[project-path]`      | Project directory to analyze.                                  | Current directory                                    |
+| `--output <path>`     | HTML report path, relative to the invocation directory.        | Configured `output`, then `show-me.html`             |
+| `--coverage <path>`   | One Istanbul JSON or LCOV report.                              | Configured `coverage`, then automatic discovery      |
+| `--exclude <pattern>` | Replace all file exclusion patterns. Repeat for more patterns. | Configured `exclude`, then `*.test.*` and `*.spec.*` |
+| `-h`, `--help`        | Print command help.                                            |                                                      |
+| `-v`, `--version`     | Print the installed version.                                   |                                                      |
 
-When `--coverage` is omitted, Show Me looks for these files at the project root and at package roots:
+When neither `--coverage` nor configured `coverage` is present, Show Me looks for these files at the project root and at package roots:
 
 1. `coverage/coverage-final.json`
 2. `coverage/lcov.info`
@@ -80,16 +80,24 @@ Create `show-me.config.json` at the analyzed project root to keep project-specif
 
 ```jsonc
 {
+  // Relative configured paths start at the analyzed project root.
+  "output": "reports/dependencies.html",
+  "coverage": "coverage/lcov.info",
+
   // This is the complete exclusion list.
   "exclude": ["*.test.*", "*.spec.*", "*.generated.*"],
 }
 ```
 
-| Option    | Type       | Default                    |
-| --------- | ---------- | -------------------------- |
-| `exclude` | `string[]` | `["*.test.*", "*.spec.*"]` |
+| Option     | Type       | Default                                     | CLI override |
+| ---------- | ---------- | ------------------------------------------- | ------------ |
+| `output`   | `string`   | `show-me.html` in the invocation directory  | `--output`   |
+| `coverage` | `string`   | Automatically discover conventional reports | `--coverage` |
+| `exclude`  | `string[]` | `["*.test.*", "*.spec.*"]`                  | `--exclude`  |
 
-Configuration values replace defaults. CLI values replace configuration values. Arrays are not merged, so passing only `--exclude "*.generated.*"` includes test and spec files. Set `"exclude": []` to disable the default test exclusions.
+Relative `output` and `coverage` paths in configuration are resolved from the analyzed project root. Relative CLI paths are resolved from the invocation directory. Each CLI value replaces the matching configuration value, and each configured value replaces its default.
+
+Exclusion arrays are not merged, so passing only `--exclude "*.generated.*"` includes test and spec files. Set `"exclude": []` to disable the default test exclusions.
 
 Exclusion patterns use case-insensitive gitignore syntax against forward-slash, project-relative paths. A pattern without a slash matches a basename anywhere. A leading slash anchors the pattern at the project root. Negated patterns are not supported.
 

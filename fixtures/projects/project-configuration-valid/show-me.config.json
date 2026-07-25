@@ -1,4 +1,6 @@
 {
-  // Replace the built-in test and spec exclusions.
+  // Paths are resolved from this project root.
+  "output": "reports/configured.html",
+  "coverage": "inputs/coverage.json",
   "exclude": ["*.generated.*"],
 }

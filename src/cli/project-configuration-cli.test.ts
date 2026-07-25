@@ -92,6 +92,101 @@ describe("project configuration through the CLI", () => {
     })
   })
 
+  it("resolves configured output and coverage paths from the analyzed project root", async () => {
+    await withTemporaryDirectory(async (currentDirectory) => {
+      // Arrange
+      const projectRoot = join(currentDirectory, "project")
+      const sourceFile = join(projectRoot, "index.ts")
+      const configuredReport = join(projectRoot, "reports", "configured.html")
+      await mkdir(join(currentDirectory, "inputs"), { recursive: true })
+      await mkdir(join(projectRoot, "inputs"), { recursive: true })
+      await mkdir(join(projectRoot, "reports"), { recursive: true })
+      await writeFile(
+        join(projectRoot, PROJECT_CONFIGURATION_FILE_NAME),
+        '{"output":"reports/configured.html","coverage":"inputs/coverage.json"}',
+        "utf8",
+      )
+      await writeFile(sourceFile, "export const value = true", "utf8")
+      await writeFile(
+        join(currentDirectory, "inputs", "coverage.json"),
+        JSON.stringify({ [sourceFile]: istanbulFileCoverage(sourceFile, 0) }),
+        "utf8",
+      )
+      await writeFile(
+        join(projectRoot, "inputs", "coverage.json"),
+        JSON.stringify({ [sourceFile]: istanbulFileCoverage(sourceFile, 1) }),
+        "utf8",
+      )
+      const captured = captureOutput()
+
+      // Act
+      const exitCode = await runCli(["project"], captured.output, {
+        currentDirectory,
+        browserBundle: TEST_BROWSER_BUNDLE,
+      })
+
+      // Assert
+      const analysis = parseAnalysis(await readFile(configuredReport, "utf8"))
+      expect(exitCode).toBe(0)
+      expect(analysis.files).toEqual([
+        expect.objectContaining({
+          path: "index.ts",
+          coverage: { lines: 100 },
+        }),
+      ])
+      expect(captured.standardOutput.join("")).toContain(configuredReport)
+      expect(captured.standardError).toEqual([])
+    })
+  })
+
+  it("lets CLI output and coverage paths replace configured paths from the invocation directory", async () => {
+    await withTemporaryDirectory(async (currentDirectory) => {
+      // Arrange
+      const projectRoot = join(currentDirectory, "project")
+      const sourceFile = join(projectRoot, "index.ts")
+      const configuredReport = join(projectRoot, "reports", "configured.html")
+      const cliReport = join(currentDirectory, "cli.html")
+      await mkdir(join(currentDirectory, "inputs"), { recursive: true })
+      await mkdir(join(projectRoot, "inputs"), { recursive: true })
+      await mkdir(join(projectRoot, "reports"), { recursive: true })
+      await writeFile(
+        join(projectRoot, PROJECT_CONFIGURATION_FILE_NAME),
+        '{"output":"reports/configured.html","coverage":"inputs/configured.json"}',
+        "utf8",
+      )
+      await writeFile(sourceFile, "export const value = true", "utf8")
+      await writeFile(
+        join(projectRoot, "inputs", "configured.json"),
+        JSON.stringify({ [sourceFile]: istanbulFileCoverage(sourceFile, 0) }),
+        "utf8",
+      )
+      await writeFile(
+        join(currentDirectory, "inputs", "cli.json"),
+        JSON.stringify({ [sourceFile]: istanbulFileCoverage(sourceFile, 1) }),
+        "utf8",
+      )
+      const captured = captureOutput()
+
+      // Act
+      const exitCode = await runCli(["project", "--output", "cli.html", "--coverage", "inputs/cli.json"], captured.output, {
+        currentDirectory,
+        browserBundle: TEST_BROWSER_BUNDLE,
+      })
+
+      // Assert
+      const analysis = parseAnalysis(await readFile(cliReport, "utf8"))
+      expect(exitCode).toBe(0)
+      expect(analysis.files).toEqual([
+        expect.objectContaining({
+          path: "index.ts",
+          coverage: { lines: 100 },
+        }),
+      ])
+      await expect(readFile(configuredReport, "utf8")).rejects.toMatchObject({ code: "ENOENT" })
+      expect(captured.standardError).toEqual([])
+    })
+  })
+
   it("treats an explicitly empty configured array as a full replacement without weakening permanent exclusions", async () => {
     await withTemporaryDirectory(async (projectRoot) => {
       // Arrange

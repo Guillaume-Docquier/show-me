@@ -18,6 +18,8 @@ export const PROJECT_CONFIGURATION_FILE_NAME = "show-me.config.json"
  * Persisted project configuration parsed into application inputs.
  */
 export type ProjectConfiguration = {
+  readonly outputPath: string | undefined
+  readonly coveragePath: string | undefined
   readonly fileSelection: ProjectFileSelectionInput | undefined
 }
 
@@ -64,6 +66,8 @@ export type ProjectConfigurationError =
     }
 
 const projectConfigurationSchema = z.strictObject({
+  output: z.string().optional(),
+  coverage: z.string().optional(),
   exclude: z.array(z.string()).optional(),
 })
 
@@ -77,12 +81,13 @@ const projectConfigurationSchema = z.strictObject({
  * @returns Parsed application configuration, or a typed read or parse failure.
  */
 export async function loadProjectConfiguration(projectRoot: string): Promise<Result<ProjectConfiguration, ProjectConfigurationError>> {
-  const configurationFile = join(resolve(projectRoot), PROJECT_CONFIGURATION_FILE_NAME)
+  const resolvedProjectRoot = resolve(projectRoot)
+  const configurationFile = join(resolvedProjectRoot, PROJECT_CONFIGURATION_FILE_NAME)
   const contents = await Result.tryCatch(readFile(configurationFile, "utf8"))
 
   if (Result.isFailure(contents)) {
     if (isMissingConfigurationFile(contents.error)) {
-      return Result.Success({ fileSelection: undefined })
+      return Result.Success({ outputPath: undefined, coveragePath: undefined, fileSelection: undefined })
     }
 
     return Result.Failure({
@@ -121,20 +126,25 @@ export async function loadProjectConfiguration(projectRoot: string): Promise<Res
     })
   }
 
-  if (parsedConfiguration.data.exclude === undefined) {
-    return Result.Success({ fileSelection: undefined })
+  let fileSelection: ProjectFileSelectionInput | undefined
+  if (parsedConfiguration.data.exclude !== undefined) {
+    const parsedFileSelection = ProjectFileSelection.parse(parsedConfiguration.data.exclude)
+    if (Result.isFailure(parsedFileSelection)) {
+      return Result.Failure({
+        _tag: "ProjectConfigurationFileSelectionInvalid",
+        configurationFile,
+        cause: parsedFileSelection.error,
+      })
+    }
+    fileSelection = parsedFileSelection.value
   }
 
-  const fileSelection = ProjectFileSelection.parse(parsedConfiguration.data.exclude)
-  if (Result.isFailure(fileSelection)) {
-    return Result.Failure({
-      _tag: "ProjectConfigurationFileSelectionInvalid",
-      configurationFile,
-      cause: fileSelection.error,
-    })
-  }
-
-  return Result.Success({ fileSelection: fileSelection.value })
+  return Result.Success({
+    outputPath: parsedConfiguration.data.output === undefined ? undefined : resolve(resolvedProjectRoot, parsedConfiguration.data.output),
+    coveragePath:
+      parsedConfiguration.data.coverage === undefined ? undefined : resolve(resolvedProjectRoot, parsedConfiguration.data.coverage),
+    fileSelection,
+  })
 }
 
 function isMissingConfigurationFile(error: Error): boolean {

@@ -1,3 +1,5 @@
 {
+  "output": 42,
+  "coverage": [],
   "exclude": "*.test.*"
 }

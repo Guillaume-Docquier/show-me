@@ -8,7 +8,7 @@ This document describes the target architecture. The implementation is being bui
 
 The initial end-to-end product is operational. The CLI discovers supported project files, excludes conventional test files by default, classifies code, comment, and blank physical lines, analyzes static ESM, CommonJS, and dynamic-import dependencies through Oxc, identifies pnpm workspace ownership and external npm package roots, optionally imports Istanbul or LCOV line coverage, and writes a self-contained interactive graph report. The repository publishes its latest validated report through GitHub Pages.
 
-Analysis, report packaging, browser presentation, CLI, build, and package boundaries have been consolidated and are covered through Node and real-browser tests. CLOC-style metrics, interactive line-category sizing, optional external-package nodes, per-source-file TypeScript configuration discovery, pnpm workspace ownership, cross-package resolution, package filters, persisted project file selection, and measured large-codebase performance are implemented.
+Analysis, report packaging, browser presentation, CLI, build, and package boundaries have been consolidated and are covered through Node and real-browser tests. CLOC-style metrics, interactive line-category sizing, optional external-package nodes, per-source-file TypeScript configuration discovery, pnpm workspace ownership, cross-package resolution, package filters, persisted CLI settings, and measured large-codebase performance are implemented.
 
 ## System flow
 
