@@ -116,6 +116,7 @@ Do not reimplement the logic in the test to create the expected result. Be expli
 ## Commits And PRs
 
 - Never commit, push, or open a pull request unless the human explicitly asks for it. A request to change code or tests does not imply permission to commit, push, or open a PR.
+- When explicitly asked to commit or push, use raw Git commands such as `git commit` and `git push`, not the GitHub CLI (`gh`).
 - Pre-commit runs `pnpm lint-staged`, for linting and formatting
 
 ## `@guillaume-docquier/tools-ts` Gotchas
