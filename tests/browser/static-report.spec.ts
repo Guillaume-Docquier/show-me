@@ -133,7 +133,7 @@ test("navigates a collapsible and searchable project-files tree", async ({ page 
       await expect(page.locator("html")).toHaveAttribute("data-hovered-node", "project-file:src/runtime.ts")
       await expect(graph).toHaveAttribute("data-dependency-focus", /project-file:src\/runtime\.ts/u)
       await expect(graph).toHaveAttribute("data-rendered-dependency-focus-ring-count", "3")
-      await expect(page.locator("#selected-heading")).toHaveText("Hovered project file")
+      await expect(page.locator("#selected-node-type")).toHaveText("Project file")
       await expect(page.locator("#selected-path")).toHaveText("src/runtime.ts")
       await expect(page.locator("#tooltip")).toHaveCount(0)
       await expect(graph).toHaveAttribute("data-camera-focused-node", "project-file:src/main.ts")
@@ -158,7 +158,7 @@ test("navigates a collapsible and searchable project-files tree", async ({ page 
       expect(Math.abs(runtimePosition.y - graphBounds.height / 2)).toBeLessThanOrEqual(2)
 
       await page.locator("header").hover()
-      await expect(page.locator("#selected-heading")).toHaveText("Selected project file")
+      await expect(page.locator("html")).not.toHaveAttribute("data-hovered-node", /.+/u)
       await expect(page.locator("#selected-path")).toHaveText("src/runtime.ts")
     })
   })
@@ -560,7 +560,7 @@ test("uses weighted folder nodes as the primary force graph under dependency arr
       await expectStableGraph()
     })
 
-    await test.step("Reveal centered directory and project-file labels progressively while zooming", async () => {
+    await test.step("Reveal directory and project-file labels above their nodes while zooming", async () => {
       const graph = page.locator("#graph")
       await expect(graph).toHaveAttribute("data-visible-directory-label-depth", "1")
       await expect(graph).toHaveAttribute("data-visible-directory-labels", '["project","src"]')
@@ -598,8 +598,8 @@ test("uses weighted folder nodes as the primary force graph under dependency arr
       const directoryLabel = nodeLabels.find(({ nodeKind }) => nodeKind === "directory")
       Assert.isDefined(fileLabel)
       Assert.isDefined(directoryLabel)
-      expectCenteredBelowNode(fileLabel)
-      expectCenteredBelowNode(directoryLabel)
+      expectCenteredAboveNode(fileLabel)
+      expectCenteredAboveNode(directoryLabel)
 
       await page.setViewportSize({ width: 1440, height: 900 })
       await expect(graph).toHaveAttribute("data-file-label-visibility", "visible")
@@ -828,7 +828,7 @@ test("focuses only the hovered file's direct dependency neighborhood", async ({ 
       Assert.isDefined(cameraState)
       await page.locator('#file-list button[data-node-id="project-file:src/hovered.ts"]').hover()
       await expect(page.locator("html")).toHaveAttribute("data-hovered-node", hovered.id)
-      await expect(page.locator("#selected-heading")).toHaveText("Hovered project file")
+      await expect(page.locator("#selected-node-type")).toHaveText("Project file")
       await expect(page.locator("#selected-path")).toHaveText("src/hovered.ts")
       await expect(page.locator("#tooltip")).toHaveCount(0)
       await expect(graph).toHaveAttribute("data-rendered-dependency-focus-ring-count", "3")
@@ -1306,9 +1306,9 @@ function expectDirectoryLabelsNotToOverlap(labels: readonly DirectoryLabelDiagno
   }
 }
 
-function expectCenteredBelowNode(label: NodeLabelDiagnostic): void {
+function expectCenteredAboveNode(label: NodeLabelDiagnostic): void {
   expect((label.bounds.left + label.bounds.right) / 2).toBeCloseTo(label.nodeX, 5)
-  expect(label.bounds.top).toBeGreaterThan(label.nodeY + label.nodeSize)
+  expect(label.bounds.bottom).toBeLessThan(label.nodeY - label.nodeSize)
 }
 
 async function sampleDirectoryHoverPixels(

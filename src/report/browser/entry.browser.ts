@@ -923,7 +923,7 @@ function centeredNodeLabelGeometry(
   const text = context.measureText(label)
   const ascent = Math.max(text.actualBoundingBoxAscent, labelSize)
   const descent = Math.max(text.actualBoundingBoxDescent, 0)
-  const baseline = nodeY + nodeSize + LABEL_OFFSET + ascent
+  const baseline = nodeY - nodeSize - LABEL_OFFSET - descent
   return {
     textX: nodeX,
     baseline,
