@@ -41,8 +41,6 @@ declare global {
   }
 }
 
-const TOOLTIP_OFFSET = 14
-const VIEWPORT_MARGIN = 10
 const DIRECTORY_NODE_SIZE = 9
 const ROOT_DIRECTORY_NODE_SIZE = 15
 const STRUCTURE_EDGE_WEIGHT = 6
@@ -124,7 +122,6 @@ const presentation = buildBrowserPresentation(analysis)
 const graphContainer = requiredElement("graph")
 const projectName = requiredElement("project-name")
 const projectFileCount = requiredElement("project-file-count")
-const tooltip = requiredElement("tooltip")
 const selectedHeading = requiredElement("selected-heading")
 const selectedEmpty = requiredElement("selected-empty")
 const selectedDetails = requiredElement("selected-details")
@@ -309,7 +306,7 @@ fileSearch.addEventListener("input", () => {
   renderProjectFileList()
 })
 
-renderer.on("enterNode", ({ node, event }) => {
+renderer.on("enterNode", ({ node }) => {
   const attributes = graph.getNodeAttributes(node)
   if (attributes.nodeKind === "directory") {
     hoveredDirectoryNodeId = node
@@ -328,15 +325,9 @@ renderer.on("enterNode", ({ node, event }) => {
   hoveredNodeId = node
   dependencyFocus = reportNode.kind === "project-file" ? dependencyFocusFor(reportNode) : undefined
   updateDependencyFocusDiagnostics()
-  showTooltip(reportNode)
-  positionTooltip(event.x, event.y)
+  renderSelection()
   document.documentElement.dataset.hoveredNode = node
   refreshDependencyEdges()
-})
-renderer.on("moveBody", ({ event }) => {
-  if (hoveredNodeId !== undefined) {
-    positionTooltip(event.x, event.y)
-  }
 })
 renderer.on("leaveNode", clearHover)
 renderer.on("clickNode", ({ node }) => {
@@ -964,18 +955,26 @@ function renderSelection(): void {
     button.setAttribute("aria-current", button.dataset.nodeId === selectedNodeId ? "true" : "false")
   }
 
-  const node = selectedNodeId === undefined ? undefined : nodeById.get(selectedNodeId)
-  clearSelection.hidden = node === undefined
+  const selectedNode = selectedNodeId === undefined ? undefined : nodeById.get(selectedNodeId)
+  clearSelection.hidden = selectedNode === undefined
+  if (selectedNode === undefined) {
+    delete document.documentElement.dataset.selectedNode
+  } else {
+    document.documentElement.dataset.selectedNode = selectedNode.id
+  }
+
+  const nodeIdToDisplay = hoveredNodeId ?? selectedNodeId
+  const node = nodeIdToDisplay === undefined ? undefined : nodeById.get(nodeIdToDisplay)
   selectedEmpty.hidden = node !== undefined
   selectedDetails.hidden = node === undefined
   if (node === undefined) {
     selectedHeading.textContent = "Selected node"
-    delete document.documentElement.dataset.selectedNode
     return
   }
 
   const projectFile = node.kind === "project-file"
-  selectedHeading.textContent = projectFile ? "Selected project file" : "Selected external package"
+  const interaction = hoveredNodeId === undefined ? "Selected" : "Hovered"
+  selectedHeading.textContent = `${interaction} ${projectFile ? "project file" : "external package"}`
   selectedNodeType.textContent = projectFile ? "Project file" : "External package"
   selectedPath.textContent = node.displayName
   for (const element of projectFileDetailElements) {
@@ -990,7 +989,6 @@ function renderSelection(): void {
   selectedConsumers.textContent = String(consumerNodeIds.length)
   renderRelatedNodes(selectedDependencyNodes, dependencyNodeIds)
   renderRelatedNodes(selectedConsumerNodes, consumerNodeIds)
-  document.documentElement.dataset.selectedNode = node.id
 }
 
 function showProjectFileDetails(node: ReportProjectFileNode): void {
@@ -1113,35 +1111,6 @@ function renderCoverageLegend(): void {
   }
 }
 
-function showTooltip(node: ReportNode): void {
-  tooltip.replaceChildren()
-  const kind = document.createElement("span")
-  kind.className = "tooltip-node-kind"
-  kind.textContent = node.kind === "project-file" ? "Project file" : "External package"
-  const name = document.createElement("strong")
-  name.textContent = node.tooltipName
-  name.title = node.displayName
-  const dependencyNodeIds = visibleRelationships(node.dependencyNodeIds)
-  const consumerNodeIds = visibleRelationships(node.consumerNodeIds)
-  const metricElements = []
-  if (node.kind === "project-file") {
-    metricElements.push(
-      metric("Code", node.lineMetrics.code),
-      metric("Comments", node.lineMetrics.comment),
-      metric("Blank", node.lineMetrics.blank),
-    )
-  }
-  metricElements.push(metric("Dependencies", dependencyNodeIds.length), metric("Consumers", consumerNodeIds.length))
-  if (node.kind === "project-file") {
-    metricElements.push(metric("Coverage", coverageLabel(node.coverage)))
-  }
-  const metrics = document.createElement("div")
-  metrics.className = "tooltip-metrics"
-  metrics.append(...metricElements)
-  tooltip.append(kind, name, metrics)
-  tooltip.hidden = false
-}
-
 function visibleRelationships(nodeIds: readonly string[]): readonly string[] {
   // Relationship facts cover the complete presentation, but counts and navigation describe the current visible subgraph.
   return nodeIds.filter((nodeId) => visibleNodeIds.has(nodeId))
@@ -1153,12 +1122,12 @@ function clearHover(): void {
   hoveredNodeId = undefined
   hoveredDirectoryNodeId = undefined
   dependencyFocus = undefined
-  tooltip.hidden = true
   delete document.documentElement.dataset.hoveredNode
   delete graphContainer.dataset.hoveredDirectoryLabel
   delete graphContainer.dataset.directoryLabelHoverForeground
   delete graphContainer.dataset.directoryLabelHoverBackground
   updateDependencyFocusDiagnostics()
+  renderSelection()
   if (dependencyFocusChanged) {
     refreshDependencyEdges()
   }
@@ -1166,33 +1135,6 @@ function clearHover(): void {
     markGraphLabelVisibilityDirty()
     renderer.scheduleRender()
   }
-}
-
-function positionTooltip(pointerX: number, pointerY: number): void {
-  // Sigma reports pointer coordinates relative to its container while the fixed
-  // tooltip uses viewport coordinates. Convert before flipping and clamping.
-  const graphBounds = graphContainer.getBoundingClientRect()
-  const tooltipBounds = tooltip.getBoundingClientRect()
-  const pointerViewportX = graphBounds.left + pointerX
-  const pointerViewportY = graphBounds.top + pointerY
-  let left = pointerViewportX + TOOLTIP_OFFSET
-  if (left + tooltipBounds.width > window.innerWidth - VIEWPORT_MARGIN) {
-    left = pointerViewportX - tooltipBounds.width - TOOLTIP_OFFSET
-  }
-  let top = pointerViewportY + TOOLTIP_OFFSET
-  if (top + tooltipBounds.height > window.innerHeight - VIEWPORT_MARGIN) {
-    top = pointerViewportY - tooltipBounds.height - TOOLTIP_OFFSET
-  }
-  tooltip.style.left = `${Math.max(VIEWPORT_MARGIN, left)}px`
-  tooltip.style.top = `${Math.max(VIEWPORT_MARGIN, top)}px`
-}
-
-function metric(label: string, value: number | string): HTMLElement {
-  const container = document.createElement("div")
-  const number = document.createElement("span")
-  number.textContent = String(value)
-  container.append(number, label)
-  return container
 }
 
 function coverageLabel(coverage: number | undefined): string {

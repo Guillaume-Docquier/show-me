@@ -43,12 +43,11 @@ it("embeds the complete project analysis without presentation-only data", async 
     externalPackageDependencies: analysis.value.externalPackageDependencies,
     diagnostics: [{ code: "test-diagnostic", message: "Diagnostic detail", file: "src/entry.ts" }],
   })
-  expect(JSON.stringify(embeddedAnalysis)).not.toMatch(
-    /"(?:color|size|displayName|tooltipName|dependencyNodeIds|consumerNodeIds|nodes|edges|id)"/u,
-  )
+  expect(JSON.stringify(embeddedAnalysis)).not.toMatch(/"(?:color|size|displayName|dependencyNodeIds|consumerNodeIds|nodes|edges|id)"/u)
   expect(html).toContain("<!doctype html>")
   expect(html).toContain("<title>Show Me</title>")
   expect(html).toContain('<h1 id="project-name"></h1><p id="project-file-count"></p>')
+  expect(html).not.toContain('id="tooltip"')
   expect(html).toContain(browserBundle)
   expect(html).not.toContain('src="')
   expect(html).not.toMatch(/https?:\/\//u)

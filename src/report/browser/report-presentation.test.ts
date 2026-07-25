@@ -2,7 +2,7 @@ import { Result } from "@guillaume-docquier/tools-ts"
 import { expect, it } from "vitest"
 import type { ProjectAnalysis } from "../../analysis/project-analysis.js"
 import { ProjectFilePath } from "../../project-files/project-file-path.js"
-import { activeLineCount, buildBrowserPresentation, coverageColor, nodeSizeForLines, truncatePathFromStart } from "./report-presentation.js"
+import { activeLineCount, buildBrowserPresentation, coverageColor, nodeSizeForLines } from "./report-presentation.js"
 
 it.each([
   [0, 3],
@@ -116,18 +116,6 @@ it("derives deterministic identities, display data, and relationship indexes fro
       },
     ],
   })
-})
-
-it("truncates leading directories while preserving the complete filename", () => {
-  // Arrange
-  const longPath = "packages/application/src/features/accounts/components/account-configuration-panel.tsx"
-
-  // Act
-  const truncated = truncatePathFromStart(longPath, 38)
-
-  // Assert
-  expect(truncated.startsWith("...")).toBe(true)
-  expect(truncated.endsWith("account-configuration-panel.tsx")).toBe(true)
 })
 
 function parseProjectFilePath(input: string): ProjectFilePath {

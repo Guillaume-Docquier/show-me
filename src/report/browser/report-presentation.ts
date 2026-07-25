@@ -5,7 +5,6 @@ const DEFAULT_NODE_COLOR = "#8fa3b8"
 const UNCOVERED_NODE_COLOR = "#dc2626"
 const PARTIALLY_COVERED_NODE_COLOR = "#eab308"
 const COVERED_NODE_COLOR = "#16a34a"
-const PATH_TRUNCATION_PREFIX = "..."
 const EXTERNAL_PACKAGE_NODE_SIZE = 8
 const EXTERNAL_PACKAGE_NODE_COLOR = "#c084fc"
 
@@ -38,7 +37,6 @@ export type ReportNodeLineMetrics = {
 type ReportNodeBase = {
   readonly id: string
   readonly displayName: string
-  readonly tooltipName: string
   readonly dependencyNodeIds: readonly string[]
   readonly consumerNodeIds: readonly string[]
   readonly color: string
@@ -111,7 +109,6 @@ export function buildBrowserPresentation(analysis: ProjectAnalysis): BrowserPres
         id,
         kind: "project-file",
         displayName: file.path,
-        tooltipName: truncatePathFromStart(file.path),
         path: file.path,
         workspacePackage: file.workspacePackage,
         lineMetrics: file.lines,
@@ -128,7 +125,6 @@ export function buildBrowserPresentation(analysis: ProjectAnalysis): BrowserPres
         id,
         kind: "external-package",
         displayName: externalPackage.name,
-        tooltipName: externalPackage.name,
         packageName: externalPackage.name,
         dependencyNodeIds: [],
         consumerNodeIds: consumerNodeIdsByTarget.get(id) ?? [],
@@ -178,25 +174,6 @@ export function coverageColor(coverage: number | undefined): string {
     return interpolateColor(UNCOVERED_NODE_COLOR, PARTIALLY_COVERED_NODE_COLOR, boundedCoverage / 50)
   }
   return interpolateColor(PARTIALLY_COVERED_NODE_COLOR, COVERED_NODE_COLOR, (boundedCoverage - 50) / 50)
-}
-
-/**
- * Preserve a path's filename while truncating leading directories for a tooltip.
- *
- * @param path - Normalized project-relative path.
- * @param maximumLength - Preferred maximum character count.
- * @returns The original path or a tail-preserving truncated path.
- */
-export function truncatePathFromStart(path: string, maximumLength = 48): string {
-  if (path.length <= maximumLength) {
-    return path
-  }
-
-  const fileName = path.split("/").at(-1) ?? path
-  const minimumTail = `${PATH_TRUNCATION_PREFIX}/${fileName}`
-  return minimumTail.length >= maximumLength
-    ? minimumTail
-    : `${PATH_TRUNCATION_PREFIX}${path.slice(-(maximumLength - PATH_TRUNCATION_PREFIX.length))}`
 }
 
 function projectFileNodeId(path: string): string {

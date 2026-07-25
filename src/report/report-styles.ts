@@ -77,8 +77,8 @@ main {
 .report-controls h2 { margin: 0; padding-right: 18px; border-right: 1px solid #25303b; white-space: nowrap; }
 #details h3 { margin: 16px 0 7px; font-size: 11px; color: #8fa3b8; }
 #selected-empty { color: #6f8295; line-height: 1.5; }
-#selected-details[hidden], #tooltip[hidden], #external-package-section[hidden], [data-project-file-detail][hidden] { display: none; }
-.node-type, .tooltip-node-kind { color: #c9a7f5; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+#selected-details[hidden], #external-package-section[hidden], [data-project-file-detail][hidden] { display: none; }
+.node-type { color: #c9a7f5; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .node-type { margin-bottom: 6px; }
 .detail-path { overflow-wrap: anywhere; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; line-height: 1.45; }
 dl { display: grid; grid-template-columns: 1fr auto; gap: 7px 16px; margin: 16px 0 22px; font-size: 12px; }
@@ -101,15 +101,6 @@ dt { color: #8fa3b8; } dd { margin: 0; font-variant-numeric: tabular-nums; }
 .node-kind-label { display: block; margin-top: 2px; color: #c9a7f5; font: 9px ui-sans-serif, system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase; }
 .package-swatch { display: inline-block; width: 9px; height: 9px; margin-right: 6px; border: 2px solid #f0ddff; border-radius: 50%; background: #c084fc; }
 #external-package-section { margin-top: 20px; }
-#tooltip {
-  position: fixed; z-index: 10; pointer-events: none; width: min(360px, calc(100vw - 24px));
-  padding: 10px 12px; border: 1px solid #42556a; border-radius: 5px;
-  background: rgba(17, 24, 33, 0.96); box-shadow: 0 10px 35px rgba(0,0,0,.35); font-size: 11px;
-}
-#tooltip strong { display: block; margin-bottom: 7px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; overflow-wrap: anywhere; }
-.tooltip-node-kind { display: block; margin-bottom: 4px; }
-.tooltip-metrics { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 9px; color: #8fa3b8; }
-.tooltip-metrics span { display: block; color: #e7edf4; font-variant-numeric: tabular-nums; }
 .clear-selection {
   width: 100%; margin: 0 0 22px; border: 1px solid #42556a; border-radius: 5px; padding: 7px 9px;
   background: transparent; color: #aebdca; font: inherit; cursor: pointer;

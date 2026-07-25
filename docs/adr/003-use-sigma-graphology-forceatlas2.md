@@ -55,3 +55,9 @@ The browser renderer now owns all layout coordinates. The embedded analysis cont
 Sigma interprets node sizes relative to layout positions, matching the coordinate system used by ForceAtlas2's size adjustment. Barnes-Hut remains disabled for radius-aware exact repulsion. Sigma now fits the resulting Graphology extent directly; the removed shared layout module, collision padding, fixed random seed, and custom radius-aware bounding box described by the earlier amendments are no longer part of the implementation.
 
 The browser's one report-view transition remains the ownership boundary for line-category sizing, package visibility, selection and hover reconciliation, relationship filtering, and layout. This amendment supersedes the earlier amendments only where they describe the removed shared layout implementation.
+
+### 2026-07-25 hover-details amendment
+
+Node hover no longer creates a pointer-following tooltip. Instead, hover temporarily drives the existing right-hand node-details panel with the same complete information used for click selection. Leaving the node restores the persistently selected node or the empty details state, so hover never replaces click selection.
+
+This removes graph occlusion while keeping node information in accessible DOM content. It supersedes the original decision only where that decision required a constrained tooltip; Sigma, Graphology, the browser-owned interaction state, and the persistent selection side panel remain unchanged.

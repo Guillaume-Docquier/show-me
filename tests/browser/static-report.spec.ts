@@ -158,22 +158,35 @@ test("supports graph hover, selection, clearing, and side-panel navigation", asy
       const sourceDirectory = join(projectDirectory, "fixtures", "projects", "minimal-typescript", "src")
       await mkdir(sourceDirectory, { recursive: true })
       await writeFile(join(sourceDirectory, "index.ts"), "// comment\n\nexport const message = 'hello'\n\n", "utf8")
+      await mkdir(join(projectDirectory, "src"), { recursive: true })
+      await writeFile(join(projectDirectory, "src", "selected.ts"), "export const selected = true\n", "utf8")
       const analysis = await analyzeProject({ projectRoot: projectDirectory })
       Assert.isSuccess(analysis)
       const browserBundle = await readFile(join(process.cwd(), "dist", "report", "browser.js"), "utf8")
       const reportPath = join(temporaryDirectory, "show-me.html")
       await writeFile(reportPath, buildHtmlReport(analysis.value, browserBundle), "utf8")
-      return { reportPath, longPath, longPathNodeId: "project-file:" + longPath }
+      return {
+        reportPath,
+        longPath,
+        longPathNodeId: "project-file:" + longPath,
+        selectedPath: "src/selected.ts",
+        selectedNodeId: "project-file:src/selected.ts",
+      }
     })
 
-    const pointer = await test.step("Open the report and inspect browser-derived heading and tooltip content", async () => {
+    const pointer = await test.step("Preview complete node details on hover without replacing selection", async () => {
       await page.goto(pathToFileURL(report.reportPath).href)
       await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
       await expect(page).toHaveTitle("project · Show Me")
       await expect(page.locator("#project-name")).toHaveText("project")
-      await expect(page.locator("#project-file-count")).toHaveText("1 / 1 project file")
-      await expect(page.locator("#graph")).toHaveAttribute("data-visible-node-count", "1")
+      await expect(page.locator("#project-file-count")).toHaveText("2 / 2 project files")
+      await expect(page.locator("#graph")).toHaveAttribute("data-visible-node-count", "2")
       await expect(page.locator("#graph")).toHaveAttribute("data-visible-edge-count", "0")
+      const selectedFileButton = page.getByRole("button", { name: report.selectedPath })
+      await selectedFileButton.focus()
+      await selectedFileButton.press("Enter")
+      await expect(page.locator("html")).toHaveAttribute("data-selected-node", report.selectedNodeId)
+      await expect(page.locator("#selected-path")).toHaveText(report.selectedPath)
       await page.evaluate(async () => {
         await new Promise<void>((resolve) => {
           requestAnimationFrame(() => {
@@ -198,28 +211,25 @@ test("supports graph hover, selection, clearing, and side-panel navigation", asy
       const pointerY = bounds.y + nodePosition.y
       await page.mouse.move(pointerX, pointerY)
       await expect(page.locator("html")).toHaveAttribute("data-hovered-node", report.longPathNodeId)
-      const tooltip = page.locator("#tooltip")
-      await expect(tooltip).toBeVisible()
-      const tooltipPath = tooltip.locator("strong")
-      await expect(tooltipPath).toHaveText("...ures/projects/minimal-typescript/src/index.ts")
-      await expect(tooltip.locator(".tooltip-metrics")).toContainText("Code")
-      await expect(tooltip.locator(".tooltip-metrics")).toContainText("Comments")
-      await expect(tooltip.locator(".tooltip-metrics")).toContainText("Blank")
-      await expect(tooltip.locator(".tooltip-metrics")).toContainText("Coverage")
-      await expect(tooltip.locator(".tooltip-metrics")).toContainText("Not available")
-      expect(await tooltipPath.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
-      const tooltipBounds = await tooltip.boundingBox()
-      Assert.isDefined(tooltipBounds)
-      expect(
-        Math.min(Math.abs(tooltipBounds.x - (pointerX + 14)), Math.abs(tooltipBounds.x - (pointerX - tooltipBounds.width - 14))),
-      ).toBeLessThanOrEqual(1)
-      expect(
-        Math.min(Math.abs(tooltipBounds.y - (pointerY + 14)), Math.abs(tooltipBounds.y - (pointerY - tooltipBounds.height - 14))),
-      ).toBeLessThanOrEqual(1)
+      await expect(page.locator("html")).toHaveAttribute("data-selected-node", report.selectedNodeId)
+      await expect(page.locator("#selected-heading")).toHaveText("Hovered project file")
+      await expect(page.locator("#selected-path")).toHaveText(report.longPath)
+      await expect(page.locator("#selected-code-lines")).toHaveText("1")
+      await expect(page.locator("#selected-comment-lines")).toHaveText("1")
+      await expect(page.locator("#selected-blank-lines")).toHaveText("2")
+      await expect(page.locator("#selected-coverage")).toHaveText("Not available")
+      await expect(page.locator("#tooltip")).toHaveCount(0)
+
+      await page.mouse.move(bounds.x + 2, bounds.y + 2)
+      await expect(page.locator("html")).not.toHaveAttribute("data-hovered-node", report.longPathNodeId)
+      await expect(page.locator("#selected-heading")).toHaveText("Selected project file")
+      await expect(page.locator("#selected-path")).toHaveText(report.selectedPath)
       return { pointerX, pointerY }
     })
 
     await test.step("Select the file and rebuild every non-empty line-category view", async () => {
+      await page.mouse.move(pointer.pointerX, pointer.pointerY)
+      await expect(page.locator("html")).toHaveAttribute("data-hovered-node", report.longPathNodeId)
       await page.mouse.click(pointer.pointerX, pointer.pointerY)
       await expect(page.locator("html")).toHaveAttribute("data-selected-node", report.longPathNodeId)
       await expect(page.locator("#selected-path")).toHaveText(report.longPath)

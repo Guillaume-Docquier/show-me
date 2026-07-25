@@ -79,7 +79,7 @@ export function buildHtmlReport(analysis: ProjectAnalysis, browserBundle: string
   </section>
   <aside id="details" aria-label="Graph node details">
     <h2 id="selected-heading">Selected node</h2>
-    <p id="selected-empty">Select a node to inspect it.</p>
+    <p id="selected-empty">Hover over or select a node to inspect it.</p>
     <section id="selected-details" hidden>
       <div class="node-type" id="selected-node-type"></div>
       <div class="detail-path" id="selected-path"></div>
@@ -99,7 +99,6 @@ export function buildHtmlReport(analysis: ProjectAnalysis, browserBundle: string
     </section>
   </aside>
 </main>
-<div id="tooltip" role="tooltip" hidden></div>
 <script>window.showMeAnalysis=${serializedAnalysis};</script>
 <script>${escapeBrowserBundle(browserBundle)}</script>
 </body>

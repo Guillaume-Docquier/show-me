@@ -72,13 +72,13 @@ Sigma renders node size relative to layout positions so its radii use the same c
 
 An accessible checkbox group combines code, comment, and blank physical lines for node sizing. Code is selected by default. Every non-empty combination is valid; the only selected checkbox is disabled so the active metric cannot become empty.
 
-Changing the active categories recomputes node sizes and browser layout through one report-view state transition. Selection remains active across relayout. Returning to an earlier category combination rebuilds the same ordered layout inputs. Tooltips and the selected-file panel always show the complete three-category breakdown regardless of the sizing selection.
+Changing the active categories recomputes node sizes and browser layout through one report-view state transition. Selection remains active across relayout. Returning to an earlier category combination rebuilds the same ordered layout inputs. The node-details panel always shows the complete three-category breakdown regardless of the sizing selection.
 
 ## External-package control
 
 External-package nodes and their edges are hidden by default, so package facts do not perturb the initial file-only layout or relationship counts. An accessible unchecked control reveals the canonical package roots referenced by currently visible project files. The same report-view transition rebuilds and lays out the visible Graphology subgraph, combining package visibility with the active line categories and workspace-package filters.
 
-Package nodes use a fixed size and a distinct purple appearance. Color is not their only cue: the package list, tooltip, and selected-node panel all identify them as external packages. Package details show the project files that consume the package and never fabricate line metrics, coverage, or installed-package contents. Hiding packages clears package hover or selection while preserving a selected project file.
+Package nodes use a fixed size and a distinct purple appearance. Color is not their only cue: the package list and node-details panel identify them as external packages. Package details show the project files that consume the package and never fabricate line metrics, coverage, or installed-package contents. Hiding packages clears package hover or selection while preserving a selected project file.
 
 ## Workspace-package controls
 
@@ -88,7 +88,7 @@ Package filters compose with line-category sizing and external-package visibilit
 
 ## Hover and selection
 
-A hover tooltip follows the pointer with a small offset and flips or clamps at viewport edges. Project-file tooltips show a width-constrained, tail-preserving path plus the complete code, comment, and blank line breakdown, visible dependency count, consumer count, and coverage when available. Package tooltips show the canonical package root, explicit entity type, and visible relationships. A long file path truncates its beginning so the filename and nearest directories remain visible; CSS may wrap exceptionally long filenames but must not apply a second end-truncating ellipsis.
+Hovering a project file or external package temporarily shows that node's complete information in the right-hand details panel without changing click selection. Project-file details include the complete path, code, comment, and blank line breakdown, visible dependency count, consumer count, and coverage when available. Package details show the canonical package root, explicit entity type, and visible relationships. Moving the pointer away restores the selected node's details or the empty state when no node is selected. The graph does not render a pointer-following tooltip.
 
 Clicking a project file node selects and visually highlights only that node. Selection opens a side panel containing:
 
