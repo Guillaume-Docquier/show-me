@@ -12,6 +12,65 @@ import { withTemporaryDirectory } from "../../src/testing/temporary-directory.js
 
 const execFileAsync = promisify(execFile)
 
+test("keeps every report region usable together on a large desktop", async ({ page }) => {
+  await withTemporaryDirectory(async (temporaryDirectory) => {
+    const reportPath = await test.step("Generate a report with files, relationships, and graph controls", async () => {
+      const analysis = await analyzeProject({ projectRoot: fixtureProjectPath("external-packages") })
+      Assert.isSuccess(analysis)
+      const browserBundle = await readFile(join(process.cwd(), "dist", "report", "browser.js"), "utf8")
+      const path = join(temporaryDirectory, "desktop-shell.html")
+      await writeFile(path, buildHtmlReport(analysis.value, browserBundle), "utf8")
+      return path
+    })
+
+    await test.step("Open the four-region report shell at a large desktop viewport", async () => {
+      await page.setViewportSize({ width: 1920, height: 1080 })
+      await page.goto(pathToFileURL(reportPath).href)
+      await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
+
+      const files = page.locator("#files")
+      const graph = page.locator("#graph")
+      const details = page.locator("#details")
+      const controls = page.locator("#controls")
+      await expect(files).toBeVisible()
+      await expect(graph).toBeVisible()
+      await expect(details).toBeVisible()
+      await expect(controls).toBeVisible()
+
+      const filesBounds = await files.boundingBox()
+      const graphBounds = await graph.boundingBox()
+      const detailsBounds = await details.boundingBox()
+      const controlsBounds = await controls.boundingBox()
+      Assert.isDefined(filesBounds)
+      Assert.isDefined(graphBounds)
+      Assert.isDefined(detailsBounds)
+      Assert.isDefined(controlsBounds)
+      expect(filesBounds.x + filesBounds.width).toBeLessThanOrEqual(graphBounds.x)
+      expect(graphBounds.x + graphBounds.width).toBeLessThanOrEqual(detailsBounds.x)
+      expect(graphBounds.y + graphBounds.height).toBeLessThanOrEqual(controlsBounds.y)
+      expect(Math.abs(graphBounds.x - controlsBounds.x)).toBeLessThanOrEqual(1)
+      expect(Math.abs(graphBounds.width - controlsBounds.width)).toBeLessThanOrEqual(1)
+      expect(graphBounds.width).toBeGreaterThan(filesBounds.width + detailsBounds.width)
+    })
+
+    await test.step("Navigate files, inspect details, and change controls without losing the graph", async () => {
+      const graph = page.locator("#graph")
+      await expect(graph.locator("canvas.sigma-structure")).toBeVisible()
+      await page.locator("#files").getByRole("button", { name: "src/entry.ts", exact: true }).click()
+      await expect(page.locator("#selected-path")).toHaveText("src/entry.ts")
+
+      await page.locator("#controls").getByRole("checkbox", { name: "External packages" }).check()
+      await expect(page.locator("html")).toHaveAttribute("data-external-packages", "visible")
+      await expect(page.locator("#files #external-package-section")).toBeVisible()
+      await expect(page.locator("#details #selected-dependencies")).toHaveText("4")
+      await expect(graph).toHaveAttribute("data-visible-node-count", "6")
+      await expect(page.locator("#files")).toBeVisible()
+      await expect(page.locator("#details")).toBeVisible()
+      await expect(page.locator("#controls")).toBeVisible()
+    })
+  })
+})
+
 test("supports graph hover, selection, clearing, and side-panel navigation", async ({ page }) => {
   await withTemporaryDirectory(async (temporaryDirectory) => {
     const report = await test.step("Generate a raw-analysis report with a long project path", async () => {

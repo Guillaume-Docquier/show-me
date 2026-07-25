@@ -34,29 +34,40 @@ export function buildHtmlReport(analysis: ProjectAnalysis, browserBundle: string
 <body>
 <header>
   <div class="report-heading"><h1 id="project-name"></h1><p id="project-file-count"></p></div>
-  <div class="report-controls">
-    <fieldset id="line-category-controls">
-      <legend>Size nodes by</legend>
-      <label><input id="line-category-code" type="checkbox" value="code" checked>Code</label>
-      <label><input id="line-category-comment" type="checkbox" value="comment">Comments</label>
-      <label><input id="line-category-blank" type="checkbox" value="blank">Blank</label>
-    </fieldset>
-    <fieldset id="graph-content-controls">
-      <legend>Show</legend>
-      <label><input id="external-packages-toggle" type="checkbox">External packages</label>
-    </fieldset>
-    <fieldset id="workspace-package-fieldset" hidden>
-      <legend>Workspace packages</legend>
-      <span id="workspace-package-controls"></span>
-    </fieldset>
-    <div class="graph-key" aria-label="Graph edge types">
-      <span><i class="graph-edge-swatch structure-edge-swatch" aria-hidden="true"></i>Structure</span>
-      <span><i class="graph-edge-swatch dependency-edge-swatch" aria-hidden="true"></i>Dependency</span>
-    </div>
-  </div>
 </header>
 <main>
+  <aside id="files" aria-labelledby="files-heading">
+    <h2 id="files-heading">Project files</h2>
+    <ol id="file-list" class="file-list node-list"></ol>
+    <section id="external-package-section" hidden>
+      <h2><span class="package-swatch" aria-hidden="true"></span>External packages</h2>
+      <ol id="external-package-list" class="file-list node-list"></ol>
+    </section>
+  </aside>
   <section id="graph" aria-label="Project folder and file structure with dependency arrows"></section>
+  <section id="controls" class="report-controls" aria-labelledby="controls-heading">
+    <h2 id="controls-heading">Graph controls</h2>
+    <div class="report-control-groups">
+      <fieldset id="line-category-controls">
+        <legend>Size nodes by</legend>
+        <label><input id="line-category-code" type="checkbox" value="code" checked>Code</label>
+        <label><input id="line-category-comment" type="checkbox" value="comment">Comments</label>
+        <label><input id="line-category-blank" type="checkbox" value="blank">Blank</label>
+      </fieldset>
+      <fieldset id="graph-content-controls">
+        <legend>Show</legend>
+        <label><input id="external-packages-toggle" type="checkbox">External packages</label>
+      </fieldset>
+      <fieldset id="workspace-package-fieldset" hidden>
+        <legend>Workspace packages</legend>
+        <span id="workspace-package-controls"></span>
+      </fieldset>
+      <div class="graph-key" aria-label="Graph edge types">
+        <span><i class="graph-edge-swatch structure-edge-swatch" aria-hidden="true"></i>Structure</span>
+        <span><i class="graph-edge-swatch dependency-edge-swatch" aria-hidden="true"></i>Dependency</span>
+      </div>
+    </div>
+  </section>
   <aside id="details" aria-label="Graph node details">
     <h2 id="selected-heading">Selected node</h2>
     <p id="selected-empty">Select a node to inspect it.</p>
@@ -76,12 +87,6 @@ export function buildHtmlReport(analysis: ProjectAnalysis, browserBundle: string
       <ol id="selected-dependency-nodes" class="file-list relationship-list"></ol>
       <h3>Consumers</h3>
       <ol id="selected-consumer-files" class="file-list relationship-list"></ol>
-    </section>
-    <h2>Project files</h2>
-    <ol id="file-list" class="file-list node-list"></ol>
-    <section id="external-package-section" hidden>
-      <h2><span class="package-swatch" aria-hidden="true"></span>External packages</h2>
-      <ol id="external-package-list" class="file-list node-list"></ol>
     </section>
   </aside>
 </main>
