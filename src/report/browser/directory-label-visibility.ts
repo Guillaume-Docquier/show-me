@@ -1,5 +1,3 @@
-const FILE_LABEL_MAXIMUM_CAMERA_RATIO = 0.65
-
 /** One label rectangle measured in current viewport pixels. */
 export type ViewportLabelBounds = {
   readonly left: number
@@ -72,7 +70,12 @@ export function visibleDirectoryDepth(cameraRatio: number): number {
  * @returns Whether file labels may be rendered at this zoom.
  */
 export function fileLabelsAreVisible(cameraRatio: number): boolean {
-  return cameraRatio <= FILE_LABEL_MAXIMUM_CAMERA_RATIO
+  if (cameraRatio >= 0.3) {
+    // Zooming in twice goes to 0.34
+    return false
+  }
+
+  return true
 }
 
 /**

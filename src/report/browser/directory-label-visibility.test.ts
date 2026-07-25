@@ -23,10 +23,9 @@ describe("visibleDirectoryDepth", () => {
 
 describe("fileLabelsAreVisible", () => {
   it.each([
-    { cameraRatio: 1, expected: false },
-    { cameraRatio: 0.66, expected: false },
-    { cameraRatio: 0.65, expected: true },
-    { cameraRatio: 0.34, expected: true },
+    { cameraRatio: 0.34, expected: false }, // 2x zoom in
+    { cameraRatio: 0.2, expected: true }, // 3x zoom in
+    { cameraRatio: 0.11, expected: true }, // 4x zoom in
   ])("returns $expected at camera ratio $cameraRatio", ({ cameraRatio, expected }) => {
     expect(fileLabelsAreVisible(cameraRatio)).toBe(expected)
   })
