@@ -11,7 +11,7 @@ import { DirectedGraph } from "graphology"
 import { circular } from "graphology-layout"
 import forceAtlas2 from "graphology-layout-forceatlas2"
 import { Sigma } from "sigma"
-import { createEdgeArrowProgram, drawDiscNodeHover, type NodeHoverDrawingFunction } from "sigma/rendering"
+import { createEdgeArrowProgram, drawDiscNodeHover, type NodeHoverDrawingFunction, type NodeLabelDrawingFunction } from "sigma/rendering"
 import type { EdgeDisplayData, NodeDisplayData } from "sigma/types"
 import { type ProjectAnalysis } from "../../analysis/project-analysis.js"
 import {
@@ -49,6 +49,7 @@ const EXTERNAL_DEPENDENCY_EDGE_WEIGHT = 1.2
 const DEPENDENCY_EDGE_COLOR = "rgba(98, 139, 181, 0.32)"
 const EXTERNAL_DEPENDENCY_EDGE_COLOR = "rgba(154, 104, 193, 0.38)"
 const LABEL_FONT = "ui-monospace, SFMono-Regular, Consolas, monospace"
+const LABEL_COLOR = "#aebdca"
 const LABEL_SIZE = 11
 const LABEL_WEIGHT = "500"
 const LABEL_OFFSET = 3
@@ -78,6 +79,7 @@ type BrowserNodeAttributes = {
 }
 
 type BrowserNodeHoverDrawingFunction = NodeHoverDrawingFunction<BrowserNodeAttributes, BrowserEdgeAttributes>
+type BrowserNodeLabelDrawingFunction = NodeLabelDrawingFunction<BrowserNodeAttributes, BrowserEdgeAttributes>
 
 type BrowserEdgeAttributes = {
   readonly edgeKind: "structure" | "dependency"
@@ -204,7 +206,8 @@ const renderer = new Sigma<BrowserNodeAttributes, BrowserEdgeAttributes>(graph, 
     }
     return attributes
   },
-  labelColor: { color: "#aebdca" },
+  labelColor: { color: LABEL_COLOR },
+  defaultDrawNodeLabel: drawNodeLabel,
   defaultDrawNodeHover: drawNodeHover,
   labelFont: LABEL_FONT,
   labelRenderedSizeThreshold: 0,
@@ -565,14 +568,15 @@ function directoryLabelCandidates(maximumDepth: number): readonly DirectoryLabel
 
     const node = renderer.graphToViewport(attributes)
     const nodeSize = renderer.scaleSize(attributes.size)
-    const text = structureContext.measureText(attributes.label)
-    const baseline = node.y + LABEL_SIZE / 3
-    const bounds = {
-      left: node.x + nodeSize + LABEL_OFFSET - DIRECTORY_LABEL_COLLISION_PADDING,
-      top: baseline - Math.max(text.actualBoundingBoxAscent, LABEL_SIZE) - DIRECTORY_LABEL_COLLISION_PADDING,
-      right: node.x + nodeSize + LABEL_OFFSET + text.width + DIRECTORY_LABEL_COLLISION_PADDING,
-      bottom: baseline + Math.max(text.actualBoundingBoxDescent, 0) + DIRECTORY_LABEL_COLLISION_PADDING,
-    }
+    const { bounds } = centeredNodeLabelGeometry(
+      structureContext,
+      attributes.label,
+      node.x,
+      node.y,
+      nodeSize,
+      LABEL_SIZE,
+      DIRECTORY_LABEL_COLLISION_PADDING,
+    )
     if (bounds.right <= 0 || bounds.bottom <= 0 || bounds.left >= dimensions.width || bounds.top >= dimensions.height) {
       return
     }
@@ -602,6 +606,17 @@ function updateDirectoryLabelDiagnostics(candidateCount: number): void {
 function updateRenderedLabelDiagnostics(): void {
   const renderedFileLabels: string[] = []
   const renderedDirectoryLabels: string[] = []
+  const renderedNodeLabelRectangles: Array<{
+    readonly id: string
+    readonly label: string
+    readonly nodeKind: "project-file" | "directory"
+    readonly nodeX: number
+    readonly nodeY: number
+    readonly nodeSize: number
+    readonly bounds: { readonly left: number; readonly top: number; readonly right: number; readonly bottom: number }
+  }> = []
+  structureContext.save()
+  structureContext.font = `${LABEL_WEIGHT} ${LABEL_SIZE}px ${LABEL_FONT}`
   for (const id of renderer.getNodeDisplayedLabels()) {
     if (!graph.hasNode(id)) {
       continue
@@ -614,10 +629,27 @@ function updateRenderedLabelDiagnostics(): void {
       renderedFileLabels.push(attributes.label)
     } else if (attributes.nodeKind === "directory") {
       renderedDirectoryLabels.push(attributes.label)
+    } else {
+      continue
     }
+    const node = renderer.graphToViewport(attributes)
+    const nodeSize = renderer.scaleSize(attributes.size)
+    renderedNodeLabelRectangles.push({
+      id,
+      label: attributes.label,
+      nodeKind: attributes.nodeKind,
+      nodeX: node.x,
+      nodeY: node.y,
+      nodeSize,
+      bounds: centeredNodeLabelGeometry(structureContext, attributes.label, node.x, node.y, nodeSize, LABEL_SIZE, 0).bounds,
+    })
   }
+  structureContext.restore()
   graphContainer.dataset.renderedFileLabels = JSON.stringify(renderedFileLabels.toSorted())
   graphContainer.dataset.renderedDirectoryLabels = JSON.stringify(renderedDirectoryLabels.toSorted())
+  graphContainer.dataset.renderedNodeLabelRectangles = JSON.stringify(
+    renderedNodeLabelRectangles.toSorted((left, right) => left.id.localeCompare(right.id)),
+  )
 }
 
 function updateCameraDiagnostics(): void {
@@ -830,34 +862,88 @@ function drawNodeHover(
   data: Parameters<BrowserNodeHoverDrawingFunction>[1],
   settings: Parameters<BrowserNodeHoverDrawingFunction>[2],
 ): void {
-  if (typeof data.key !== "string" || !data.key.startsWith("directory:")) {
-    drawDiscNodeHover(context, data, settings)
+  context.save()
+  const isDirectory = typeof data.key === "string" && data.key.startsWith("directory:")
+  if (isDirectory) {
+    context.strokeStyle = DIRECTORY_LABEL_HOVER_FOREGROUND
+    context.lineWidth = 2
+    context.beginPath()
+    context.arc(data.x, data.y, data.size + 3, 0, Math.PI * 2)
+    context.stroke()
+  } else {
+    drawDiscNodeHover(context, { ...data, label: null }, settings)
+  }
+
+  if (typeof data.label === "string") {
+    context.font = `${settings.labelWeight} ${settings.labelSize}px ${settings.labelFont}`
+    context.textAlign = "center"
+    const geometry = centeredNodeLabelGeometry(
+      context,
+      data.label,
+      data.x,
+      data.y,
+      data.size,
+      settings.labelSize,
+      DIRECTORY_LABEL_COLLISION_PADDING,
+    )
+    context.fillStyle = isDirectory ? DIRECTORY_LABEL_HOVER_BACKGROUND : "#fff"
+    context.fillRect(
+      geometry.bounds.left,
+      geometry.bounds.top,
+      geometry.bounds.right - geometry.bounds.left,
+      geometry.bounds.bottom - geometry.bounds.top,
+    )
+    context.fillStyle = isDirectory ? DIRECTORY_LABEL_HOVER_FOREGROUND : LABEL_COLOR
+    context.fillText(data.label, geometry.textX, geometry.baseline)
+  }
+  context.restore()
+}
+
+function drawNodeLabel(
+  context: Parameters<BrowserNodeLabelDrawingFunction>[0],
+  data: Parameters<BrowserNodeLabelDrawingFunction>[1],
+  settings: Parameters<BrowserNodeLabelDrawingFunction>[2],
+): void {
+  if (data.label === null || data.label.length === 0) {
     return
   }
 
   context.save()
-  context.strokeStyle = DIRECTORY_LABEL_HOVER_FOREGROUND
-  context.lineWidth = 2
-  context.beginPath()
-  context.arc(data.x, data.y, data.size + 3, 0, Math.PI * 2)
-  context.stroke()
-
-  if (typeof data.label === "string") {
-    context.font = `${settings.labelWeight} ${settings.labelSize}px ${settings.labelFont}`
-    const labelX = data.x + data.size + LABEL_OFFSET
-    const labelBaseline = data.y + settings.labelSize / 3
-    const labelWidth = context.measureText(data.label).width
-    context.fillStyle = DIRECTORY_LABEL_HOVER_BACKGROUND
-    context.fillRect(
-      labelX - DIRECTORY_LABEL_COLLISION_PADDING,
-      labelBaseline - settings.labelSize - DIRECTORY_LABEL_COLLISION_PADDING,
-      labelWidth + DIRECTORY_LABEL_COLLISION_PADDING * 2,
-      settings.labelSize + DIRECTORY_LABEL_COLLISION_PADDING * 2,
-    )
-    context.fillStyle = DIRECTORY_LABEL_HOVER_FOREGROUND
-    context.fillText(data.label, labelX, labelBaseline)
-  }
+  context.fillStyle = LABEL_COLOR
+  context.font = `${settings.labelWeight} ${settings.labelSize}px ${settings.labelFont}`
+  context.textAlign = "center"
+  const geometry = centeredNodeLabelGeometry(context, data.label, data.x, data.y, data.size, settings.labelSize, 0)
+  context.fillText(data.label, geometry.textX, geometry.baseline)
   context.restore()
+}
+
+function centeredNodeLabelGeometry(
+  context: CanvasRenderingContext2D,
+  label: string,
+  nodeX: number,
+  nodeY: number,
+  nodeSize: number,
+  labelSize: number,
+  padding: number,
+): {
+  readonly textX: number
+  readonly baseline: number
+  readonly bounds: { readonly left: number; readonly top: number; readonly right: number; readonly bottom: number }
+} {
+  const text = context.measureText(label)
+  const ascent = Math.max(text.actualBoundingBoxAscent, labelSize)
+  const descent = Math.max(text.actualBoundingBoxDescent, 0)
+  const baseline = nodeY + nodeSize + LABEL_OFFSET + ascent
+  return {
+    textX: nodeX,
+    baseline,
+    bounds: {
+      left: nodeX - text.width / 2 - padding,
+      top: baseline - ascent - padding,
+      right: nodeX + text.width / 2 + padding,
+      bottom: baseline + descent + padding,
+    },
+  }
 }
 
 function requiredCanvasContext(canvas: HTMLCanvasElement): CanvasRenderingContext2D {

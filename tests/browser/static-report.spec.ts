@@ -544,7 +544,7 @@ test("uses weighted folder nodes as the primary force graph under dependency arr
       await expectStableGraph()
     })
 
-    await test.step("Reveal directory and project-file labels progressively while zooming", async () => {
+    await test.step("Reveal centered directory and project-file labels progressively while zooming", async () => {
       const graph = page.locator("#graph")
       await expect(graph).toHaveAttribute("data-visible-directory-label-depth", "1")
       await expect(graph).toHaveAttribute("data-visible-directory-labels", '["project","src"]')
@@ -577,6 +577,13 @@ test("uses weighted folder nodes as the primary force graph under dependency arr
       const labels = await readJsonAttribute<readonly DirectoryLabelDiagnostic[]>(graph, "data-visible-directory-label-rectangles")
       expect(labels.length).toBeGreaterThan(0)
       expectDirectoryLabelsNotToOverlap(labels)
+      const nodeLabels = await readJsonAttribute<readonly NodeLabelDiagnostic[]>(graph, "data-rendered-node-label-rectangles")
+      const fileLabel = nodeLabels.find(({ nodeKind }) => nodeKind === "project-file")
+      const directoryLabel = nodeLabels.find(({ nodeKind }) => nodeKind === "directory")
+      Assert.isDefined(fileLabel)
+      Assert.isDefined(directoryLabel)
+      expectCenteredBelowNode(fileLabel)
+      expectCenteredBelowNode(directoryLabel)
 
       await page.setViewportSize({ width: 1440, height: 900 })
       await expect(graph).toHaveAttribute("data-file-label-visibility", "visible")
@@ -1163,6 +1170,11 @@ type DirectoryLabelDiagnostic = {
   }
 }
 
+type NodeLabelDiagnostic = DirectoryLabelDiagnostic & {
+  readonly nodeKind: "project-file" | "directory"
+  readonly nodeSize: number
+}
+
 type CameraDiagnostic = {
   readonly x: number
   readonly y: number
@@ -1259,6 +1271,11 @@ function expectDirectoryLabelsNotToOverlap(labels: readonly DirectoryLabelDiagno
   }
 }
 
+function expectCenteredBelowNode(label: NodeLabelDiagnostic): void {
+  expect((label.bounds.left + label.bounds.right) / 2).toBeCloseTo(label.nodeX, 5)
+  expect(label.bounds.top).toBeGreaterThan(label.nodeY + label.nodeSize)
+}
+
 async function sampleDirectoryHoverPixels(
   graph: Locator,
   directoryLabel: DirectoryLabelDiagnostic,
@@ -1330,7 +1347,7 @@ async function sampleDirectoryHoverPixels(
       const right = Math.min(hoverCanvas.width, Math.ceil(label.bounds.right * hoverScaleX))
       const bottom = Math.min(hoverCanvas.height, Math.ceil(label.bounds.bottom * hoverScaleY))
       const plate = hoverContext.getImageData(left, top, Math.max(1, right - left), Math.max(1, bottom - top))
-      // Exclude the directory outline's rightmost pixel so foreground matches inside this region can only be label glyphs.
+      // Exclude the plate's left padding so foreground matches inside this region can only be label glyphs.
       const textLeft = Math.min(right - 1, Math.max(left, Math.floor((label.bounds.left + 5) * hoverScaleX)))
       const text = hoverContext.getImageData(textLeft, top, Math.max(1, right - textLeft), Math.max(1, bottom - top))
       const background = closestColor(plate, [17, 24, 33])
