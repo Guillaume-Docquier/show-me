@@ -7,6 +7,8 @@ export const DEPENDENCY_FOCUS_COLOR = "#46d7c6"
 export const CONSUMER_FOCUS_COLOR = "#ff9b71"
 
 const HOVERED_NODE_FOCUS_COLOR = "#f5f9ff"
+const STRUCTURE_EDGE_COLOR = "rgba(111, 130, 149, 0.68)"
+const DIMMED_STRUCTURE_EDGE_COLOR = "rgba(111, 130, 149, 0.38)"
 const FOCUS_RING_OFFSET = 5
 const FOCUS_RING_SEPARATION = 5
 const FOCUS_RING_WIDTH = 3
@@ -57,7 +59,7 @@ export class ReportGraphOverlays {
   }
 
   /** Draw or clear the project structure layer without changing graph inputs. */
-  public renderStructureLinks(edges: readonly ProjectStructureEdge[], visible: boolean): void {
+  public renderStructureLinks(edges: readonly ProjectStructureEdge[], visible: boolean, dimmed: boolean): void {
     this.#resizeCanvas(this.#structureLayer)
     const pixelRatio = this.#devicePixelRatio()
     this.#structureContext.setTransform(1, 0, 0, 1, 0, 0)
@@ -80,7 +82,7 @@ export class ReportGraphOverlays {
 
     this.#structureContext.setLineDash([2, 4])
     this.#structureContext.lineWidth = 2
-    this.#structureContext.strokeStyle = "rgba(111, 130, 149, 0.68)"
+    this.#structureContext.strokeStyle = dimmed ? DIMMED_STRUCTURE_EDGE_COLOR : STRUCTURE_EDGE_COLOR
     this.#structureContext.stroke()
     this.#structureContext.setLineDash([])
     this.#container.dataset.structureEdges = visible ? "visible" : "hidden"

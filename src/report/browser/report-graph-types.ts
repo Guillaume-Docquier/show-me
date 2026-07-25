@@ -14,6 +14,7 @@ export type BrowserNodeAttributes = {
 /** Graphology/Sigma-only edge attributes for layout and rendering. */
 export type BrowserEdgeAttributes = {
   readonly edgeKind: "structure" | "dependency"
+  readonly dependencyKind?: "project-file" | "external-package"
   readonly weight: number
   readonly color?: string
   readonly hidden?: boolean

@@ -21,6 +21,8 @@ const DEPENDENCY_EDGE_WEIGHT = 0.25
 const EXTERNAL_DEPENDENCY_EDGE_WEIGHT = 1.2
 const DEPENDENCY_EDGE_COLOR = "rgba(98, 139, 181, 0.32)"
 const EXTERNAL_DEPENDENCY_EDGE_COLOR = "rgba(154, 104, 193, 0.38)"
+const DIMMED_DEPENDENCY_EDGE_COLOR = "rgba(98, 139, 181, 0.18)"
+const DIMMED_EXTERNAL_DEPENDENCY_EDGE_COLOR = "rgba(154, 104, 193, 0.21)"
 const GRAPH_FIT_MARGIN = 1
 const DEPENDENCY_FOCUS_EDGE_SIZE = 4.4
 const CONSUMER_FOCUS_EDGE_SIZE = 5.2
@@ -149,6 +151,7 @@ export class ReportGraph {
       const externalPackage = edge.kind === "external-package"
       this.#graph.addDirectedEdgeWithKey(edge.id, edge.source, edge.target, {
         edgeKind: "dependency",
+        dependencyKind: edge.kind,
         type: "arrow",
         color: externalPackage ? EXTERNAL_DEPENDENCY_EDGE_COLOR : DEPENDENCY_EDGE_COLOR,
         size: externalPackage ? 2 : 2.4,
@@ -266,7 +269,7 @@ export class ReportGraph {
       this.#labelVisibility.markDirty()
     })
     this.#renderer.on("afterRender", () => {
-      this.#overlays.renderStructureLinks(this.#view?.structureEdges ?? [], this.#edgeVisibility.structureEdges)
+      this.#overlays.renderStructureLinks(this.#view?.structureEdges ?? [], this.#edgeVisibility.structureEdges, this.#hasDependencyFocus())
       this.#overlays.renderDependencyFocus(this.#dependencyFocus)
       this.#diagnostics.writeDependencyEdges(this.#dependencyEdgeIds(), this.#edgeVisibility.dependencyEdges)
       const labelRefreshScheduled = this.#labelVisibility.synchronizeAfterRender()
@@ -310,6 +313,12 @@ export class ReportGraph {
     }
     if (relationship === "consumer") {
       return { ...attributes, color: CONSUMER_FOCUS_COLOR, size: CONSUMER_FOCUS_EDGE_SIZE, zIndex: 1 }
+    }
+    if (this.#hasDependencyFocus()) {
+      return {
+        ...attributes,
+        color: attributes.dependencyKind === "external-package" ? DIMMED_EXTERNAL_DEPENDENCY_EDGE_COLOR : DIMMED_DEPENDENCY_EDGE_COLOR,
+      }
     }
     return attributes
   }
@@ -426,6 +435,10 @@ export class ReportGraph {
       dependencyNodeIds: new Set(visibleRelationships(view, node.dependencyNodeIds).filter((nodeId) => nodeId !== node.id)),
       consumerNodeIds: new Set(visibleRelationships(view, node.consumerNodeIds).filter((nodeId) => nodeId !== node.id)),
     }
+  }
+
+  #hasDependencyFocus(): boolean {
+    return this.#dependencyFocus !== undefined
   }
 
   #synchronizeDependencyFocus(): void {

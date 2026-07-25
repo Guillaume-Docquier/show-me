@@ -639,6 +639,7 @@ test("focuses only the hovered or selected file's direct dependency neighborhood
           "utf8",
         ),
         writeFile(join(sourceDirectory, "unrelated-target.ts"), 'export const unrelatedTarget = "unrelated"\n', "utf8"),
+        writeFile(join(sourceDirectory, "isolated.ts"), 'export const isolated = "isolated"\n', "utf8"),
       ])
       const analysis = await analyzeProject({ projectRoot: projectDirectory })
       Assert.isSuccess(analysis)
@@ -649,6 +650,7 @@ test("focuses only the hovered or selected file's direct dependency neighborhood
         ["src/transitive.ts", 25],
         ["src/unrelated-source.ts", 75],
         ["src/unrelated-target.ts", 10],
+        ["src/isolated.ts", 90],
       ])
       const analysisWithCoverage = {
         ...analysis.value,
@@ -686,6 +688,9 @@ test("focuses only the hovered or selected file's direct dependency neighborhood
       const graph = page.locator("#graph")
       const structureEdges = page.getByRole("checkbox", { name: "Structure edges" })
       const dependencyEdges = page.getByRole("checkbox", { name: "Dependency edges" })
+      const structureCanvas = graph.locator("canvas.sigma-structure")
+      await expect(graph).toHaveAttribute("data-rendered-structure-edge-count", /^[1-9]\d*$/u)
+      const normalStructureEdgeAlpha = await maximumCanvasAlpha(structureCanvas)
       await structureEdges.uncheck()
       await expect(graph).toHaveAttribute("data-rendered-structure-edge-count", "0")
 
@@ -740,14 +745,35 @@ test("focuses only the hovered or selected file's direct dependency neighborhood
       })
       expect(renderedEdgeById.get(report.edgeIds.transitive)).toEqual({
         id: report.edgeIds.transitive,
-        color: "rgba(98, 139, 181, 0.32)",
+        color: "rgba(98, 139, 181, 0.18)",
         size: 2.4,
       })
       expect(renderedEdgeById.get(report.edgeIds.unrelated)).toEqual({
         id: report.edgeIds.unrelated,
-        color: "rgba(98, 139, 181, 0.32)",
+        color: "rgba(98, 139, 181, 0.18)",
         size: 2.4,
       })
+
+      await structureEdges.evaluate((element) => {
+        if (!(element instanceof HTMLInputElement)) {
+          throw new Error("Structure edge control is not a checkbox.")
+        }
+        element.click()
+      })
+      await expect(structureEdges).toBeChecked()
+      await expect(page.locator("html")).toHaveAttribute("data-hovered-node", hovered.id)
+      await expect(graph).toHaveAttribute("data-rendered-structure-edge-count", /^[1-9]\d*$/u)
+      const dimmedStructureEdgeAlpha = await maximumCanvasAlpha(structureCanvas)
+      expect(dimmedStructureEdgeAlpha).toBeGreaterThan(0)
+      expect(dimmedStructureEdgeAlpha).toBeLessThan(normalStructureEdgeAlpha * 0.7)
+      await structureEdges.evaluate((element) => {
+        if (!(element instanceof HTMLInputElement)) {
+          throw new Error("Structure edge control is not a checkbox.")
+        }
+        element.click()
+      })
+      await expect(structureEdges).not.toBeChecked()
+      await expect(page.locator("html")).toHaveAttribute("data-hovered-node", hovered.id)
       const focusedScreenshot = await graph.screenshot()
 
       await dependencyEdges.evaluate((element) => {
@@ -802,6 +828,8 @@ test("focuses only the hovered or selected file's direct dependency neighborhood
       for (const edge of pixels.edges) {
         expect(edge.focusedToHiddenPixelCount, JSON.stringify(edge)).toBeGreaterThan(0)
       }
+      expect(pixels.edgeNoise.baselineNormalPixelCount).toBeGreaterThan(pixels.edgeNoise.focusedNormalPixelCount)
+      expect(pixels.edgeNoise.focusedDimmedPixelCount).toBeGreaterThan(0)
 
       await dependencyEdges.evaluate((element) => {
         if (!(element instanceof HTMLInputElement)) {
@@ -840,6 +868,38 @@ test("focuses only the hovered or selected file's direct dependency neighborhood
       await expect(page.locator("html")).toHaveAttribute("data-selected-node", hovered.id)
       expect(await readJsonAttribute<DependencyFocusDiagnostic>(graph, "data-dependency-focus")).toEqual(focus)
       await expect(graph).toHaveAttribute("data-rendered-dependency-focus-ring-count", "3")
+
+      const isolatedNodeId = "project-file:src/isolated.ts"
+      await page.locator(`#file-list button[data-node-id="${isolatedNodeId}"]`).hover()
+      await expect(page.locator("html")).toHaveAttribute("data-hovered-node", isolatedNodeId)
+      await expect(page.locator("html")).toHaveAttribute("data-selected-node", hovered.id)
+      expect(await readJsonAttribute<DependencyFocusDiagnostic>(graph, "data-dependency-focus")).toEqual({
+        nodeId: isolatedNodeId,
+        dependencyNodeIds: [],
+        consumerNodeIds: [],
+      })
+      await expect(graph).toHaveAttribute("data-rendered-dependency-focus-ring-count", "1")
+      const isolatedFocusEdges = await readJsonAttribute<readonly DependencyEdgeDiagnostic[]>(graph, "data-rendered-dependency-edges")
+      const isolatedFocusEdgeById = new Map(isolatedFocusEdges.map((edge) => [edge.id, edge]))
+      for (const edgeId of Object.values(report.edgeIds)) {
+        expect(isolatedFocusEdgeById.get(edgeId)).toEqual({
+          id: edgeId,
+          color: "rgba(98, 139, 181, 0.18)",
+          size: 2.4,
+        })
+      }
+      await structureEdges.evaluate((element) => {
+        if (!(element instanceof HTMLInputElement)) {
+          throw new Error("Structure edge control is not a checkbox.")
+        }
+        element.click()
+      })
+      await expect(structureEdges).toBeChecked()
+      await expect(page.locator("html")).toHaveAttribute("data-hovered-node", isolatedNodeId)
+      await expect(graph).toHaveAttribute("data-rendered-structure-edge-count", /^[1-9]\d*$/u)
+      const isolatedFocusStructureEdgeAlpha = await maximumCanvasAlpha(structureCanvas)
+      expect(isolatedFocusStructureEdgeAlpha).toBeGreaterThan(0)
+      expect(isolatedFocusStructureEdgeAlpha).toBeLessThan(normalStructureEdgeAlpha * 0.7)
     })
   })
 })
@@ -1253,6 +1313,11 @@ type DependencyFocusPixelDiagnostic = {
     readonly closestFocused: RgbDiagnostic
     readonly closestHidden: RgbDiagnostic
   }>
+  readonly edgeNoise: {
+    readonly baselineNormalPixelCount: number
+    readonly focusedNormalPixelCount: number
+    readonly focusedDimmedPixelCount: number
+  }
 }
 
 type DependencyEdgeDiagnostic = {
@@ -1292,6 +1357,24 @@ async function readJsonAttribute<T>(locator: Locator, attribute: string): Promis
   Assert.isDefined(serialized)
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- SAFETY: These diagnostics come from the real report; malformed data must fail the consuming assertion.
   return JSON.parse(serialized) as T
+}
+
+async function maximumCanvasAlpha(canvas: Locator): Promise<number> {
+  return await canvas.evaluate((element) => {
+    if (!(element instanceof HTMLCanvasElement)) {
+      throw new Error("Expected a canvas element.")
+    }
+    const context = element.getContext("2d", { willReadFrequently: true })
+    if (context === null) {
+      throw new Error("Canvas pixels are not readable.")
+    }
+    const pixels = context.getImageData(0, 0, element.width, element.height).data
+    let maximumAlpha = 0
+    for (let index = 3; index < pixels.length; index += 4) {
+      maximumAlpha = Math.max(maximumAlpha, pixels[index] ?? 0)
+    }
+    return maximumAlpha
+  })
 }
 
 function expectDirectoryLabelsNotToOverlap(labels: readonly DirectoryLabelDiagnostic[]): void {
@@ -1548,7 +1631,30 @@ async function sampleDependencyFocusPixels(
         }
         return { id: edge.id, focusedToHiddenPixelCount, closestFocused, closestHidden }
       })
-      return { nodes: nodeSamples, edges: edgeSamples }
+      const countPixelsNear = (context: CanvasRenderingContext2D, target: readonly [number, number, number]): number => {
+        const pixels = context.getImageData(0, 0, context.canvas.width, context.canvas.height).data
+        let count = 0
+        for (let index = 0; index < pixels.length; index += 4) {
+          const color = {
+            red: pixels[index] ?? 0,
+            green: pixels[index + 1] ?? 0,
+            blue: pixels[index + 2] ?? 0,
+            alpha: pixels[index + 3] ?? 0,
+          }
+          if (color.alpha === 255 && colorDistance(color, target) <= 4) {
+            count += 1
+          }
+        }
+        return count
+      }
+      const normalEdgeColor = [40, 56, 74] as const
+      const dimmedEdgeColor = [28, 39, 51] as const
+      const edgeNoise = {
+        baselineNormalPixelCount: countPixelsNear(baseline, normalEdgeColor),
+        focusedNormalPixelCount: countPixelsNear(focused, normalEdgeColor),
+        focusedDimmedPixelCount: countPixelsNear(focused, dimmedEdgeColor),
+      }
+      return { nodes: nodeSamples, edges: edgeSamples, edgeNoise }
     },
     {
       nodes,
