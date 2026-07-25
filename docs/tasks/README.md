@@ -4,12 +4,12 @@ This directory tracks milestones, implementation progress, verification evidence
 
 ## Roadmap
 
-| Milestone                                                                       | Status      | Outcome                                                                |
-| ------------------------------------------------------------------------------- | ----------- | ---------------------------------------------------------------------- |
-| [011 Large-codebase performance](./011-large-codebase-performance.md)           | Not started | Profile and optimize analysis and rendering for large projects.        |
-| [014 CLI file selection](./014-cli-file-selection.md)                           | Not started | Include default-excluded tests and add one-invocation ignore patterns. |
-| [015 Project configuration](./015-project-configuration.md)                     | Not started | Persist file-selection settings with explicit CLI precedence.          |
-| [020 Configurable coverage locations](./020-configurable-coverage-locations.md) | Not started | Configure per-package locations and multiple explicit reports.         |
+| Milestone                                                                       | Status      | Outcome                                                         |
+| ------------------------------------------------------------------------------- | ----------- | --------------------------------------------------------------- |
+| [011 Large-codebase performance](./011-large-codebase-performance.md)           | Not started | Profile and optimize analysis and rendering for large projects. |
+| [014 CLI file selection](./014-cli-file-selection.md)                           | Not started | Replace default test exclusions with one-invocation patterns.   |
+| [015 Project configuration](./015-project-configuration.md)                     | Not started | Persist file-selection settings with explicit CLI precedence.   |
+| [020 Configurable coverage locations](./020-configurable-coverage-locations.md) | Not started | Configure per-package locations and multiple explicit reports.  |
 
 ## Done
 
