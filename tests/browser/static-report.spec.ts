@@ -610,7 +610,7 @@ test("uses weighted folder nodes as the primary force graph under dependency arr
   })
 })
 
-test("focuses only the hovered file's direct dependency neighborhood", async ({ page }) => {
+test("focuses only the hovered or selected file's direct dependency neighborhood", async ({ page }) => {
   await withTemporaryDirectory(async (temporaryDirectory) => {
     const report = await test.step("Generate a real project with direct, transitive, and unrelated dependencies", async () => {
       const projectDirectory = join(temporaryDirectory, "dependency-neighborhood")
@@ -814,15 +814,14 @@ test("focuses only the hovered file's direct dependency neighborhood", async ({ 
       const restoredEdges = await readJsonAttribute<readonly DependencyEdgeDiagnostic[]>(graph, "data-rendered-dependency-edges")
       expect(restoredEdges).toEqual(renderedEdges)
 
+      await page.mouse.click(graphBounds.x + hovered.x, graphBounds.y + hovered.y)
+      await expect(page.locator("html")).toHaveAttribute("data-selected-node", hovered.id)
       await page.locator("header").hover()
       await expect(page.locator("html")).not.toHaveAttribute("data-hovered-node", hovered.id)
-      await expect(graph).not.toHaveAttribute("data-dependency-focus", /.+/u)
-      await expect(graph).toHaveAttribute("data-rendered-dependency-focus-ring-count", "0")
-      const clearedEdges = await readJsonAttribute<readonly DependencyEdgeDiagnostic[]>(graph, "data-rendered-dependency-edges")
-      const clearedEdgeById = new Map(clearedEdges.map((edge) => [edge.id, edge]))
-      for (const edgeId of Object.values(report.edgeIds)) {
-        expect(clearedEdgeById.get(edgeId)).toEqual({ id: edgeId, color: "rgba(98, 139, 181, 0.32)", size: 2.4 })
-      }
+      await expect(page.locator("html")).toHaveAttribute("data-selected-node", hovered.id)
+      expect(await readJsonAttribute<DependencyFocusDiagnostic>(graph, "data-dependency-focus")).toEqual(focus)
+      await expect(graph).toHaveAttribute("data-rendered-dependency-focus-ring-count", "3")
+      expect(await readJsonAttribute<readonly DependencyEdgeDiagnostic[]>(graph, "data-rendered-dependency-edges")).toEqual(renderedEdges)
 
       const cameraState = await graph.getAttribute("data-camera-state")
       Assert.isDefined(cameraState)
@@ -838,7 +837,9 @@ test("focuses only the hovered file's direct dependency neighborhood", async ({ 
 
       await page.locator("header").hover()
       await expect(page.locator("html")).not.toHaveAttribute("data-hovered-node", hovered.id)
-      await expect(graph).not.toHaveAttribute("data-dependency-focus", /.+/u)
+      await expect(page.locator("html")).toHaveAttribute("data-selected-node", hovered.id)
+      expect(await readJsonAttribute<DependencyFocusDiagnostic>(graph, "data-dependency-focus")).toEqual(focus)
+      await expect(graph).toHaveAttribute("data-rendered-dependency-focus-ring-count", "3")
     })
   })
 })

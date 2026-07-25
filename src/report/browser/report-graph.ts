@@ -176,12 +176,9 @@ export class ReportGraph {
       this.#interaction = { ...this.#interaction, selectedNodeId: undefined }
     }
     if (this.#interaction.hoveredNodeId !== undefined && !view.nodeIds.has(this.#interaction.hoveredNodeId)) {
-      this.clearHover()
-    } else if (this.#interaction.hoveredNodeId !== undefined) {
-      const hoveredNode = this.#nodeById.get(this.#interaction.hoveredNodeId)
-      this.#dependencyFocus = hoveredNode?.kind === "project-file" ? this.#dependencyFocusFor(hoveredNode) : undefined
-      this.#diagnostics.writeDependencyFocus(this.#dependencyFocus)
+      this.#interaction = { ...this.#interaction, hoveredNodeId: undefined }
     }
+    this.#synchronizeDependencyFocus()
     this.#updateViewDiagnostics()
     this.#emitInteraction()
     this.#renderer.refresh()
@@ -204,6 +201,7 @@ export class ReportGraph {
   public selectNode(nodeId: string | undefined): void {
     const visibleNodeId = nodeId === undefined || this.#graph.hasNode(nodeId) ? nodeId : undefined
     this.#interaction = { ...this.#interaction, selectedNodeId: visibleNodeId }
+    this.#synchronizeDependencyFocus()
     this.#emitInteraction()
     this.#renderer.refresh()
   }
@@ -215,21 +213,19 @@ export class ReportGraph {
       return
     }
     this.#interaction = { ...this.#interaction, hoveredNodeId: node.id }
-    this.#dependencyFocus = node.kind === "project-file" ? this.#dependencyFocusFor(node) : undefined
-    this.#diagnostics.writeDependencyFocus(this.#dependencyFocus)
+    this.#synchronizeDependencyFocus()
     this.#emitInteraction()
     this.#refreshDependencyEdges()
   }
 
   /** Clear node and directory hover effects. */
   public clearHover(): void {
-    const dependencyFocusChanged = this.#dependencyFocus !== undefined
+    const previousDependencyFocusNodeId = this.#dependencyFocus?.nodeId
     this.#interaction = { ...this.#interaction, hoveredNodeId: undefined }
-    this.#dependencyFocus = undefined
+    this.#synchronizeDependencyFocus()
     this.#labelVisibility.clearDirectoryHover()
-    this.#diagnostics.writeDependencyFocus(this.#dependencyFocus)
     this.#emitInteraction()
-    if (dependencyFocusChanged) {
+    if (previousDependencyFocusNodeId !== this.#dependencyFocus?.nodeId) {
       this.#refreshDependencyEdges()
     }
   }
@@ -430,6 +426,16 @@ export class ReportGraph {
       dependencyNodeIds: new Set(visibleRelationships(view, node.dependencyNodeIds).filter((nodeId) => nodeId !== node.id)),
       consumerNodeIds: new Set(visibleRelationships(view, node.consumerNodeIds).filter((nodeId) => nodeId !== node.id)),
     }
+  }
+
+  #synchronizeDependencyFocus(): void {
+    const focusedNodeId = this.#interaction.hoveredNodeId ?? this.#interaction.selectedNodeId
+    const focusedNode = focusedNodeId === undefined ? undefined : this.#nodeById.get(focusedNodeId)
+    this.#dependencyFocus =
+      focusedNode?.kind === "project-file" && this.#view?.nodeIds.has(focusedNode.id) === true
+        ? this.#dependencyFocusFor(focusedNode)
+        : undefined
+    this.#diagnostics.writeDependencyFocus(this.#dependencyFocus)
   }
 
   #refreshDependencyEdges(): void {
