@@ -119,12 +119,13 @@ test("navigates a collapsible and searchable project-files tree", async ({ page 
       await expect(page.locator("#file-list button[data-node-id]")).toHaveCount(report.fileCount)
     })
 
-    await test.step("Focus a hovered file's dependency neighborhood without moving the camera or replacing selection", async () => {
+    await test.step("Preview a hovered file without moving the camera, then center it when selected", async () => {
       const graph = page.locator("#graph")
       const mainFile = page.locator('#file-list button[data-node-id="project-file:src/main.ts"]')
       const runtimeFile = page.locator('#file-list button[data-node-id="project-file:src/runtime.ts"]')
       await mainFile.click()
       await expect(page.locator("html")).toHaveAttribute("data-selected-node", "project-file:src/main.ts")
+      await expect(graph).toHaveAttribute("data-camera-focused-node", "project-file:src/main.ts")
       const cameraState = await graph.getAttribute("data-camera-state")
       Assert.isDefined(cameraState)
 
@@ -132,14 +133,33 @@ test("navigates a collapsible and searchable project-files tree", async ({ page 
       await expect(page.locator("html")).toHaveAttribute("data-hovered-node", "project-file:src/runtime.ts")
       await expect(graph).toHaveAttribute("data-dependency-focus", /project-file:src\/runtime\.ts/u)
       await expect(graph).toHaveAttribute("data-rendered-dependency-focus-ring-count", "3")
-      await expect(page.locator("#tooltip")).toBeHidden()
-      await expect(graph).not.toHaveAttribute("data-camera-focused-node", /.+/u)
+      await expect(page.locator("#selected-heading")).toHaveText("Hovered project file")
+      await expect(page.locator("#selected-path")).toHaveText("src/runtime.ts")
+      await expect(page.locator("#tooltip")).toHaveCount(0)
+      await expect(graph).toHaveAttribute("data-camera-focused-node", "project-file:src/main.ts")
       await expect(graph).toHaveAttribute("data-camera-state", cameraState)
       await expect(page.locator("html")).toHaveAttribute("data-selected-node", "project-file:src/main.ts")
 
       await runtimeFile.click()
       await expect(page.locator("html")).toHaveAttribute("data-selected-node", "project-file:src/runtime.ts")
       await expect(runtimeFile).toHaveAttribute("aria-current", "true")
+      await expect(graph).toHaveAttribute("data-camera-focused-node", "project-file:src/runtime.ts")
+      const graphBounds = await graph.boundingBox()
+      const serializedPositions = await graph.getAttribute("data-visible-node-positions")
+      Assert.isDefined(graphBounds)
+      Assert.isDefined(serializedPositions)
+      const runtimePosition =
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- It's a test, malformed diagnostics must fail this browser assertion.
+        (JSON.parse(serializedPositions) as Array<{ readonly id: string; readonly x: number; readonly y: number }>).find(
+          ({ id }) => id === "project-file:src/runtime.ts",
+        )
+      Assert.isDefined(runtimePosition)
+      expect(Math.abs(runtimePosition.x - graphBounds.width / 2)).toBeLessThanOrEqual(2)
+      expect(Math.abs(runtimePosition.y - graphBounds.height / 2)).toBeLessThanOrEqual(2)
+
+      await page.locator("header").hover()
+      await expect(page.locator("#selected-heading")).toHaveText("Selected project file")
+      await expect(page.locator("#selected-path")).toHaveText("src/runtime.ts")
     })
   })
 })
@@ -193,6 +213,9 @@ test("supports graph hover, selection, clearing, and side-panel navigation", asy
         })
       })
       const graph = page.locator("#graph")
+      await expect(graph).toHaveAttribute("data-camera-focused-node", report.selectedNodeId)
+      await page.getByRole("button", { name: "Fit current graph" }).click()
+      await expect(graph).toHaveAttribute("data-camera-reset", "complete")
       const bounds = await graph.boundingBox()
       Assert.isDefined(bounds)
       const serializedNodePositions = await graph.getAttribute("data-visible-node-positions")
@@ -805,7 +828,9 @@ test("focuses only the hovered file's direct dependency neighborhood", async ({ 
       Assert.isDefined(cameraState)
       await page.locator('#file-list button[data-node-id="project-file:src/hovered.ts"]').hover()
       await expect(page.locator("html")).toHaveAttribute("data-hovered-node", hovered.id)
-      await expect(page.locator("#tooltip")).toBeHidden()
+      await expect(page.locator("#selected-heading")).toHaveText("Hovered project file")
+      await expect(page.locator("#selected-path")).toHaveText("src/hovered.ts")
+      await expect(page.locator("#tooltip")).toHaveCount(0)
       await expect(graph).toHaveAttribute("data-rendered-dependency-focus-ring-count", "3")
       await expect(graph).toHaveAttribute("data-camera-state", cameraState)
       expect(await readJsonAttribute<DependencyFocusDiagnostic>(graph, "data-dependency-focus")).toEqual(focus)

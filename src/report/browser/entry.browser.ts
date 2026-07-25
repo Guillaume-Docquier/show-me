@@ -324,7 +324,6 @@ renderer.on("enterNode", ({ node }) => {
     return
   }
   focusHoveredNode(reportNode)
-  renderSelection()
 })
 renderer.on("leaveNode", clearHover)
 renderer.on("clickNode", ({ node }) => {
@@ -1006,6 +1005,9 @@ function projectFileTreeFileItem(entry: ProjectFileTreeFile): HTMLLIElement {
     focusHoveredNode(node)
   })
   button.addEventListener("pointerleave", clearHover)
+  button.addEventListener("click", () => {
+    centerNodeInViewport(node.id)
+  })
   item.append(button)
   return item
 }
@@ -1128,6 +1130,18 @@ function nodeListButton(node: ReportNode, label: string): HTMLButtonElement {
   return button
 }
 
+function centerNodeInViewport(nodeId: string): void {
+  const node = renderer.getNodeDisplayData(nodeId)
+  if (node === undefined) {
+    return
+  }
+
+  delete graphContainer.dataset.cameraFocusedNode
+  camera.animate({ x: node.x, y: node.y }, { duration: 250 }, () => {
+    graphContainer.dataset.cameraFocusedNode = nodeId
+  })
+}
+
 function updateGraphNodeCircleDiagnostics(): void {
   graphContainer.dataset.visibleNodePositions = JSON.stringify(graphNodeCircles())
 }
@@ -1183,6 +1197,7 @@ function focusHoveredNode(node: ReportNode): void {
   dependencyFocus = node.kind === "project-file" ? dependencyFocusFor(node) : undefined
   document.documentElement.dataset.hoveredNode = node.id
   updateDependencyFocusDiagnostics()
+  renderSelection()
   refreshDependencyEdges()
 }
 
