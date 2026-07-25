@@ -549,7 +549,7 @@ test("keeps dense orientation labels collision-free and readable on directory ho
   })
 })
 
-test("derives covered, uncovered, partial, and missing-coverage colors in the browser", async ({ page }) => {
+test("explains project-file coverage colors and shows exact coverage in hover tooltips", async ({ page }) => {
   await withTemporaryDirectory(async (temporaryDirectory) => {
     const reportPath = await test.step("Generate a report containing all raw coverage states", async () => {
       const projectDirectory = join(temporaryDirectory, "project")
@@ -577,7 +577,7 @@ test("derives covered, uncovered, partial, and missing-coverage colors in the br
       return path
     })
 
-    await test.step("Open the report and inspect colors derived from embedded analysis", async () => {
+    await test.step("Open the report and inspect its coverage color mapping and legend", async () => {
       await page.goto(pathToFileURL(reportPath).href)
       await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
       const serializedColors = await page.locator("#graph").getAttribute("data-visible-node-colors")
@@ -588,10 +588,52 @@ test("derives covered, uncovered, partial, and missing-coverage colors in the br
         { id: "project-file:partial.ts", color: "#eab308" },
         { id: "project-file:uncovered.ts", color: "#dc2626" },
       ])
+      const legend = page.locator("#coverage-legend")
+      await expect(legend).toBeVisible()
+      await expect(legend).toContainText("Line coverage")
+      await expect(legend.locator('[data-coverage-legend-entry="uncovered"]')).toHaveText("0% uncovered")
+      await expect(legend.locator('[data-coverage-legend-entry="partial"]')).toHaveText("50% partially covered")
+      await expect(legend.locator('[data-coverage-legend-entry="covered"]')).toHaveText("100% covered")
+      await expect(legend.locator('[data-coverage-legend-entry="unavailable"]')).toHaveText("Not available")
       await page.locator("#file-list").getByRole("button", { name: "covered.ts", exact: true }).click()
       await expect(page.locator("#selected-coverage")).toHaveText("100%")
       await page.locator("#file-list").getByRole("button", { name: "missing.ts", exact: true }).click()
       await expect(page.locator("#selected-coverage")).toHaveText("Not available")
+    })
+
+    await test.step("Hover each project-file coverage state to inspect its exact value", async () => {
+      for (const { path, coverage } of [
+        { path: "covered.ts", coverage: "100%" },
+        { path: "partial.ts", coverage: "50%" },
+        { path: "uncovered.ts", coverage: "0%" },
+        { path: "missing.ts", coverage: "Not available" },
+      ]) {
+        await page.goto(pathToFileURL(reportPath).href)
+        await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
+        await page.evaluate(async () => {
+          await new Promise<void>((resolve) => {
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                resolve()
+              })
+            })
+          })
+        })
+        const graph = page.locator("#graph")
+        const graphBounds = await graph.boundingBox()
+        const serializedPositions = await graph.getAttribute("data-visible-node-positions")
+        Assert.isDefined(graphBounds)
+        Assert.isDefined(serializedPositions)
+        const positions =
+          // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- It's a test, malformed graph diagnostics must fail this browser assertion.
+          JSON.parse(serializedPositions) as Array<{ readonly id: string; readonly x: number; readonly y: number }>
+        const position = positions.find(({ id }) => id === `project-file:${path}`)
+        Assert.isDefined(position)
+        await page.mouse.move(graphBounds.x + position.x, graphBounds.y + position.y)
+        await expect(page.locator("html")).toHaveAttribute("data-hovered-node", `project-file:${path}`)
+        await expect(page.locator("#tooltip .tooltip-metrics")).toContainText("Coverage")
+        await expect(page.locator("#tooltip .tooltip-metrics")).toContainText(coverage)
+      }
     })
   })
 })

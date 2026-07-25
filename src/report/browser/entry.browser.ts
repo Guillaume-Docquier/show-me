@@ -25,6 +25,8 @@ import { buildProjectStructure, type ProjectStructureEdge } from "./project-stru
 import {
   activeLineCount,
   buildBrowserPresentation,
+  COVERAGE_LEGEND_ENTRIES,
+  coverageColor,
   nodeSizeForLines,
   REPORT_LINE_CATEGORIES,
   type ReportLineCategory,
@@ -106,6 +108,7 @@ const selectedDependencyNodes = requiredElement("selected-dependency-nodes")
 const selectedConsumerNodes = requiredElement("selected-consumer-files")
 const clearSelection = requiredElement("clear-selection")
 const resetCameraButton = requiredButton("reset-camera")
+const coverageLegend = requiredElement("coverage-legend")
 const fileSearch = requiredSearchInput("file-search")
 const fileTreeEmpty = requiredElement("file-tree-empty")
 const fileList = requiredElement("file-list")
@@ -121,6 +124,7 @@ const lineCategoryControls = REPORT_LINE_CATEGORIES.map((category) => ({
 const projectFileDetailElements = document.querySelectorAll<HTMLElement>("[data-project-file-detail]")
 document.title = `${presentation.projectName} · Show Me`
 projectName.textContent = presentation.projectName
+renderCoverageLegend()
 
 // This index covers the complete derived presentation. The Graphology graph and
 // visibleNodeIds below contain only the projection selected by the current view.
@@ -791,7 +795,7 @@ function showProjectFileDetails(node: ReportProjectFileNode): void {
   selectedCodeLines.textContent = String(node.lineMetrics.code)
   selectedCommentLines.textContent = String(node.lineMetrics.comment)
   selectedBlankLines.textContent = String(node.lineMetrics.blank)
-  selectedCoverage.textContent = node.coverage === undefined ? "Not available" : `${node.coverage}%`
+  selectedCoverage.textContent = coverageLabel(node.coverage)
 }
 
 function renderRelatedNodes(container: HTMLElement, relatedNodeIds: readonly string[]): void {
@@ -877,6 +881,36 @@ function graphNodeCircles(): readonly GraphNodeCircle[] {
   })
 }
 
+function renderCoverageLegend(): void {
+  coverageLegend.replaceChildren()
+  const title = document.createElement("span")
+  title.className = "coverage-legend-title"
+  title.textContent = "Line coverage"
+  const scale = document.createElement("span")
+  scale.className = "coverage-legend-scale"
+  const gradient = document.createElement("i")
+  gradient.className = "coverage-legend-gradient"
+  gradient.setAttribute("aria-hidden", "true")
+  const coverageGradientColors = COVERAGE_LEGEND_ENTRIES.filter(({ coverage }) => coverage !== undefined).map(({ coverage }) =>
+    coverageColor(coverage),
+  )
+  gradient.style.backgroundImage = `linear-gradient(to right, ${coverageGradientColors.join(", ")})`
+  scale.append(gradient)
+  coverageLegend.append(title, scale)
+
+  for (const entry of COVERAGE_LEGEND_ENTRIES) {
+    const label = document.createElement("span")
+    label.className = "coverage-legend-entry"
+    label.dataset.coverageLegendEntry = entry.id
+    const swatch = document.createElement("i")
+    swatch.className = "coverage-legend-swatch"
+    swatch.setAttribute("aria-hidden", "true")
+    swatch.style.backgroundColor = coverageColor(entry.coverage)
+    label.append(swatch, document.createTextNode(entry.label))
+    coverageLegend.append(label)
+  }
+}
+
 function showTooltip(node: ReportNode): void {
   tooltip.replaceChildren()
   const kind = document.createElement("span")
@@ -896,8 +930,8 @@ function showTooltip(node: ReportNode): void {
     )
   }
   metricElements.push(metric("Dependencies", dependencyNodeIds.length), metric("Consumers", consumerNodeIds.length))
-  if (node.kind === "project-file" && node.coverage !== undefined) {
-    metricElements.push(metric("Coverage", `${node.coverage}%`))
+  if (node.kind === "project-file") {
+    metricElements.push(metric("Coverage", coverageLabel(node.coverage)))
   }
   const metrics = document.createElement("div")
   metrics.className = "tooltip-metrics"
@@ -951,6 +985,10 @@ function metric(label: string, value: number | string): HTMLElement {
   number.textContent = String(value)
   container.append(number, label)
   return container
+}
+
+function coverageLabel(coverage: number | undefined): string {
+  return coverage === undefined ? "Not available" : `${coverage}%`
 }
 
 function selectedLineCategories(): readonly ReportLineCategory[] {

@@ -72,6 +72,7 @@ export function buildHtmlReport(analysis: ProjectAnalysis, browserBundle: string
         <span><i class="graph-edge-swatch structure-edge-swatch" aria-hidden="true"></i>Structure</span>
         <span><i class="graph-edge-swatch dependency-edge-swatch" aria-hidden="true"></i>Dependency</span>
       </div>
+      <div id="coverage-legend" class="coverage-legend" aria-label="Project-file coverage colors"></div>
     </div>
   </section>
   <aside id="details" aria-label="Graph node details">

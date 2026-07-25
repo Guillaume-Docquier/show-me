@@ -46,6 +46,13 @@ header p { margin: 0; color: #8fa3b8; font-size: 12px; }
 .graph-edge-swatch { display: inline-block; width: 18px; }
 .structure-edge-swatch { height: 0; border-top: 1px dashed #6f8295; }
 .dependency-edge-swatch { height: 2px; background: #628bb5; }
+.coverage-legend, .coverage-legend-scale, .coverage-legend-entry { display: flex; align-items: center; }
+.coverage-legend { gap: 8px; color: #8fa3b8; font-size: 11px; }
+.coverage-legend-title { color: #8fa3b8; }
+.coverage-legend-scale { gap: 5px; }
+.coverage-legend-gradient { display: inline-block; width: 48px; height: 7px; border-radius: 999px; }
+.coverage-legend-entry { gap: 4px; white-space: nowrap; }
+.coverage-legend-swatch { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
 main {
   min-height: 0; display: grid;
   grid-template-columns: clamp(260px, 18vw, 340px) minmax(0, 1fr) clamp(300px, 20vw, 380px);

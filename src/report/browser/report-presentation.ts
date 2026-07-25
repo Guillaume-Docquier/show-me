@@ -9,6 +9,19 @@ const PATH_TRUNCATION_PREFIX = "..."
 const EXTERNAL_PACKAGE_NODE_SIZE = 8
 const EXTERNAL_PACKAGE_NODE_COLOR = "#c084fc"
 
+/**
+ * Coverage states explained by the report legend.
+ *
+ * Their colors are derived through {@link coverageColor}, the same mapping used
+ * for project-file nodes.
+ */
+export const COVERAGE_LEGEND_ENTRIES = [
+  { id: "uncovered", coverage: 0, label: "0% uncovered" },
+  { id: "partial", coverage: 50, label: "50% partially covered" },
+  { id: "covered", coverage: 100, label: "100% covered" },
+  { id: "unavailable", coverage: undefined, label: "Not available" },
+] as const
+
 /** Line categories that report controls can combine for project-file sizing. */
 export const REPORT_LINE_CATEGORIES = ["code", "comment", "blank"] as const
 
