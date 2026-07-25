@@ -323,12 +323,8 @@ renderer.on("enterNode", ({ node }) => {
   if (reportNode === undefined) {
     return
   }
-  hoveredNodeId = node
-  dependencyFocus = reportNode.kind === "project-file" ? dependencyFocusFor(reportNode) : undefined
-  updateDependencyFocusDiagnostics()
+  focusHoveredNode(reportNode)
   renderSelection()
-  document.documentElement.dataset.hoveredNode = node
-  refreshDependencyEdges()
 })
 renderer.on("leaveNode", clearHover)
 renderer.on("clickNode", ({ node }) => {
@@ -1007,8 +1003,9 @@ function projectFileTreeFileItem(entry: ProjectFileTreeFile): HTMLLIElement {
   const button = nodeListButton(node, entry.name)
   button.setAttribute("aria-label", node.displayName)
   button.addEventListener("pointerenter", () => {
-    bringNodeIntoView(node.id)
+    focusHoveredNode(node)
   })
+  button.addEventListener("pointerleave", clearHover)
   item.append(button)
   return item
 }
@@ -1131,18 +1128,6 @@ function nodeListButton(node: ReportNode, label: string): HTMLButtonElement {
   return button
 }
 
-function bringNodeIntoView(nodeId: string): void {
-  const node = renderer.getNodeDisplayData(nodeId)
-  if (node === undefined) {
-    return
-  }
-
-  delete graphContainer.dataset.cameraFocusedNode
-  camera.animate({ x: node.x, y: node.y }, { duration: 250 }, () => {
-    graphContainer.dataset.cameraFocusedNode = nodeId
-  })
-}
-
 function updateGraphNodeCircleDiagnostics(): void {
   graphContainer.dataset.visibleNodePositions = JSON.stringify(graphNodeCircles())
 }
@@ -1191,6 +1176,14 @@ function renderCoverageLegend(): void {
 function visibleRelationships(nodeIds: readonly string[]): readonly string[] {
   // Relationship facts cover the complete presentation, but counts and navigation describe the current visible subgraph.
   return nodeIds.filter((nodeId) => visibleNodeIds.has(nodeId))
+}
+
+function focusHoveredNode(node: ReportNode): void {
+  hoveredNodeId = node.id
+  dependencyFocus = node.kind === "project-file" ? dependencyFocusFor(node) : undefined
+  document.documentElement.dataset.hoveredNode = node.id
+  updateDependencyFocusDiagnostics()
+  refreshDependencyEdges()
 }
 
 function clearHover(): void {
