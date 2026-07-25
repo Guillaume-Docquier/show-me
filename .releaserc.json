@@ -1,0 +1,41 @@
+{
+  "tagFormat": "${version}",
+  "plugins": [
+    [
+      "@semantic-release/commit-analyzer",
+      {
+        "preset": "conventionalcommits",
+        "releaseRules": [{ "breaking": true, "release": "major" }, { "type": "feat", "release": "minor" }, { "release": "patch" }]
+      }
+    ],
+    "@semantic-release/github",
+    [
+      "@semantic-release/exec",
+      {
+        "prepareCmd": "pnpm version ${nextRelease.version} --git-tag-version=false",
+        "publishCmd": "pnpm publish --no-git-checks"
+      }
+    ],
+    [
+      "@semantic-release/release-notes-generator",
+      {
+        "preset": "conventionalcommits",
+        "presetConfig": {
+          "types": [
+            { "type": "feat", "section": "✨ Features", "hidden": false },
+            { "type": "fix", "section": "🐛 Bug Fixes", "hidden": false },
+            { "type": "docs", "section": "🛠️ Misc", "hidden": false },
+            { "type": "style", "section": "🛠️ Misc", "hidden": false },
+            { "type": "refactor", "section": "🛠️ Misc", "hidden": false },
+            { "type": "perf", "section": "🛠️ Misc", "hidden": false },
+            { "type": "test", "section": "🛠️ Misc", "hidden": false },
+            { "type": "build", "section": "🛠️ Misc", "hidden": false },
+            { "type": "ci", "section": "🛠️ Misc", "hidden": false },
+            { "type": "chore", "section": "🛠️ Misc", "hidden": false },
+            { "type": "revert", "section": "🛠️ Misc", "hidden": false }
+          ]
+        }
+      }
+    ]
+  ]
+}

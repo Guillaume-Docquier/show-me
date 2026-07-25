@@ -77,6 +77,31 @@ jobs:
         with:
           path: _site
 
+  publish:
+    needs: ci
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      packages: write
+      id-token: write
+    steps:
+      - name: Checkout ${{ github.head_ref || github.ref_name }}
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+
+      - name: Install dependencies
+        run: pnpm ci
+
+      - name: Release
+        run: pnpm semantic-release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
   deploy-pages:
     needs: ci
     runs-on: ubuntu-latest

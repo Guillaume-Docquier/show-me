@@ -1,0 +1,11 @@
+#!/usr/bin/env sh
+
+MESSAGE="$(cat $1)"
+
+CONVENTIONAL_COMMIT_REGEX="^((Merge[ a-z-]* branch.*)|(Revert*)|((feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.*\))?!?: .*))"
+
+if ! [[ $MESSAGE =~ $CONVENTIONAL_COMMIT_REGEX ]]; then
+	echo -e "\n❌ Commit should start with feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert:, e.g: fix: fixed some stuff"
+	echo "message=$MESSAGE"
+	exit 1
+fi
