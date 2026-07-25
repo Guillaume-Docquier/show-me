@@ -6,6 +6,25 @@ Show me is a codebase visualization tool.
 
 The initial JavaScript and TypeScript analysis pipeline and self-contained interactive report are operational. The CLI discovers project files, analyzes static runtime ESM dependencies, optionally imports Istanbul coverage, and publishes the latest validated report through GitHub Pages. See `docs/tasks/README.md` for implemented and planned milestones.
 
+## README maintenance
+
+`README.md` is the user-facing documentation for the published tool. Keep it aligned with current production behavior whenever a change affects installation, commands, CLI options, configuration, defaults, supported inputs, coverage handling, generated output, report controls, or other user-visible behavior. Update the screenshot when the report changes materially.
+
+The README should contain:
+
+- a short, high-level description of the tool and its output;
+- a current screenshot and a link to the [live GitHub Pages report](https://guillaume-docquier.github.io/show-me/) generated from this codebase;
+- installation and everyday usage examples;
+- every public CLI argument and option, with examples and default values;
+- every project configuration option, with its type, default value, precedence, and an example;
+- the user-visible report capabilities and important limitations;
+- an invitation to suggest improvements or features and a link to contribution guidance;
+- the AI disclosure.
+
+Verify commands, option names, configuration fields, defaults, and examples against the current code before editing the README. Keep architecture details, implementation plans, test guidance, and agent instructions in `docs/` or `AGENTS.md` instead of duplicating them in the README.
+
+Write for tool users in plain language. Be concise, direct, and human. Prefer short paragraphs, practical examples, and tables when they make options or defaults easier to scan. Avoid em dashes, marketing language, filler, and superfluous expressions. Use `Show Me` for the product name and exact lowercase commands and package names in code spans.
+
 ## Project Structure
 
 This is a TypeScript repository managed via pnpm.
