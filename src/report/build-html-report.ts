@@ -78,7 +78,6 @@ export function buildHtmlReport(analysis: ProjectAnalysis, browserBundle: string
     </div>
   </section>
   <aside id="details" aria-label="Graph node details">
-    <h2 id="selected-heading">Selected node</h2>
     <p id="selected-empty">Hover over or select a node to inspect it.</p>
     <section id="selected-details" hidden>
       <div class="node-type" id="selected-node-type"></div>
@@ -91,7 +90,6 @@ export function buildHtmlReport(analysis: ProjectAnalysis, browserBundle: string
         <dt>Consumers</dt><dd id="selected-consumers"></dd>
         <dt data-project-file-detail>Coverage</dt><dd id="selected-coverage" data-project-file-detail></dd>
       </dl>
-      <button id="clear-selection" class="clear-selection" type="button" hidden>Clear selection</button>
       <h3>Dependencies</h3>
       <ol id="selected-dependency-nodes" class="file-list relationship-list"></ol>
       <h3>Consumers</h3>

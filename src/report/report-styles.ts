@@ -62,7 +62,7 @@ main {
 #files { grid-area: files; border-right: 1px solid #25303b; background: #111821; overflow: auto; padding: 18px; }
 #graph { grid-area: graph; position: relative; min-width: 0; background: #0d1117; }
 #details { grid-area: details; border-left: 1px solid #25303b; background: #111821; overflow: auto; padding: 18px; }
-#files h2, #details h2, .report-controls h2 {
+#files h2, .report-controls h2 {
   margin: 0 0 12px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: #8fa3b8;
 }
 .file-search { display: grid; gap: 6px; margin-bottom: 14px; color: #8fa3b8; font-size: 11px; }
@@ -101,10 +101,4 @@ dt { color: #8fa3b8; } dd { margin: 0; font-variant-numeric: tabular-nums; }
 .node-kind-label { display: block; margin-top: 2px; color: #c9a7f5; font: 9px ui-sans-serif, system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase; }
 .package-swatch { display: inline-block; width: 9px; height: 9px; margin-right: 6px; border: 2px solid #f0ddff; border-radius: 50%; background: #c084fc; }
 #external-package-section { margin-top: 20px; }
-.clear-selection {
-  width: 100%; margin: 0 0 22px; border: 1px solid #42556a; border-radius: 5px; padding: 7px 9px;
-  background: transparent; color: #aebdca; font: inherit; cursor: pointer;
-}
-.clear-selection:hover, .clear-selection:focus-visible { background: #18222d; color: #f5f9ff; outline: none; }
-.clear-selection[hidden] { display: none; }
 `

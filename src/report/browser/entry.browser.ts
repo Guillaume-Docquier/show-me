@@ -124,7 +124,6 @@ const presentation = buildBrowserPresentation(analysis)
 const graphContainer = requiredElement("graph")
 const projectName = requiredElement("project-name")
 const projectFileCount = requiredElement("project-file-count")
-const selectedHeading = requiredElement("selected-heading")
 const selectedEmpty = requiredElement("selected-empty")
 const selectedDetails = requiredElement("selected-details")
 const selectedNodeType = requiredElement("selected-node-type")
@@ -137,7 +136,6 @@ const selectedConsumers = requiredElement("selected-consumers")
 const selectedCoverage = requiredElement("selected-coverage")
 const selectedDependencyNodes = requiredElement("selected-dependency-nodes")
 const selectedConsumerNodes = requiredElement("selected-consumer-files")
-const clearSelection = requiredElement("clear-selection")
 const resetCameraButton = requiredButton("reset-camera")
 const coverageLegend = requiredElement("coverage-legend")
 const fileSearch = requiredSearchInput("file-search")
@@ -337,9 +335,6 @@ renderer.on("clickNode", ({ node }) => {
   selectNode(node)
 })
 renderer.on("clickStage", () => {
-  selectNode(undefined)
-})
-clearSelection.addEventListener("click", () => {
   selectNode(undefined)
 })
 resetCameraButton.addEventListener("click", () => {
@@ -1042,7 +1037,6 @@ function renderSelection(): void {
   }
 
   const selectedNode = selectedNodeId === undefined ? undefined : nodeById.get(selectedNodeId)
-  clearSelection.hidden = selectedNode === undefined
   if (selectedNode === undefined) {
     delete document.documentElement.dataset.selectedNode
   } else {
@@ -1054,13 +1048,10 @@ function renderSelection(): void {
   selectedEmpty.hidden = node !== undefined
   selectedDetails.hidden = node === undefined
   if (node === undefined) {
-    selectedHeading.textContent = "Selected node"
     return
   }
 
   const projectFile = node.kind === "project-file"
-  const interaction = hoveredNodeId === undefined ? "Selected" : "Hovered"
-  selectedHeading.textContent = `${interaction} ${projectFile ? "project file" : "external package"}`
   selectedNodeType.textContent = projectFile ? "Project file" : "External package"
   selectedPath.textContent = node.displayName
   for (const element of projectFileDetailElements) {

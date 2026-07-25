@@ -182,6 +182,8 @@ test("supports graph hover, selection, clearing, and side-panel navigation", asy
       await expect(page.locator("#project-file-count")).toHaveText("2 / 2 project files")
       await expect(page.locator("#graph")).toHaveAttribute("data-visible-node-count", "2")
       await expect(page.locator("#graph")).toHaveAttribute("data-visible-edge-count", "0")
+      await expect(page.locator("#details h2")).toHaveCount(0)
+      await expect(page.getByRole("button", { name: "Clear selection" })).toHaveCount(0)
       const selectedFileButton = page.getByRole("button", { name: report.selectedPath })
       await selectedFileButton.focus()
       await selectedFileButton.press("Enter")
@@ -212,7 +214,6 @@ test("supports graph hover, selection, clearing, and side-panel navigation", asy
       await page.mouse.move(pointerX, pointerY)
       await expect(page.locator("html")).toHaveAttribute("data-hovered-node", report.longPathNodeId)
       await expect(page.locator("html")).toHaveAttribute("data-selected-node", report.selectedNodeId)
-      await expect(page.locator("#selected-heading")).toHaveText("Hovered project file")
       await expect(page.locator("#selected-path")).toHaveText(report.longPath)
       await expect(page.locator("#selected-code-lines")).toHaveText("1")
       await expect(page.locator("#selected-comment-lines")).toHaveText("1")
@@ -222,7 +223,6 @@ test("supports graph hover, selection, clearing, and side-panel navigation", asy
 
       await page.mouse.move(bounds.x + 2, bounds.y + 2)
       await expect(page.locator("html")).not.toHaveAttribute("data-hovered-node", report.longPathNodeId)
-      await expect(page.locator("#selected-heading")).toHaveText("Selected project file")
       await expect(page.locator("#selected-path")).toHaveText(report.selectedPath)
       return { pointerX, pointerY }
     })
@@ -282,8 +282,8 @@ test("supports graph hover, selection, clearing, and side-panel navigation", asy
       await expect(codeControl).toBeDisabled()
     })
 
-    await test.step("Clear selection and navigate back through the accessible file list", async () => {
-      await page.getByRole("button", { name: "Clear selection" }).click()
+    await test.step("Clear selection through the canvas and navigate back through the accessible file list", async () => {
+      await page.locator("#graph").click({ position: { x: 2, y: 2 } })
       await expect(page.locator("html")).not.toHaveAttribute("data-selected-node", /.+/u)
       await page.getByRole("button", { name: report.longPath }).click()
       await expect(page.locator("html")).toHaveAttribute("data-selected-node", report.longPathNodeId)
@@ -352,7 +352,6 @@ test("keeps packages hidden by default and rebuilds one combined metric and pack
       const reactPackage = page.locator("#external-package-list button").filter({ hasText: "react" })
       await reactPackage.click()
       await expect(page.locator("html")).toHaveAttribute("data-selected-node", "external-package:react")
-      await expect(page.locator("#selected-heading")).toHaveText("Selected external package")
       await expect(page.locator("#selected-node-type")).toHaveText("External package")
       await expect(page.locator("#selected-path")).toHaveText("react")
       await expect(page.locator("#selected-consumers")).toHaveText("2")
