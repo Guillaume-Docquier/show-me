@@ -12,6 +12,7 @@ This directory tracks milestones, implementation progress, verification evidence
 | [014 CLI file selection](./014-cli-file-selection.md)                           | Not started | Include default-excluded tests and add one-invocation ignore patterns. |
 | [015 Project configuration](./015-project-configuration.md)                     | Not started | Persist file-selection settings with explicit CLI precedence.          |
 | [020 Configurable coverage locations](./020-configurable-coverage-locations.md) | Not started | Configure per-package locations and multiple explicit reports.         |
+| [021 Type-only dependencies](./021-type-only-dependencies.md)                   | Not started | Track, distinguish, and filter explicitly type-only dependencies.      |
 
 ## Done
 
