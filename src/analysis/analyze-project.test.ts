@@ -2,6 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { Result } from "@guillaume-docquier/tools-ts"
 import { expect, it } from "vitest"
+import { ProjectFileSelection } from "../project-files/project-file-selection.js"
 import { fixtureProjectPath } from "../testing/fixture-project.js"
 import { withTemporaryDirectory } from "../testing/temporary-directory.js"
 import { analyzeProject } from "./analyze-project.js"
@@ -199,7 +200,12 @@ it("includes test files through the typed selection seam and reports malformed s
   const projectRoot = fixtureProjectPath("test-file-exclusions")
 
   // Act
-  const result = await analyzeProject({ projectRoot, fileSelection: { testFiles: "include" } })
+  const fileSelection = ProjectFileSelection.parse([])
+  if (Result.isFailure(fileSelection)) {
+    throw new Error("The empty test selection should be valid.")
+  }
+
+  const result = await analyzeProject({ projectRoot, fileSelection: fileSelection.value })
 
   // Assert
   expect(Result.isSuccess(result)).toBe(true)

@@ -33,10 +33,11 @@ export type RunCliOptions = {
 const HELP = `Usage: show-me [project-path] [options]
 
 Options:
-  --output <path>    Write the report to this path
-  --coverage <path>  Read one explicit Istanbul or LCOV report
-  -h, --help         Show this help
-  -v, --version      Show the version
+  --output <path>      Write the report to this path
+  --coverage <path>    Read one explicit Istanbul or LCOV report
+  --exclude <pattern>  Replace built-in exclusions; repeat for more patterns
+  -h, --help           Show this help
+  -v, --version        Show the version
 `
 
 /**
@@ -69,6 +70,7 @@ export async function runCli(arguments_: readonly string[], output: CliOutput, o
   const projectRoot = resolve(currentDirectory, command.value.projectPath)
   const analysis = await analyzeProject({
     projectRoot,
+    fileSelection: command.value.fileSelection,
     ...(options.performanceProfiler === undefined ? {} : { performanceProfiler: options.performanceProfiler }),
   })
 

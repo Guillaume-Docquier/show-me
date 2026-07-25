@@ -1,5 +1,6 @@
 import { Result } from "@guillaume-docquier/tools-ts"
 import { expect, it } from "vitest"
+import { DEFAULT_PROJECT_FILE_SELECTION } from "../project-files/project-file-selection.js"
 import { parseCliArguments } from "./parse-cli-arguments.js"
 
 it("uses the current directory when the project path is omitted", () => {
@@ -13,6 +14,7 @@ it("uses the current directory when the project path is omitted", () => {
       projectPath: ".",
       outputPath: undefined,
       coveragePath: undefined,
+      fileSelection: DEFAULT_PROJECT_FILE_SELECTION,
     }),
   )
 })
@@ -28,6 +30,7 @@ it("parses the project, output, and coverage paths", () => {
       projectPath: "../project",
       outputPath: "report.html",
       coveragePath: "coverage.json",
+      fileSelection: DEFAULT_PROJECT_FILE_SELECTION,
     }),
   )
 })
@@ -43,6 +46,25 @@ it("accepts options before the project path", () => {
       projectPath: "../project",
       outputPath: "report.html",
       coveragePath: "coverage.json",
+      fileSelection: DEFAULT_PROJECT_FILE_SELECTION,
+    }),
+  )
+})
+
+it("replaces the built-in exclusions with repeated patterns", () => {
+  // Act
+  const result = parseCliArguments(["--exclude", "generated/**", "--exclude", "vendor/*.ts"])
+
+  // Assert
+  expect(result).toEqual(
+    Result.Success({
+      _tag: "GenerateReport",
+      projectPath: ".",
+      outputPath: undefined,
+      coveragePath: undefined,
+      fileSelection: {
+        exclusionPatterns: ["generated/**", "vendor/*.ts"],
+      },
     }),
   )
 })
@@ -65,7 +87,31 @@ it.each([
   [["--output", "--coverage"], "--output requires a path."],
   [["--coverage"], "--coverage requires a path."],
   [["--coverage", "--output"], "--coverage requires a path."],
+  [["--exclude"], "--exclude requires a pattern."],
+  [["--exclude", "--output"], "--exclude requires a pattern."],
 ] as const)("rejects an option without a path: %j", (arguments_, message) => {
+  // Act
+  const result = parseCliArguments(arguments_)
+
+  // Assert
+  expect(result).toEqual(
+    Result.Failure({
+      _tag: "InvalidCliArguments",
+      message,
+    }),
+  )
+})
+
+it.each([
+  [["--exclude", ""], "--exclude requires a non-empty pattern."],
+  [["--exclude", "  "], "--exclude requires a non-empty pattern."],
+  [["--exclude", "first\nsecond"], 'Invalid --exclude pattern "first\\nsecond": patterns must contain exactly one line.'],
+  [["--exclude", "# generated"], 'Invalid --exclude pattern "# generated": comment patterns are not exclusions.'],
+  [["--exclude", "!src/keep.ts"], 'Invalid --exclude pattern "!src/keep.ts": negation is not supported.'],
+  [["--exclude", "src\\generated\\**"], 'Invalid --exclude pattern "src\\\\generated\\\\**": use forward slashes.'],
+  [["--exclude", "C:/project/**"], 'Invalid --exclude pattern "C:/project/**": patterns must be project-relative.'],
+  [["--exclude", "src/../outside.ts"], 'Invalid --exclude pattern "src/../outside.ts": dot path segments are not supported.'],
+] as const)("rejects an invalid exclusion pattern: %j", (arguments_, message) => {
   // Act
   const result = parseCliArguments(arguments_)
 

@@ -14,6 +14,8 @@ show-me path/to/project
 show-me --output reports/project.html
 show-me path/to/project --coverage path/to/coverage-final.json
 show-me path/to/project --coverage path/to/lcov.info
+show-me --exclude "*.generated.*"
+show-me --exclude "*.test.*" --exclude "*.spec.*" --exclude "*.generated.*"
 ```
 
 Defaults and path rules:
@@ -21,11 +23,12 @@ Defaults and path rules:
 - The project root defaults to the directory where the command is invoked.
 - The report defaults to `show-me.html` in the directory where the command is invoked.
 - A relative `--output` path is resolved from the invocation directory.
+- Repeatable `--exclude` patterns replace the built-in `*.test.*` and `*.spec.*` exclusions for that invocation.
 - The output file is overwritten without requiring a force flag.
 - The command never opens a browser and no browser-opening option is planned.
 - Success prints the resolved output path and total execution time, then exits.
 
-The first CLI surface contains only the optional project path, `--output`, `--coverage`, `--help`, and `--version`. There is no Show Me configuration file initially.
+The CLI surface contains the optional project path, `--output`, `--coverage`, repeatable `--exclude`, `--help`, and `--version`. Exclusion patterns use the project-relative semantics documented in [analysis architecture](./analysis.md). There is no Show Me configuration file yet; persistent selection belongs to [milestone 015](../tasks/015-project-configuration.md).
 
 ## Published repository report
 

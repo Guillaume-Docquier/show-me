@@ -8,7 +8,7 @@ import {
 } from "../languages/javascript-typescript/javascript-typescript-file-support.js"
 import { compareText } from "../text/compare-text.js"
 import { ProjectFilePath, type InvalidProjectFilePath } from "./project-file-path.js"
-import { DEFAULT_PROJECT_FILE_SELECTION, isProjectFileSelected, type ProjectFileSelection } from "./project-file-selection.js"
+import { createProjectFileSelectionMatcher, DEFAULT_PROJECT_FILE_SELECTION, type ProjectFileSelection } from "./project-file-selection.js"
 
 const STANDARD_EXCLUDED_DIRECTORIES = new Set([".git", ".nyc_output", "build", "coverage", "dist", "node_modules", "out"])
 
@@ -69,8 +69,9 @@ export async function discoverProjectFiles(
 ): Promise<Result<readonly DiscoveredProjectFile[], ProjectFileDiscoveryError>> {
   const projectRoot = resolve(input.projectRoot)
   const fileSelection = input.fileSelection ?? DEFAULT_PROJECT_FILE_SELECTION
+  const isProjectFileSelected = createProjectFileSelectionMatcher(fileSelection)
   const discoveredFiles: DiscoveredProjectFile[] = []
-  const walkResult = await walkDirectory(projectRoot, "", [], fileSelection, discoveredFiles)
+  const walkResult = await walkDirectory(projectRoot, "", [], isProjectFileSelected, discoveredFiles)
 
   if (Result.isFailure(walkResult)) {
     return walkResult
@@ -84,7 +85,7 @@ async function walkDirectory(
   projectRoot: string,
   relativeDirectory: string,
   parentIgnoreContexts: readonly IgnoreContext[],
-  fileSelection: ProjectFileSelection,
+  isProjectFileSelected: (projectPath: ProjectFilePath) => boolean,
   discoveredFiles: DiscoveredProjectFile[],
 ): Promise<Result<void, ProjectFileDiscoveryError>> {
   const absoluteDirectory = join(projectRoot, ...splitProjectPath(relativeDirectory))
@@ -125,7 +126,7 @@ async function walkDirectory(
         continue
       }
 
-      const childResult = await walkDirectory(projectRoot, relativePath, ignoreContexts, fileSelection, discoveredFiles)
+      const childResult = await walkDirectory(projectRoot, relativePath, ignoreContexts, isProjectFileSelected, discoveredFiles)
       if (Result.isFailure(childResult)) {
         return childResult
       }
@@ -141,10 +142,6 @@ async function walkDirectory(
       continue
     }
 
-    if (!isProjectFileSelected(entry.name, fileSelection)) {
-      continue
-    }
-
     const projectFilePath = ProjectFilePath.parse(relativePath)
     if (Result.isFailure(projectFilePath)) {
       return Result.Failure({
@@ -152,6 +149,10 @@ async function walkDirectory(
         absolutePath: join(absoluteDirectory, entry.name),
         cause: projectFilePath.error,
       })
+    }
+
+    if (!isProjectFileSelected(projectFilePath.value)) {
+      continue
     }
 
     discoveredFiles.push({

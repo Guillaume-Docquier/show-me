@@ -6,6 +6,7 @@ import { analyzeProject } from "../analysis/analyze-project.js"
 import { fixtureProjectPath } from "../testing/fixture-project.js"
 import { withTemporaryDirectory } from "../testing/temporary-directory.js"
 import { discoverProjectFiles } from "./discover-project-files.js"
+import { ProjectFileSelection, type ProjectFileSelection as ProjectFileSelectionInput } from "./project-file-selection.js"
 
 it("discovers supported files while honoring declarations, ignore rules, and standard exclusions", async () => {
   // Arrange
@@ -71,7 +72,7 @@ it("can include conventionally named test files without bypassing permanent excl
     await writeFile(join(projectRoot, "included.test.ts"), "export const included = true", "utf8")
 
     // Act
-    const result = await discoverProjectFiles({ projectRoot, fileSelection: { testFiles: "include" } })
+    const result = await discoverProjectFiles({ projectRoot, fileSelection: selection([]) })
 
     // Assert
     expect(result).toEqual(
@@ -82,6 +83,66 @@ it("can include conventionally named test files without bypassing permanent excl
         }),
       ]),
     )
+  })
+})
+
+it("uses custom patterns instead of the built-in test and spec exclusions", async () => {
+  await withTemporaryDirectory(async (projectRoot) => {
+    // Arrange
+    await writeFile(join(projectRoot, "app.ts"), "export const app = true", "utf8")
+    await writeFile(join(projectRoot, "app.test.ts"), "export const test = true", "utf8")
+    await writeFile(join(projectRoot, "app.spec.ts"), "export const spec = true", "utf8")
+    await writeFile(join(projectRoot, "drop.generated.ts"), "export const generated = true", "utf8")
+
+    // Act
+    const result = await discoverProjectFiles({ projectRoot, fileSelection: selection(["*.generated.*"]) })
+
+    // Assert
+    expect(Result.isSuccess(result)).toBe(true)
+    if (Result.isSuccess(result)) {
+      expect(result.value.map(({ path }) => path)).toEqual(["app.spec.ts", "app.test.ts", "app.ts"])
+    }
+  })
+})
+
+it("combines explicitly restated test and spec patterns with additional exclusions", async () => {
+  await withTemporaryDirectory(async (projectRoot) => {
+    // Arrange
+    await mkdir(join(projectRoot, "src"))
+    await writeFile(join(projectRoot, "src", "app.ts"), "export const app = true", "utf8")
+    await writeFile(join(projectRoot, "src", "app.test.ts"), "export const test = true", "utf8")
+    await writeFile(join(projectRoot, "src", "app.spec.ts"), "export const spec = true", "utf8")
+    await writeFile(join(projectRoot, "src", "drop.generated.ts"), "export const generated = true", "utf8")
+
+    // Act
+    const result = await discoverProjectFiles({
+      projectRoot,
+      fileSelection: selection(["*.test.*", "*.spec.*", "src/*.generated.*"]),
+    })
+
+    // Assert
+    expect(Result.isSuccess(result)).toBe(true)
+    if (Result.isSuccess(result)) {
+      expect(result.value.map(({ path }) => path)).toEqual(["src/app.ts"])
+    }
+  })
+})
+
+it("matches custom patterns from the project root without requiring Git tracking", async () => {
+  await withTemporaryDirectory(async (projectRoot) => {
+    // Arrange
+    await mkdir(join(projectRoot, "nested"))
+    await writeFile(join(projectRoot, "root.ts"), "export const root = true", "utf8")
+    await writeFile(join(projectRoot, "nested", "root.ts"), "export const nested = true", "utf8")
+
+    // Act
+    const result = await discoverProjectFiles({ projectRoot, fileSelection: selection(["/root.ts"]) })
+
+    // Assert
+    expect(Result.isSuccess(result)).toBe(true)
+    if (Result.isSuccess(result)) {
+      expect(result.value.map(({ path }) => path)).toEqual(["nested/root.ts"])
+    }
   })
 })
 
@@ -162,3 +223,11 @@ it("always excludes generated, dependency, coverage, and version-control directo
     }
   })
 })
+
+function selection(exclusionPatterns: readonly string[]): ProjectFileSelectionInput {
+  const result = ProjectFileSelection.parse(exclusionPatterns)
+  if (Result.isFailure(result)) {
+    throw new Error(`Invalid test exclusion pattern: ${result.error.pattern}`)
+  }
+  return result.value
+}

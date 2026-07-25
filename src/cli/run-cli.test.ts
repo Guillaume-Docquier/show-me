@@ -42,10 +42,11 @@ describe("runCli", () => {
       `Usage: show-me [project-path] [options]
 
 Options:
-  --output <path>    Write the report to this path
-  --coverage <path>  Read one explicit Istanbul or LCOV report
-  -h, --help         Show this help
-  -v, --version      Show the version
+  --output <path>      Write the report to this path
+  --coverage <path>    Read one explicit Istanbul or LCOV report
+  --exclude <pattern>  Replace built-in exclusions; repeat for more patterns
+  -h, --help           Show this help
+  -v, --version        Show the version
 `,
     ])
     expect(captured.standardError).toEqual([])
@@ -105,6 +106,55 @@ Options:
       const html = await readFile(join(reportDirectory, "graph.html"), "utf8")
       expect(exitCode).toBe(0)
       expect(html).toContain("app.js")
+    })
+  })
+
+  it("applies replacement exclusions consistently to report files, metrics, coverage, and relationships", async () => {
+    await withTemporaryDirectory(async (currentDirectory) => {
+      // Arrange
+      const sourceDirectory = join(currentDirectory, "src")
+      const coverageDirectory = join(currentDirectory, "coverage")
+      await mkdir(sourceDirectory)
+      await mkdir(coverageDirectory)
+      await writeFile(join(sourceDirectory, "app.ts"), 'import "./helper.js"\nexport const app = true\n', "utf8")
+      await writeFile(join(sourceDirectory, "helper.ts"), "export const helper = true\n", "utf8")
+      await writeFile(join(sourceDirectory, "app.test.ts"), 'import "./app.js"\nexport const tested = true\n', "utf8")
+      await writeFile(
+        join(coverageDirectory, "coverage-final.json"),
+        coverageFinalEntries([
+          { path: "src/app.ts", hits: 1 },
+          { path: "src/helper.ts", hits: 0 },
+          { path: "src/app.test.ts", hits: 1 },
+        ]),
+        "utf8",
+      )
+      const captured = captureOutput()
+
+      // Act
+      const exitCode = await runCli(["--exclude", "src/helper.ts"], captured.output, {
+        currentDirectory,
+        browserBundle: TEST_BROWSER_BUNDLE,
+      })
+
+      // Assert
+      const analysis = parseAnalysis(await readFile(join(currentDirectory, "show-me.html"), "utf8"))
+      expect(exitCode).toBe(0)
+      expect(analysis.files).toEqual([
+        {
+          path: "src/app.test.ts",
+          language: "typescript",
+          lines: { code: 2, comment: 0, blank: 0 },
+          coverage: { lines: 100 },
+        },
+        {
+          path: "src/app.ts",
+          language: "typescript",
+          lines: { code: 2, comment: 0, blank: 0 },
+          coverage: { lines: 100 },
+        },
+      ])
+      expect(analysis.dependencies).toEqual([{ source: "src/app.test.ts", target: "src/app.ts", kind: "runtime" }])
+      expect(captured.standardError).toEqual([])
     })
   })
 
@@ -481,6 +531,30 @@ function coverageFinal(path: string, hits: number): string {
       b: {},
     },
   })
+}
+
+function coverageFinalEntries(entries: ReadonlyArray<{ readonly path: string; readonly hits: number }>): string {
+  return JSON.stringify(
+    Object.fromEntries(
+      entries.map(({ path, hits }) => [
+        path,
+        {
+          path,
+          statementMap: {
+            0: {
+              start: { line: 1, column: 0 },
+              end: { line: 1, column: 1 },
+            },
+          },
+          s: { 0: hits },
+          fnMap: {},
+          f: {},
+          branchMap: {},
+          b: {},
+        },
+      ]),
+    ),
+  )
 }
 
 function lcov(path: string, hits: number): string {

@@ -37,5 +37,5 @@ Default analysis omits conventional JavaScript and TypeScript test files so prod
 
 ## Discovered gaps
 
-- [Milestone 014](../014-cli-file-selection.md) owns one-invocation CLI overrides for the default test exclusion and additional ignore patterns.
+- [Milestone 014](./014-cli-file-selection.md) owns one-invocation CLI overrides for the default test exclusion and additional patterns.
 - [Milestone 015](../015-project-configuration.md) owns persistent project configuration after an ADR defines its contract.

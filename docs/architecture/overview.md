@@ -8,7 +8,7 @@ This document describes the target architecture. The implementation is being bui
 
 The initial end-to-end product is operational. The CLI discovers supported project files, excludes conventional test files by default, classifies code, comment, and blank physical lines, analyzes static ESM, CommonJS, and dynamic-import dependencies through Oxc, identifies pnpm workspace ownership and external npm package roots, optionally imports Istanbul or LCOV line coverage, and writes a self-contained interactive graph report. The repository publishes its latest validated report through GitHub Pages.
 
-Analysis, report packaging, browser presentation, CLI, build, and package boundaries have been consolidated and are covered through Node and real-browser tests. CLOC-style metrics, interactive line-category sizing, optional external-package nodes, per-source-file TypeScript configuration discovery, pnpm workspace ownership, cross-package resolution, package filters, and measured large-codebase performance are implemented. User-facing file-selection controls remain planned.
+Analysis, report packaging, browser presentation, CLI, build, and package boundaries have been consolidated and are covered through Node and real-browser tests. CLOC-style metrics, interactive line-category sizing, optional external-package nodes, per-source-file TypeScript configuration discovery, pnpm workspace ownership, cross-package resolution, package filters, one-invocation file selection, and measured large-codebase performance are implemented.
 
 ## System flow
 
@@ -50,9 +50,9 @@ The current product:
 - optionally colors project file nodes using format-neutral line coverage imported from Istanbul or LCOV; and
 - writes one offline HTML file.
 
-Analysis has a typed internal file-selection policy that can restore default-excluded tests without bypassing permanent discovery exclusions. CLI selection options and persistent configuration remain milestones 014 and 015.
+Analysis has a typed file-selection policy populated by the repeatable CLI `--exclude` option. Supplied patterns replace the built-in test and spec patterns without bypassing permanent discovery exclusions. Persistent configuration remains milestone 015.
 
-Non-literal CommonJS and dynamic-import expressions produce diagnostics rather than guessed edges. CLI selection options, persistent configuration, and configurable coverage locations remain planned milestones.
+Non-literal CommonJS and dynamic-import expressions produce diagnostics rather than guessed edges. Persistent configuration and configurable coverage locations remain planned milestones.
 
 ## Package shape
 

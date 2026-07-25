@@ -19,9 +19,13 @@ Initial executable extensions are:
 
 TypeScript declaration files such as `.d.ts`, `.d.mts`, and `.d.cts` are excluded. CSS, JSON, SVG, images, and other non-code assets do not become project files or dependency targets.
 
-Supported JavaScript and TypeScript files are also excluded by default when their basename contains `.test.` or `.spec.`, matched case-insensitively and anywhere in the basename. The rule is basename-only: marker-like directory names do not exclude their contents, and bare names such as `test.ts` and `spec.ts` remain project files. Excluded test files are filtered during discovery, before source reading, parsing, line metrics, dependency analysis, coverage matching, and report construction. An included file may resolve an import to an existing excluded test file without creating an edge or unresolved-dependency diagnostic.
+Supported JavaScript and TypeScript files are also excluded by the built-in `*.test.*` and `*.spec.*` patterns. Matching is case-insensitive and applies to otherwise eligible project-relative file paths. Because these patterns contain no slash, they preserve the original basename-only rule: marker-like directory names do not exclude their contents, and bare names such as `test.ts` and `spec.ts` remain project files.
 
-Internal analysis callers can restore only this default test-file exclusion through the typed selection policy. User-facing CLI selection and additional ignore-pattern semantics remain milestone 014; configuration-file loading remains milestone 015.
+One CLI invocation can replace the complete built-in set through repeatable `--exclude <pattern>` options. Patterns use gitignore matching against normalized forward-slash project-relative file paths: a pattern without a slash matches basenames at any depth, a slash makes it project-root relative, and a leading slash explicitly anchors the match at the root. For example, `--exclude "*.generated.*"` includes conventional tests and specs while excluding matching generated files. Keeping the defaults and adding that exclusion requires restating all three patterns.
+
+Patterns are parsed into the typed file-selection input before analysis. Empty, multiline, comment, negated, Windows-backslash, absolute-drive, and dot-segment patterns are rejected with argument errors. Negation is deliberately unsupported because selection can only remove otherwise eligible files. Discovery compiles built-in and supplied patterns through the same case-insensitive matcher and tests only supported project files, after permanent directory, `.gitignore`, declaration-file, and language exclusions. Eligible files do not need to be tracked by Git.
+
+Excluded files are filtered before source reading, parsing, line metrics, dependency analysis, coverage matching, and report construction. An included file may resolve an import to an existing excluded file without creating an edge or unresolved-dependency diagnostic. Persistent configuration-file loading remains milestone 015.
 
 ## Internal analysis model
 
