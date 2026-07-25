@@ -151,3 +151,4 @@ vite.config.ts.timestamp-*
 show-me.html
 _site/
 test-results/
+.benchmark/

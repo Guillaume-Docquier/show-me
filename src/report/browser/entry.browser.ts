@@ -6,13 +6,14 @@
  * effects and enters the browser bundle exclusively through this file.
  */
 import type { ProjectAnalysis } from "../../analysis/project-analysis.js"
+import { PerformanceProfiler } from "../../performance/performance-profiler.js"
 import { renderCoverageLegend } from "./coverage-legend.js"
 import { INITIAL_EDGE_VISIBILITY, ReportControls, type EdgeVisibilityState } from "./report-controls.js"
 import { getReportElements } from "./report-elements.js"
 import { ReportGraph } from "./report-graph.js"
 import { INITIAL_REPORT_INTERACTION, type ReportInteractionState } from "./report-interaction.js"
 import { ReportPanels } from "./report-panels.js"
-import { buildBrowserPresentation } from "./report-presentation.js"
+import { browserPresentationSignature, buildBrowserPresentation } from "./report-presentation.js"
 import { buildReportView, initialReportViewState, type ReportViewState } from "./report-view.js"
 
 declare global {
@@ -22,8 +23,10 @@ declare global {
   }
 }
 
+const browserStartedAt = performance.now()
+const performanceProfiler = new PerformanceProfiler()
 const analysis = window.showMeAnalysis
-const presentation = buildBrowserPresentation(analysis)
+const presentation = performanceProfiler.measure("browser-presentation", () => buildBrowserPresentation(analysis))
 const elements = getReportElements(document)
 let viewState = initialReportViewState(presentation)
 let edgeVisibility: EdgeVisibilityState = INITIAL_EDGE_VISIBILITY
@@ -38,6 +41,7 @@ const graph = new ReportGraph({
   presentation,
   initialInteraction: INITIAL_REPORT_INTERACTION,
   initialEdgeVisibility: edgeVisibility,
+  performanceProfiler,
   events: { onInteractionChange: renderInteraction },
 })
 
@@ -83,6 +87,9 @@ applyViewState(viewState)
 // The graph and interaction state initialize synchronously. Sigma may still
 // paint the resulting WebGL frame on the next animation frame.
 elements.root.dataset.showMeReady = "true"
+elements.root.dataset.performanceMeasurements = JSON.stringify(performanceProfiler.measurements())
+elements.root.dataset.browserLoadMilliseconds = String(performance.now() - browserStartedAt)
+elements.root.dataset.presentationSignature = browserPresentationSignature(presentation)
 
 function renderInteraction(interaction: ReportInteractionState): void {
   panels.renderInteraction(interaction)

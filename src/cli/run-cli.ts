@@ -4,6 +4,7 @@ import { Result, Time, Timer, UnitOfTime } from "@guillaume-docquier/tools-ts"
 import packageMetadata from "../../package.json" with { type: "json" }
 import { analyzeProject, type AnalyzeProjectError } from "../analysis/analyze-project.js"
 import { importCoverage, importDiscoveredCoverage, type CoverageImportError } from "../coverage/import-coverage.js"
+import type { PerformanceProfiler } from "../performance/performance-profiler.js"
 import { buildHtmlReport, loadBrowserBundle, type BrowserBundleReadError } from "../report/build-html-report.js"
 import { parseCliArguments } from "./parse-cli-arguments.js"
 
@@ -26,6 +27,7 @@ export type CliOutput = {
 export type RunCliOptions = {
   readonly currentDirectory?: string
   readonly browserBundle?: string
+  readonly performanceProfiler?: PerformanceProfiler
 }
 
 const HELP = `Usage: show-me [project-path] [options]
@@ -65,7 +67,10 @@ export async function runCli(arguments_: readonly string[], output: CliOutput, o
   const startedAt = Timer.start()
   const currentDirectory = options.currentDirectory ?? process.cwd()
   const projectRoot = resolve(currentDirectory, command.value.projectPath)
-  const analysis = await analyzeProject({ projectRoot })
+  const analysis = await analyzeProject({
+    projectRoot,
+    ...(options.performanceProfiler === undefined ? {} : { performanceProfiler: options.performanceProfiler }),
+  })
 
   if (Result.isFailure(analysis)) {
     output.writeStandardError(`${formatAnalysisError(analysis.error)}\n`)
@@ -75,7 +80,12 @@ export async function runCli(arguments_: readonly string[], output: CliOutput, o
   let reportAnalysis = analysis.value
 
   if (command.value.coveragePath === undefined) {
-    const coveredAnalysis = await importDiscoveredCoverage(analysis.value, projectRoot)
+    const importDiscovered = async (): ReturnType<typeof importDiscoveredCoverage> =>
+      await importDiscoveredCoverage(analysis.value, projectRoot)
+    const coveredAnalysis =
+      options.performanceProfiler === undefined
+        ? await importDiscovered()
+        : await options.performanceProfiler.measureAsync("coverage", importDiscovered)
     if (Result.isFailure(coveredAnalysis)) {
       output.writeStandardError(`${formatCoverageImportError(coveredAnalysis.error)}\n`)
       return 1
@@ -86,7 +96,11 @@ export async function runCli(arguments_: readonly string[], output: CliOutput, o
     }
   } else {
     const coverageFile = resolve(currentDirectory, command.value.coveragePath)
-    const coveredAnalysis = await importCoverage(analysis.value, projectRoot, coverageFile)
+    const importExplicit = async (): ReturnType<typeof importCoverage> => await importCoverage(analysis.value, projectRoot, coverageFile)
+    const coveredAnalysis =
+      options.performanceProfiler === undefined
+        ? await importExplicit()
+        : await options.performanceProfiler.measureAsync("coverage", importExplicit)
     if (Result.isFailure(coveredAnalysis)) {
       output.writeStandardError(`${formatCoverageImportError(coveredAnalysis.error)}\n`)
       return 1
@@ -104,9 +118,17 @@ export async function runCli(arguments_: readonly string[], output: CliOutput, o
     browserBundle = loadedBrowserBundle.value
   }
 
-  const html = buildHtmlReport(reportAnalysis, browserBundle)
+  const html =
+    options.performanceProfiler === undefined
+      ? buildHtmlReport(reportAnalysis, browserBundle)
+      : options.performanceProfiler.measure("html-packaging", () => buildHtmlReport(reportAnalysis, browserBundle))
   const outputPath = resolve(currentDirectory, command.value.outputPath ?? "show-me.html")
-  const writeResult = await Result.tryCatch(writeFile(outputPath, html, "utf8"))
+  const writeReport = async (): ReturnType<typeof writeFile> => {
+    await writeFile(outputPath, html, "utf8")
+  }
+  const writeResult = await Result.tryCatch(
+    options.performanceProfiler === undefined ? writeReport() : options.performanceProfiler.measureAsync("report-writing", writeReport),
+  )
 
   if (Result.isFailure(writeResult)) {
     output.writeStandardError(`Could not write report to ${outputPath}: ${writeResult.error.message}\n`)

@@ -131,6 +131,21 @@ export function buildBrowserPresentation(analysis: ProjectAnalysis): BrowserPres
 }
 
 /**
+ * Fingerprint the complete ordered browser presentation for reproducibility checks.
+ *
+ * @param presentation - Browser-owned facts derived from embedded analysis.
+ * @returns A deterministic non-cryptographic hexadecimal signature.
+ */
+export function browserPresentationSignature(presentation: BrowserPresentation): string {
+  let hash = 2_166_136_261
+  for (const character of JSON.stringify(presentation)) {
+    hash ^= character.charCodeAt(0)
+    hash = Math.imul(hash, 16_777_619)
+  }
+  return (hash >>> 0).toString(16)
+}
+
+/**
  * Calculate a renderer size that grows logarithmically with a line count.
  *
  * @param lines - Active combined physical-line count.

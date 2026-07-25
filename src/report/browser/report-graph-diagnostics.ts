@@ -3,6 +3,7 @@ import type { Sigma } from "sigma"
 import { centeredNodeLabelGeometry, LABEL_FONT, LABEL_SIZE, LABEL_WEIGHT } from "./report-graph-labels.js"
 import type { DependencyFocus } from "./report-graph-overlays.js"
 import type { BrowserEdgeAttributes, BrowserNodeAttributes, GraphNodeCircle } from "./report-graph-types.js"
+import type { ReportLayoutMetrics } from "./report-layout.js"
 import { reportViewLayoutSignature, type ReportView } from "./report-view.js"
 
 /** Isolates browser-test observability from production graph decisions. */
@@ -51,6 +52,17 @@ export class ReportGraphDiagnostics {
     this.#container.dataset.structureEdgeWeight = String(structure)
     this.#container.dataset.dependencyEdgeWeight = String(dependency)
     this.#container.dataset.externalDependencyEdgeWeight = String(externalDependency)
+  }
+
+  public writeLayout(metrics: ReportLayoutMetrics): void {
+    this.#container.dataset.layoutStrategy = metrics.strategy
+    this.#container.dataset.layoutIterations = String(metrics.iterations)
+    this.#container.dataset.layoutCollisionScale = String(metrics.collisionScale)
+    if (metrics.minimumClearance === undefined) {
+      delete this.#container.dataset.layoutMinimumClearance
+    } else {
+      this.#container.dataset.layoutMinimumClearance = String(metrics.minimumClearance)
+    }
   }
 
   public writeDirectoryLabels({

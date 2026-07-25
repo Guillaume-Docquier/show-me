@@ -1,9 +1,8 @@
 import { DirectedGraph } from "graphology"
-import { circular } from "graphology-layout"
-import forceAtlas2 from "graphology-layout-forceatlas2"
 import { Sigma } from "sigma"
 import { createEdgeArrowProgram } from "sigma/rendering"
 import type { EdgeDisplayData, NodeDisplayData } from "sigma/types"
+import type { PerformanceProfiler } from "../../performance/performance-profiler.js"
 import type { EdgeVisibilityState } from "./report-controls.js"
 import { ReportGraphDiagnostics } from "./report-graph-diagnostics.js"
 import { ReportGraphLabelVisibility } from "./report-graph-label-visibility.js"
@@ -11,6 +10,7 @@ import { drawNodeHover, drawNodeLabel, LABEL_COLOR, LABEL_FONT, LABEL_SIZE, LABE
 import { CONSUMER_FOCUS_COLOR, DEPENDENCY_FOCUS_COLOR, ReportGraphOverlays, type DependencyFocus } from "./report-graph-overlays.js"
 import type { BrowserEdgeAttributes, BrowserNodeAttributes } from "./report-graph-types.js"
 import type { ReportInteractionState } from "./report-interaction.js"
+import { layoutReportGraph } from "./report-layout.js"
 import type { BrowserPresentation, ReportNode, ReportProjectFileNode } from "./report-presentation.js"
 import { visibleRelationships, type ReportView } from "./report-view.js"
 
@@ -46,6 +46,7 @@ export class ReportGraph {
   readonly #container: HTMLElement
   readonly #nodeById: ReadonlyMap<string, ReportNode>
   readonly #events: ReportGraphEvents
+  readonly #performanceProfiler: PerformanceProfiler
   readonly #graph = new DirectedGraph<BrowserNodeAttributes, BrowserEdgeAttributes>()
   readonly #renderer: Sigma<BrowserNodeAttributes, BrowserEdgeAttributes>
   readonly #camera
@@ -58,6 +59,7 @@ export class ReportGraph {
   #dependencyFocus: DependencyFocus | undefined
   #structureFocusNodeId: string | undefined
   #cameraResetAwaitingSettledRender = false
+  #cameraAnimationGeneration = 0
 
   public constructor({
     root,
@@ -65,6 +67,7 @@ export class ReportGraph {
     presentation,
     initialInteraction,
     initialEdgeVisibility,
+    performanceProfiler,
     events,
   }: {
     readonly root: HTMLElement
@@ -72,6 +75,7 @@ export class ReportGraph {
     readonly presentation: BrowserPresentation
     readonly initialInteraction: ReportInteractionState
     readonly initialEdgeVisibility: EdgeVisibilityState
+    readonly performanceProfiler: PerformanceProfiler
     readonly events: ReportGraphEvents
   }) {
     this.#root = root
@@ -80,6 +84,7 @@ export class ReportGraph {
     this.#interaction = initialInteraction
     this.#edgeVisibility = initialEdgeVisibility
     this.#events = events
+    this.#performanceProfiler = performanceProfiler
     this.#renderer = new Sigma<BrowserNodeAttributes, BrowserEdgeAttributes>(this.#graph, container, {
       allowInvalidContainer: false,
       defaultEdgeType: "arrow",
@@ -117,6 +122,7 @@ export class ReportGraph {
 
   /** Rebuild, lay out, and render the visible graph projection. */
   public applyView(view: ReportView): void {
+    this.#cancelCameraAnimation()
     this.#view = view
     this.#graph.clear()
     this.#labelVisibility.reset()
@@ -165,21 +171,8 @@ export class ReportGraph {
       })
     }
 
-    circular.assign(this.#graph)
-    forceAtlas2.assign(this.#graph, {
-      iterations: 5000,
-      settings: {
-        adjustSizes: true,
-        barnesHutOptimize: false,
-        edgeWeightInfluence: 1,
-        gravity: 1,
-        linLogMode: false,
-        outboundAttractionDistribution: false,
-        scalingRatio: 6,
-        slowDown: 2,
-        strongGravityMode: false,
-      },
-    })
+    const layoutMetrics = this.#performanceProfiler.measure("browser-layout", () => layoutReportGraph(this.#graph))
+    this.#diagnostics.writeLayout(layoutMetrics)
 
     if (this.#interaction.selectedNodeId !== undefined && !view.graphNodeIds.has(this.#interaction.selectedNodeId)) {
       this.#interaction = { ...this.#interaction, selectedNodeId: undefined }
@@ -248,17 +241,24 @@ export class ReportGraph {
       return
     }
 
+    const animationGeneration = ++this.#cameraAnimationGeneration
     delete this.#container.dataset.cameraFocusedNode
     this.#camera.animate({ x: node.x, y: node.y }, { duration: 250 }, () => {
-      this.#container.dataset.cameraFocusedNode = nodeId
+      if (animationGeneration === this.#cameraAnimationGeneration) {
+        this.#container.dataset.cameraFocusedNode = nodeId
+      }
     })
   }
 
   /** Reset and then enlarge the camera view until every rendered circle fits. */
   public resetCamera(): void {
+    const animationGeneration = ++this.#cameraAnimationGeneration
     this.#container.dataset.cameraReset = "pending"
     this.#cameraResetAwaitingSettledRender = false
     void this.#camera.animatedReset({ duration: 250 }).then(() => {
+      if (animationGeneration !== this.#cameraAnimationGeneration) {
+        return undefined
+      }
       this.#cameraResetAwaitingSettledRender = true
       this.#labelVisibility.markDirty()
       this.#renderer.scheduleRender()
@@ -305,6 +305,14 @@ export class ReportGraph {
     this.#renderer.on("clickStage", () => {
       this.selectNode(undefined)
     })
+  }
+
+  #cancelCameraAnimation(): void {
+    if (!this.#camera.isAnimated()) {
+      return
+    }
+    this.#cameraAnimationGeneration += 1
+    this.#camera.animate(this.#camera.getState(), { duration: 0 }, () => {})
   }
 
   #reduceEdge(edge: string, attributes: BrowserEdgeAttributes): Partial<EdgeDisplayData> {

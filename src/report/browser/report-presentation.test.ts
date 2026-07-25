@@ -2,7 +2,13 @@ import { Result } from "@guillaume-docquier/tools-ts"
 import { expect, it } from "vitest"
 import type { ProjectAnalysis } from "../../analysis/project-analysis.js"
 import { ProjectFilePath } from "../../project-files/project-file-path.js"
-import { activeLineCount, buildBrowserPresentation, coverageColor, nodeSizeForLines } from "./report-presentation.js"
+import {
+  activeLineCount,
+  browserPresentationSignature,
+  buildBrowserPresentation,
+  coverageColor,
+  nodeSizeForLines,
+} from "./report-presentation.js"
 
 it.each([
   [0, 3],
@@ -85,6 +91,7 @@ it("derives deterministic identities, display data, and dependency kinds from an
 
   // Assert
   expect(firstPresentation).toEqual(secondPresentation)
+  expect(browserPresentationSignature(firstPresentation)).toBe(browserPresentationSignature(secondPresentation))
   expect(firstPresentation).toMatchObject({
     projectName: "deterministic",
     nodes: [

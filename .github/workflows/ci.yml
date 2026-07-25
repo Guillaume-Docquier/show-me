@@ -53,6 +53,9 @@ jobs:
       - name: Run browser tests
         run: pnpm test:browser
 
+      - name: Run full performance benchmark
+        run: pnpm benchmark:full
+
       - name: Generate repository report
         run: |
           mkdir -p _site

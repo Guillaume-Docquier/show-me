@@ -40,6 +40,8 @@ Leverage the `@guillaume-docquier/tools-ts` npm package as much as possible. Thi
 
 Read `docs/typescript-coding-standards.md` to properly follow coding standards.
 
+Always author repository code, tooling, scripts, and configuration modules in TypeScript. JavaScript-family source files (`.js`, `.jsx`, `.mjs`, and `.cjs`) are allowed only when the file is a test fixture, an example intended to demonstrate JavaScript, or an isolated spike. Generated build output is not authored source.
+
 ## Glossary
 
 Read `docs/glossary.md` for common terms with specific meaning in this project. When introducing new vocabulary, update the glossary.

@@ -6,6 +6,7 @@ import {
   type JavaScriptTypeScriptAnalysisError,
   type JavaScriptTypeScriptSourceFile,
 } from "../languages/javascript-typescript/analyze-javascript-typescript.js"
+import type { PerformanceProfiler } from "../performance/performance-profiler.js"
 import { discoverProjectFiles, type ProjectFileDiscoveryError } from "../project-files/discover-project-files.js"
 import type { ProjectFilePath } from "../project-files/project-file-path.js"
 import type { ProjectFileSelection } from "../project-files/project-file-selection.js"
@@ -27,6 +28,7 @@ export type ProjectFileReadError = {
 export type AnalyzeProjectInput = {
   readonly projectRoot: string
   readonly fileSelection?: ProjectFileSelection
+  readonly performanceProfiler?: PerformanceProfiler
 }
 
 /**
@@ -77,35 +79,53 @@ export async function analyzeProject(input: AnalyzeProjectInput): Promise<Result
     return workspace
   }
 
-  const discoveredFiles = await discoverProjectFiles({
-    projectRoot: resolvedProjectRoot,
-    ...(input.fileSelection === undefined ? {} : { fileSelection: input.fileSelection }),
-  })
+  const discover = async (): ReturnType<typeof discoverProjectFiles> =>
+    await discoverProjectFiles({
+      projectRoot: resolvedProjectRoot,
+      ...(input.fileSelection === undefined ? {} : { fileSelection: input.fileSelection }),
+    })
+  const discoveredFiles =
+    input.performanceProfiler === undefined ? await discover() : await input.performanceProfiler.measureAsync("discovery", discover)
   if (Result.isFailure(discoveredFiles)) {
     return discoveredFiles
   }
 
-  const sourceFiles: JavaScriptTypeScriptSourceFile[] = []
-  for (const discoveredFile of discoveredFiles.value) {
-    const sourceText = await Result.tryCatch(readFile(discoveredFile.absolutePath, "utf8"))
-    if (Result.isFailure(sourceText)) {
-      return Result.Failure({
-        _tag: "ProjectFileReadFailed",
-        projectFile: discoveredFile.path,
-        cause: sourceText.error,
+  const readSourceFiles = async (): Promise<Result<JavaScriptTypeScriptSourceFile[], ProjectFileReadError>> => {
+    const sourceFiles: JavaScriptTypeScriptSourceFile[] = []
+    for (const discoveredFile of discoveredFiles.value) {
+      const sourceText = await Result.tryCatch(readFile(discoveredFile.absolutePath, "utf8"))
+      if (Result.isFailure(sourceText)) {
+        return Result.Failure({
+          _tag: "ProjectFileReadFailed",
+          projectFile: discoveredFile.path,
+          cause: sourceText.error,
+        })
+      }
+
+      sourceFiles.push({
+        path: discoveredFile.path,
+        absolutePath: discoveredFile.absolutePath,
+        sourceText: sourceText.value,
+        language: discoveredFile.language,
+        ...(workspace.value === undefined ? {} : { workspacePackage: owningWorkspacePackagePath(workspace.value, discoveredFile.path) }),
       })
     }
-
-    sourceFiles.push({
-      path: discoveredFile.path,
-      absolutePath: discoveredFile.absolutePath,
-      sourceText: sourceText.value,
-      language: discoveredFile.language,
-      ...(workspace.value === undefined ? {} : { workspacePackage: owningWorkspacePackagePath(workspace.value, discoveredFile.path) }),
-    })
+    return Result.Success(sourceFiles)
+  }
+  const sourceFiles =
+    input.performanceProfiler === undefined
+      ? await readSourceFiles()
+      : await input.performanceProfiler.measureAsync("reading", readSourceFiles)
+  if (Result.isFailure(sourceFiles)) {
+    return sourceFiles
   }
 
-  const languageAnalysis = analyzeJavaScriptTypeScript(resolvedProjectRoot, sourceFiles, workspace.value?.packages ?? [])
+  const languageAnalysis = analyzeJavaScriptTypeScript(
+    resolvedProjectRoot,
+    sourceFiles.value,
+    workspace.value?.packages ?? [],
+    input.performanceProfiler,
+  )
   if (Result.isFailure(languageAnalysis)) {
     return languageAnalysis
   }

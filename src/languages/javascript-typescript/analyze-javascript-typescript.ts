@@ -8,6 +8,7 @@ import type {
   ProjectDependency,
   ProjectFileAnalysis,
 } from "../../analysis/project-analysis.js"
+import type { PerformanceProfiler } from "../../performance/performance-profiler.js"
 import { ProjectFilePath } from "../../project-files/project-file-path.js"
 import { compareText } from "../../text/compare-text.js"
 import type { WorkspacePackageDefinition } from "../../workspaces/pnpm-workspace.js"
@@ -66,14 +67,20 @@ export type JavaScriptTypeScriptAnalysisError =
  *
  * @param projectRoot - Root of the project being analyzed.
  * @param files - Discovered JavaScript and TypeScript source files.
+ * @param workspacePackages - Workspace package definitions used for package-name resolution.
+ * @param performanceProfiler - Optional additive phase profiler used by performance benchmarks.
  * @returns File metrics, unique directed dependencies, and diagnostics, or a classified adapter failure.
  */
 export function analyzeJavaScriptTypeScript(
   projectRoot: string,
   files: readonly JavaScriptTypeScriptSourceFile[],
   workspacePackages: readonly WorkspacePackageDefinition[] = [],
+  performanceProfiler?: PerformanceProfiler,
 ): Result<JavaScriptTypeScriptAnalysis, JavaScriptTypeScriptAnalysisError> {
-  const resolverResult = createJavaScriptTypeScriptResolver(projectRoot)
+  const resolverResult =
+    performanceProfiler === undefined
+      ? createJavaScriptTypeScriptResolver(projectRoot)
+      : performanceProfiler.measure("resolution", () => createJavaScriptTypeScriptResolver(projectRoot))
   if (Result.isFailure(resolverResult)) {
     return Result.Failure({
       _tag: "JavaScriptTypeScriptResolverInitializationFailed",
@@ -90,7 +97,10 @@ export function analyzeJavaScriptTypeScript(
   const analyzedFiles: ProjectFileAnalysis[] = []
 
   for (const file of files) {
-    const requests = collectDependencyRequests(file)
+    const requests =
+      performanceProfiler === undefined
+        ? collectDependencyRequests(file)
+        : performanceProfiler.measure("parsing", () => collectDependencyRequests(file))
     if (Result.isFailure(requests)) {
       return Result.Failure({
         _tag: "JavaScriptTypeScriptParserFailed",
@@ -100,15 +110,26 @@ export function analyzeJavaScriptTypeScript(
     }
 
     diagnostics.push(...requests.value.diagnostics)
+    const lines =
+      performanceProfiler === undefined
+        ? classifyJavaScriptTypeScriptLines(file.sourceText, requests.value.comments, requests.value.jsxCommentContainers)
+        : performanceProfiler.measure("line-analysis", () =>
+            classifyJavaScriptTypeScriptLines(file.sourceText, requests.value.comments, requests.value.jsxCommentContainers),
+          )
     analyzedFiles.push({
       path: file.path,
       language: file.language,
-      lines: classifyJavaScriptTypeScriptLines(file.sourceText, requests.value.comments, requests.value.jsxCommentContainers),
+      lines,
       coverage: undefined,
       ...(file.workspacePackage === undefined ? {} : { workspacePackage: file.workspacePackage }),
     })
     for (const { request, kind } of requests.value.requests) {
-      const dependency = resolveProjectDependency(file, request, kind, resolverResult.value, discoveredPathByAbsolutePath)
+      const dependency =
+        performanceProfiler === undefined
+          ? resolveProjectDependency(file, request, kind, resolverResult.value, discoveredPathByAbsolutePath)
+          : performanceProfiler.measure("resolution", () =>
+              resolveProjectDependency(file, request, kind, resolverResult.value, discoveredPathByAbsolutePath),
+            )
       if (Result.isFailure(dependency)) {
         return dependency
       }

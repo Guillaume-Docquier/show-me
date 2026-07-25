@@ -61,3 +61,11 @@ The browser's one report-view transition remains the ownership boundary for line
 Node hover no longer creates a pointer-following tooltip. Instead, hover temporarily drives the existing right-hand node-details panel with the same complete information used for click selection. Leaving the node restores the persistently selected node or the empty details state, so hover never replaces click selection.
 
 This removes graph occlusion while keeping node information in accessible DOM content. It supersedes the original decision only where that decision required a constrained tooltip; Sigma, Graphology, the browser-owned interaction state, and the persistent selection side panel remain unchanged.
+
+### 2026-07-25 bounded large-graph layout amendment
+
+The 5,000-iteration exact layout did not complete a 1,112-node target report within four minutes. Full-product profiling showed that the CLI completed the corresponding five-million-line project in under seven seconds, so synchronous quadratic browser layout was the dominant blocker.
+
+Graphs of at most 200 nodes retain 500 exact size-aware iterations. Larger graphs use 250 Barnes-Hut iterations to establish deterministic topology, followed by one exact pairwise clearance calculation and uniform expansion around the graph center. The expansion accounts for every node radius, preserves the Barnes-Hut topology, and prevents intersections even though Barnes-Hut repulsion itself is not size-aware.
+
+This measured hybrid keeps Sigma, Graphology, ForceAtlas2, browser ownership, and the existing report-view transition. It supersedes the browser-layout simplification amendment only where that amendment mandates 5,000 exact iterations for every graph. Full and sentinel benchmarks must continue to verify deterministic presentation, positive graph and fitted-viewport clearance, and responsive interaction.
