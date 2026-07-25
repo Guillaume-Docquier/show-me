@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 import { promisify } from "node:util"
 import { Assert } from "@guillaume-docquier/tools-ts"
-import { expect, test } from "@playwright/test"
+import { expect, test, type Locator } from "@playwright/test"
 import { analyzeProject } from "../../src/analysis/analyze-project.js"
 import { buildHtmlReport } from "../../src/report/build-html-report.js"
 import { fixtureProjectPath } from "../../src/testing/fixture-project.js"
@@ -446,10 +446,12 @@ test("uses weighted folder nodes as the primary force graph under dependency arr
       ).toBe(true)
     })
 
-    await test.step("Reveal directory labels progressively while zooming", async () => {
+    await test.step("Reveal directory and project-file labels progressively while zooming", async () => {
       const graph = page.locator("#graph")
       await expect(graph).toHaveAttribute("data-visible-directory-label-depth", "1")
       await expect(graph).toHaveAttribute("data-visible-directory-labels", '["project","src"]')
+      await expect(graph).toHaveAttribute("data-file-label-visibility", "hidden")
+      await expect(graph).toHaveAttribute("data-rendered-file-labels", "[]")
       const bounds = await graph.boundingBox()
       Assert.isDefined(bounds)
       await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2)
@@ -468,11 +470,81 @@ test("uses weighted folder nodes as the primary force graph under dependency arr
       await page.mouse.wheel(0, -120)
       await page.waitForTimeout(300)
       await page.mouse.wheel(0, -120)
-      await expect(graph).toHaveAttribute("data-visible-directory-label-depth", "5")
-      await expect(graph).toHaveAttribute(
-        "data-visible-directory-labels",
-        '["project","src","features","platform","accounts","database","workflows","commands"]',
-      )
+      await expect(graph).toHaveAttribute("data-file-label-visibility", "visible")
+      await expect(graph).not.toHaveAttribute("data-rendered-file-labels", "[]")
+      const cameraState = await readJsonAttribute<{ readonly ratio: number }>(graph, "data-camera-state")
+      expect(cameraState.ratio).toBeLessThanOrEqual(0.65)
+      const labels = await readJsonAttribute<readonly DirectoryLabelDiagnostic[]>(graph, "data-visible-directory-label-rectangles")
+      expect(labels.length).toBeGreaterThan(0)
+      expectDirectoryLabelsNotToOverlap(labels)
+
+      await page.setViewportSize({ width: 1440, height: 900 })
+      await expect(graph).toHaveAttribute("data-file-label-visibility", "visible")
+      await expect(graph).not.toHaveAttribute("data-rendered-file-labels", "[]")
+      const resizedLabels = await readJsonAttribute<readonly DirectoryLabelDiagnostic[]>(graph, "data-visible-directory-label-rectangles")
+      expectDirectoryLabelsNotToOverlap(resizedLabels)
+    })
+  })
+})
+
+test("keeps dense orientation labels collision-free and readable on directory hover", async ({ page }) => {
+  await withTemporaryDirectory(async (temporaryDirectory) => {
+    const reportPath = await test.step("Generate a report with many long sibling directory labels", async () => {
+      const projectDirectory = join(temporaryDirectory, "dense-labels")
+      for (let index = 0; index < 24; index += 1) {
+        const directory = join(
+          projectDirectory,
+          `orientation-area-${String(index).padStart(2, "0")}-with-a-deliberately-long-descriptive-name`,
+        )
+        await mkdir(directory, { recursive: true })
+        await writeFile(join(directory, "index.ts"), `export const value${index} = ${index}\n`, "utf8")
+      }
+      const analysis = await analyzeProject({ projectRoot: projectDirectory })
+      Assert.isSuccess(analysis)
+      const browserBundle = await readFile(join(process.cwd(), "dist", "report", "browser.js"), "utf8")
+      const path = join(temporaryDirectory, "dense-labels.html")
+      await writeFile(path, buildHtmlReport(analysis.value, browserBundle), "utf8")
+      return path
+    })
+
+    const rootLabel = await test.step("Keep only priority labels when viewport rectangles collide", async () => {
+      await page.goto(pathToFileURL(reportPath).href)
+      await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
+      const graph = page.locator("#graph")
+      const bounds = await graph.boundingBox()
+      Assert.isDefined(bounds)
+      await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2)
+      await page.mouse.wheel(0, 120)
+      await page.waitForTimeout(300)
+      await expect.poll(async () => Number(await graph.getAttribute("data-suppressed-directory-label-count"))).toBeGreaterThan(0)
+
+      const labels = await readJsonAttribute<readonly DirectoryLabelDiagnostic[]>(graph, "data-visible-directory-label-rectangles")
+      expect(labels.map(({ label }) => label)).toContain("dense-labels")
+      expectDirectoryLabelsNotToOverlap(labels)
+      const root = labels.find(({ id }) => id === "directory:.")
+      Assert.isDefined(root)
+      return root
+    })
+
+    await test.step("Render a high-contrast label plate without covering the directory node", async () => {
+      const graph = page.locator("#graph")
+      const bounds = await graph.boundingBox()
+      Assert.isDefined(bounds)
+      await page.mouse.move(bounds.x + rootLabel.nodeX, bounds.y + rootLabel.nodeY)
+      await expect(graph).toHaveAttribute("data-hovered-directory-label", rootLabel.id)
+      const hoveredLabels = await readJsonAttribute<readonly DirectoryLabelDiagnostic[]>(graph, "data-visible-directory-label-rectangles")
+      const hoveredRoot = hoveredLabels.find(({ id }) => id === rootLabel.id)
+      Assert.isDefined(hoveredRoot)
+      await expect.poll(async () => (await sampleDirectoryHoverPixels(graph, hoveredRoot)).foregroundPixelCount).toBeGreaterThan(0)
+
+      const pixels = await sampleDirectoryHoverPixels(graph, hoveredRoot)
+      expect(pixels.backgroundPixelCount).toBeGreaterThan(0)
+      expectRgbNear(pixels.background, "#111821")
+      expectRgbNear(pixels.foreground, "#f5f9ff")
+      expect(contrastRatio(rgbHex(pixels.foreground), rgbHex(pixels.background))).toBeGreaterThanOrEqual(7)
+      expectRgbNear(pixels.directoryNode, "#79b8ff")
+      expect(pixels.directoryNode.alpha).toBeGreaterThan(0)
+      expect(pixels.hoverAtNodeCenter.alpha).toBe(0)
     })
   })
 })
@@ -636,6 +708,48 @@ test("renders and filters one complete pnpm workspace without mutating its analy
       await expect(page.locator("#external-package-list")).not.toContainText("frontend-library")
     })
 
+    await test.step("Fit the current filtered graph after tree focus and zoom without undoing filters", async () => {
+      const graph = page.locator("#graph")
+      const file = page.locator("#file-list button[data-node-id]").first()
+      const focusedNodeId = await file.getAttribute("data-node-id")
+      Assert.isDefined(focusedNodeId)
+      await file.hover()
+      await expect(graph).toHaveAttribute("data-camera-focused-node", focusedNodeId)
+      const graphBounds = await graph.boundingBox()
+      Assert.isDefined(graphBounds)
+      await page.mouse.move(graphBounds.x + graphBounds.width / 2, graphBounds.y + graphBounds.height / 2)
+      await page.mouse.wheel(0, -120)
+      await page.waitForTimeout(300)
+      const disturbedCamera = await readJsonAttribute<CameraDiagnostic>(graph, "data-camera-state")
+      expect(disturbedCamera.ratio).not.toBe(1)
+
+      await page.getByRole("button", { name: "Fit current graph" }).click()
+      await expect(graph).toHaveAttribute("data-camera-reset", "complete")
+      const resetCamera = await readJsonAttribute<CameraDiagnostic>(graph, "data-camera-state")
+      expect(resetCamera.x).toBe(0.5)
+      expect(resetCamera.y).toBe(0.5)
+      expect(resetCamera.angle).toBe(0)
+      expect(resetCamera.ratio).toBeGreaterThanOrEqual(1)
+      await expect(page.locator("#workspace-package-controls input:checked")).toHaveCount(1)
+      await expect(page.getByRole("checkbox", { name: "@fixture/backend", exact: true })).toBeChecked()
+      await expect(page.getByRole("checkbox", { name: "External packages" })).toBeChecked()
+      await expect(graph).toHaveAttribute("data-visible-node-count", "3")
+
+      const graphNodeCount = Number(await graph.getAttribute("data-graph-node-count"))
+      const circles = await readJsonAttribute<readonly NodeCircleDiagnostic[]>(graph, "data-visible-node-positions")
+      expect(circles).toHaveLength(graphNodeCount)
+      expect(new Set(circles.map(({ id }) => id)).size).toBe(graphNodeCount)
+      const settledGraphBounds = await graph.boundingBox()
+      Assert.isDefined(settledGraphBounds)
+      for (const circle of circles) {
+        expect(circle.radius).toBeGreaterThan(0)
+        expect(circle.x - circle.radius).toBeGreaterThanOrEqual(0)
+        expect(circle.x + circle.radius).toBeLessThanOrEqual(settledGraphBounds.width)
+        expect(circle.y - circle.radius).toBeGreaterThanOrEqual(0)
+        expect(circle.y + circle.radius).toBeLessThanOrEqual(settledGraphBounds.height)
+      }
+    })
+
     await test.step("Hide every workspace and show a deliberate empty state", async () => {
       await page.getByRole("checkbox", { name: "@fixture/backend", exact: true }).uncheck()
       await expect(page.locator("#graph")).toHaveAttribute("data-visible-node-count", "0")
@@ -684,7 +798,207 @@ test("opens an empty report generated by the built CLI and real browser bundle",
       await expect(page.locator("#selected-empty")).toBeVisible()
       await expect(page.locator("#file-tree-empty")).toHaveText("This report contains no project files.")
       await expect(page.locator("#file-list button[data-node-id]")).toHaveCount(0)
+
+      const graph = page.locator("#graph")
+      await page.getByRole("button", { name: "Fit current graph" }).click()
+      await expect(graph).toHaveAttribute("data-camera-reset", "complete")
+      const circles = await readJsonAttribute<readonly NodeCircleDiagnostic[]>(graph, "data-visible-node-positions")
+      expect(circles).toHaveLength(1)
+      const graphBounds = await graph.boundingBox()
+      Assert.isDefined(graphBounds)
+      const [rootDirectory] = circles
+      Assert.isDefined(rootDirectory)
+      expect(rootDirectory.x - rootDirectory.radius).toBeGreaterThanOrEqual(0)
+      expect(rootDirectory.x + rootDirectory.radius).toBeLessThanOrEqual(graphBounds.width)
+      expect(rootDirectory.y - rootDirectory.radius).toBeGreaterThanOrEqual(0)
+      expect(rootDirectory.y + rootDirectory.radius).toBeLessThanOrEqual(graphBounds.height)
       expect(pageErrors).toEqual([])
     })
   })
 })
+
+type DirectoryLabelDiagnostic = {
+  readonly id: string
+  readonly label: string
+  readonly nodeX: number
+  readonly nodeY: number
+  readonly bounds: {
+    readonly left: number
+    readonly top: number
+    readonly right: number
+    readonly bottom: number
+  }
+}
+
+type CameraDiagnostic = {
+  readonly x: number
+  readonly y: number
+  readonly angle: number
+  readonly ratio: number
+}
+
+type NodeCircleDiagnostic = {
+  readonly id: string
+  readonly x: number
+  readonly y: number
+  readonly radius: number
+}
+
+type RgbDiagnostic = {
+  readonly red: number
+  readonly green: number
+  readonly blue: number
+  readonly alpha: number
+}
+
+type DirectoryHoverPixelDiagnostic = {
+  readonly background: RgbDiagnostic
+  readonly backgroundPixelCount: number
+  readonly foreground: RgbDiagnostic
+  readonly foregroundPixelCount: number
+  readonly directoryNode: RgbDiagnostic
+  readonly hoverAtNodeCenter: RgbDiagnostic
+}
+
+async function readJsonAttribute<T>(locator: Locator, attribute: string): Promise<T> {
+  const serialized = await locator.getAttribute(attribute)
+  Assert.isDefined(serialized)
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- SAFETY: These diagnostics come from the real report; malformed data must fail the consuming assertion.
+  return JSON.parse(serialized) as T
+}
+
+function expectDirectoryLabelsNotToOverlap(labels: readonly DirectoryLabelDiagnostic[]): void {
+  for (const [index, left] of labels.entries()) {
+    for (const right of labels.slice(index + 1)) {
+      const overlaps =
+        left.bounds.left < right.bounds.right &&
+        left.bounds.right > right.bounds.left &&
+        left.bounds.top < right.bounds.bottom &&
+        left.bounds.bottom > right.bounds.top
+      expect(overlaps, `${left.label} overlaps ${right.label}`).toBe(false)
+    }
+  }
+}
+
+async function sampleDirectoryHoverPixels(
+  graph: Locator,
+  directoryLabel: DirectoryLabelDiagnostic,
+): Promise<DirectoryHoverPixelDiagnostic> {
+  const screenshot = await graph.screenshot()
+  return await graph.evaluate(
+    async (container, diagnostic): Promise<DirectoryHoverPixelDiagnostic> => {
+      const { label, screenshotBase64 } = diagnostic
+      const hoverCanvas = container.querySelector("canvas.sigma-hovers")
+      if (!(hoverCanvas instanceof HTMLCanvasElement)) {
+        throw new Error("Sigma hover canvas is required for pixel diagnostics.")
+      }
+      const hoverContext = hoverCanvas.getContext("2d", { willReadFrequently: true })
+      if (hoverContext === null || hoverCanvas.clientWidth === 0 || hoverCanvas.clientHeight === 0) {
+        throw new Error("Sigma hover canvas is not readable.")
+      }
+      const renderedReport = new Image()
+      renderedReport.src = `data:image/png;base64,${screenshotBase64}`
+      await renderedReport.decode()
+      const renderedReportCanvas = document.createElement("canvas")
+      renderedReportCanvas.width = renderedReport.naturalWidth
+      renderedReportCanvas.height = renderedReport.naturalHeight
+      const renderedReportContext = renderedReportCanvas.getContext("2d", { willReadFrequently: true })
+      if (renderedReportContext === null || container.clientWidth === 0 || container.clientHeight === 0) {
+        throw new Error("Rendered report screenshot is not readable.")
+      }
+      renderedReportContext.drawImage(renderedReport, 0, 0)
+
+      const colorAt = (context: CanvasRenderingContext2D, x: number, y: number, scaleX: number, scaleY: number): RgbDiagnostic => {
+        const pixel = context.getImageData(
+          Math.max(0, Math.min(context.canvas.width - 1, Math.round(x * scaleX))),
+          Math.max(0, Math.min(context.canvas.height - 1, Math.round(y * scaleY))),
+          1,
+          1,
+        ).data
+        return { red: pixel[0] ?? 0, green: pixel[1] ?? 0, blue: pixel[2] ?? 0, alpha: pixel[3] ?? 0 }
+      }
+      const closestColor = (
+        image: ImageData,
+        target: readonly [number, number, number],
+      ): { readonly color: RgbDiagnostic; readonly matchingPixelCount: number } => {
+        let closest = { red: 0, green: 0, blue: 0, alpha: 0 }
+        let closestDistance = Number.POSITIVE_INFINITY
+        let matchingPixelCount = 0
+        for (let offset = 0; offset < image.data.length; offset += 4) {
+          const red = image.data[offset] ?? 0
+          const green = image.data[offset + 1] ?? 0
+          const blue = image.data[offset + 2] ?? 0
+          const alpha = image.data[offset + 3] ?? 0
+          if (alpha < 200) {
+            continue
+          }
+          const distance = Math.hypot(red - target[0], green - target[1], blue - target[2])
+          if (distance <= 24) {
+            matchingPixelCount += 1
+          }
+          if (distance < closestDistance) {
+            closestDistance = distance
+            closest = { red, green, blue, alpha }
+          }
+        }
+        return { color: closest, matchingPixelCount }
+      }
+
+      const hoverScaleX = hoverCanvas.width / hoverCanvas.clientWidth
+      const hoverScaleY = hoverCanvas.height / hoverCanvas.clientHeight
+      const left = Math.max(0, Math.floor(label.bounds.left * hoverScaleX))
+      const top = Math.max(0, Math.floor(label.bounds.top * hoverScaleY))
+      const right = Math.min(hoverCanvas.width, Math.ceil(label.bounds.right * hoverScaleX))
+      const bottom = Math.min(hoverCanvas.height, Math.ceil(label.bounds.bottom * hoverScaleY))
+      const plate = hoverContext.getImageData(left, top, Math.max(1, right - left), Math.max(1, bottom - top))
+      // Exclude the directory outline's rightmost pixel so foreground matches inside this region can only be label glyphs.
+      const textLeft = Math.min(right - 1, Math.max(left, Math.floor((label.bounds.left + 5) * hoverScaleX)))
+      const text = hoverContext.getImageData(textLeft, top, Math.max(1, right - textLeft), Math.max(1, bottom - top))
+      const background = closestColor(plate, [17, 24, 33])
+      const foreground = closestColor(text, [245, 249, 255])
+      const screenshotScaleX = renderedReportCanvas.width / container.clientWidth
+      const screenshotScaleY = renderedReportCanvas.height / container.clientHeight
+      return {
+        background: background.color,
+        backgroundPixelCount: background.matchingPixelCount,
+        foreground: foreground.color,
+        foregroundPixelCount: foreground.matchingPixelCount,
+        directoryNode: colorAt(renderedReportContext, label.nodeX, label.nodeY, screenshotScaleX, screenshotScaleY),
+        hoverAtNodeCenter: colorAt(hoverContext, label.nodeX, label.nodeY, hoverScaleX, hoverScaleY),
+      }
+    },
+    { label: directoryLabel, screenshotBase64: screenshot.toString("base64") },
+  )
+}
+
+function expectRgbNear(actual: RgbDiagnostic, expected: string): void {
+  const channels = [1, 3, 5].map((offset) => Number.parseInt(expected.slice(offset, offset + 2), 16))
+  const [red, green, blue] = channels
+  Assert.isDefined(red)
+  Assert.isDefined(green)
+  Assert.isDefined(blue)
+  expect(Math.abs(actual.red - red)).toBeLessThanOrEqual(2)
+  expect(Math.abs(actual.green - green)).toBeLessThanOrEqual(2)
+  expect(Math.abs(actual.blue - blue)).toBeLessThanOrEqual(2)
+}
+
+function rgbHex(color: RgbDiagnostic): string {
+  return `#${[color.red, color.green, color.blue].map((channel) => channel.toString(16).padStart(2, "0")).join("")}`
+}
+
+function contrastRatio(foreground: string, background: string): number {
+  const foregroundLuminance = relativeLuminance(foreground)
+  const backgroundLuminance = relativeLuminance(background)
+  const lighter = Math.max(foregroundLuminance, backgroundLuminance)
+  const darker = Math.min(foregroundLuminance, backgroundLuminance)
+  return (lighter + 0.05) / (darker + 0.05)
+}
+
+function relativeLuminance(color: string): number {
+  const channels = [1, 3, 5].map((offset) => Number.parseInt(color.slice(offset, offset + 2), 16) / 255)
+  const [red, green, blue] = channels.map((channel) => (channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4))
+  Assert.isDefined(red)
+  Assert.isDefined(green)
+  Assert.isDefined(blue)
+  return red * 0.2126 + green * 0.7152 + blue * 0.0722
+}

@@ -53,6 +53,7 @@ export function buildHtmlReport(analysis: ProjectAnalysis, browserBundle: string
   <section id="controls" class="report-controls" aria-labelledby="controls-heading">
     <h2 id="controls-heading">Graph controls</h2>
     <div class="report-control-groups">
+      <button id="reset-camera" class="graph-control-button" type="button">Fit current graph</button>
       <fieldset id="line-category-controls">
         <legend>Size nodes by</legend>
         <label><input id="line-category-code" type="checkbox" value="code" checked>Code</label>

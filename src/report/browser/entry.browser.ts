@@ -11,10 +11,15 @@ import { DirectedGraph } from "graphology"
 import { circular } from "graphology-layout"
 import forceAtlas2 from "graphology-layout-forceatlas2"
 import { Sigma } from "sigma"
-import { createEdgeArrowProgram } from "sigma/rendering"
+import { createEdgeArrowProgram, drawDiscNodeHover, type NodeHoverDrawingFunction } from "sigma/rendering"
 import type { NodeDisplayData } from "sigma/types"
 import { type ProjectAnalysis } from "../../analysis/project-analysis.js"
-import { visibleDirectoryDepth } from "./directory-label-visibility.js"
+import {
+  fileLabelsAreVisible,
+  selectVisibleDirectoryLabels,
+  type DirectoryLabelCandidate,
+  visibleDirectoryDepth,
+} from "./directory-label-visibility.js"
 import { buildProjectFileTree, type ProjectFileTreeEntry, type ProjectFileTreeFile } from "./project-file-tree.js"
 import { buildProjectStructure, type ProjectStructureEdge } from "./project-structure.js"
 import {
@@ -41,15 +46,34 @@ const ROOT_DIRECTORY_NODE_SIZE = 15
 const STRUCTURE_EDGE_WEIGHT = 6
 const DEPENDENCY_EDGE_WEIGHT = 0.25
 const EXTERNAL_DEPENDENCY_EDGE_WEIGHT = 1.2
+const LABEL_FONT = "ui-monospace, SFMono-Regular, Consolas, monospace"
+const LABEL_SIZE = 11
+const LABEL_WEIGHT = "500"
+const LABEL_OFFSET = 3
+const DIRECTORY_LABEL_COLLISION_PADDING = 4
+const DIRECTORY_LABEL_HOVER_FOREGROUND = "#f5f9ff"
+const DIRECTORY_LABEL_HOVER_BACKGROUND = "#111821"
+const GRAPH_FIT_MARGIN = 1
 
 type BrowserNodeAttributes = {
   readonly size: number
   readonly color: string
   readonly x: number
   readonly y: number
+  readonly nodeKind: "project-file" | "external-package" | "directory"
   readonly label?: string
   readonly forceLabel?: boolean
   readonly directoryDepth?: number
+  readonly descendantProjectFileCount?: number
+}
+
+type BrowserNodeHoverDrawingFunction = NodeHoverDrawingFunction<BrowserNodeAttributes>
+
+type GraphNodeCircle = {
+  readonly id: string
+  readonly x: number
+  readonly y: number
+  readonly radius: number
 }
 
 type ReportViewState = {
@@ -81,6 +105,7 @@ const selectedCoverage = requiredElement("selected-coverage")
 const selectedDependencyNodes = requiredElement("selected-dependency-nodes")
 const selectedConsumerNodes = requiredElement("selected-consumer-files")
 const clearSelection = requiredElement("clear-selection")
+const resetCameraButton = requiredButton("reset-camera")
 const fileSearch = requiredSearchInput("file-search")
 const fileTreeEmpty = requiredElement("file-tree-empty")
 const fileList = requiredElement("file-list")
@@ -103,6 +128,7 @@ const nodeById = new Map(presentation.nodes.map((node) => [node.id, node]))
 const graph = new DirectedGraph<BrowserNodeAttributes>()
 let selectedNodeId: string | undefined
 let hoveredNodeId: string | undefined
+let hoveredDirectoryNodeId: string | undefined
 let visibleNodeIds = new Set<string>()
 const collapsedDirectoryPaths = new Set<string>()
 let viewState: ReportViewState = {
@@ -112,25 +138,32 @@ let viewState: ReportViewState = {
 }
 let structureEdges: readonly ProjectStructureEdge[] = []
 let maximumVisibleDirectoryDepth = visibleDirectoryDepth(1)
+let showFileLabels = fileLabelsAreVisible(1)
+let visibleDirectoryLabels: readonly DirectoryLabelCandidate[] = []
+let visibleDirectoryLabelIds = new Set<string>()
+let graphLabelVisibilityDirty = true
+let cameraResetAwaitingSettledRender = false
 const renderer = new Sigma<BrowserNodeAttributes>(graph, graphContainer, {
   allowInvalidContainer: false,
   defaultEdgeType: "arrow",
   edgeProgramClasses: { arrow: createEdgeArrowProgram<BrowserNodeAttributes>() },
   labelColor: { color: "#aebdca" },
-  labelFont: "ui-monospace, SFMono-Regular, Consolas, monospace",
-  labelRenderedSizeThreshold: Number.POSITIVE_INFINITY,
-  labelSize: 11,
-  labelWeight: "500",
+  defaultDrawNodeHover: drawNodeHover,
+  labelFont: LABEL_FONT,
+  labelRenderedSizeThreshold: 0,
+  labelSize: LABEL_SIZE,
+  labelWeight: LABEL_WEIGHT,
   // ForceAtlas2 and Sigma interpret node radii in the same graph-coordinate system.
   itemSizesReference: "positions",
   nodeReducer(node, attributes): Partial<NodeDisplayData> {
-    const directoryLabel =
-      attributes.directoryDepth === undefined || attributes.directoryDepth <= maximumVisibleDirectoryDepth
-        ? {}
-        : { label: null, forceLabel: false }
+    const label =
+      (attributes.nodeKind === "directory" && !visibleDirectoryLabelIds.has(node)) ||
+      (attributes.nodeKind === "project-file" && !showFileLabels)
+        ? { label: null, forceLabel: false }
+        : {}
     return node === selectedNodeId
-      ? { ...attributes, ...directoryLabel, color: "#f4c66a", highlighted: true, zIndex: 1 }
-      : { ...attributes, ...directoryLabel }
+      ? { ...attributes, ...label, color: "#f4c66a", highlighted: true, zIndex: 1 }
+      : { ...attributes, ...label }
   },
   zIndex: true,
 })
@@ -141,20 +174,22 @@ const structureLayer = renderer.createCanvas("structure", {
 const structureContext = requiredCanvasContext(structureLayer)
 const camera = renderer.getCamera()
 maximumVisibleDirectoryDepth = visibleDirectoryDepth(camera.getState().ratio)
-camera.on("updated", ({ ratio }) => {
-  const nextVisibleDepth = visibleDirectoryDepth(ratio)
-  if (nextVisibleDepth === maximumVisibleDirectoryDepth) {
-    return
-  }
-  maximumVisibleDirectoryDepth = nextVisibleDepth
-  updateDirectoryLabelDiagnostics()
-  renderer.refresh({
-    partialGraph: { nodes: graph.filterNodes((_node, attributes) => attributes.directoryDepth !== undefined) },
-    skipIndexation: true,
-  })
-})
+showFileLabels = fileLabelsAreVisible(camera.getState().ratio)
+camera.on("updated", markGraphLabelVisibilityDirty)
 renderer.resize(true)
-renderer.on("afterRender", renderStructureLinks)
+// Sigma's window-resize path already schedules the full refresh that rebuilds
+// its label grid. This listener only invalidates geometry for the new matrix.
+renderer.on("resize", markGraphLabelVisibilityDirty)
+renderer.on("afterRender", () => {
+  renderStructureLinks()
+  const labelRefreshScheduled = synchronizeGraphLabelVisibilityAfterRender()
+  updateCameraDiagnostics()
+  if (!labelRefreshScheduled) {
+    updateRenderedLabelDiagnostics()
+    updateGraphNodeCircleDiagnostics()
+    completePendingCameraReset()
+  }
+})
 
 for (const control of lineCategoryControls) {
   control.input.addEventListener("change", () => {
@@ -196,6 +231,17 @@ fileSearch.addEventListener("input", () => {
 })
 
 renderer.on("enterNode", ({ node, event }) => {
+  const attributes = graph.getNodeAttributes(node)
+  if (attributes.nodeKind === "directory") {
+    hoveredDirectoryNodeId = node
+    graphContainer.dataset.hoveredDirectoryLabel = node
+    graphContainer.dataset.directoryLabelHoverForeground = DIRECTORY_LABEL_HOVER_FOREGROUND
+    graphContainer.dataset.directoryLabelHoverBackground = DIRECTORY_LABEL_HOVER_BACKGROUND
+    markGraphLabelVisibilityDirty()
+    renderer.scheduleRender()
+    return
+  }
+
   const reportNode = nodeById.get(node)
   if (reportNode === undefined) {
     return
@@ -220,6 +266,16 @@ renderer.on("clickStage", () => {
 clearSelection.addEventListener("click", () => {
   selectNode(undefined)
 })
+resetCameraButton.addEventListener("click", () => {
+  graphContainer.dataset.cameraReset = "pending"
+  cameraResetAwaitingSettledRender = false
+  void camera.animatedReset({ duration: 250 }).then(() => {
+    cameraResetAwaitingSettledRender = true
+    markGraphLabelVisibilityDirty()
+    renderer.scheduleRender()
+    return undefined
+  })
+})
 
 applyReportView(viewState)
 // The graph and interaction state are initialized synchronously. Sigma may still
@@ -236,6 +292,12 @@ document.documentElement.dataset.showMeReady = "true"
 function applyReportView(nextState: ReportViewState): void {
   graph.clear()
   structureEdges = []
+  hoveredDirectoryNodeId = undefined
+  visibleDirectoryLabels = []
+  visibleDirectoryLabelIds = new Set()
+  delete graphContainer.dataset.hoveredDirectoryLabel
+  delete graphContainer.dataset.directoryLabelHoverForeground
+  delete graphContainer.dataset.directoryLabelHoverBackground
   viewState = nextState
   const visibleProjectNodeIds = new Set(
     presentation.nodes
@@ -273,17 +335,27 @@ function applyReportView(nextState: ReportViewState): void {
     presentation.projectName,
   )
   structureEdges = projectStructure.edges
+  const visibleProjectFilePaths = visibleNodes.flatMap(({ reportNode }) => (reportNode.kind === "project-file" ? [reportNode.path] : []))
 
   for (const node of visibleNodes) {
-    graph.addNode(node.id, { size: node.size, color: node.color, x: 0, y: 0 })
+    graph.addNode(node.id, {
+      size: node.size,
+      color: node.color,
+      nodeKind: node.reportNode.kind,
+      ...(node.reportNode.kind === "project-file" ? { label: projectFileLabel(node.reportNode.path) } : {}),
+      x: 0,
+      y: 0,
+    })
   }
   for (const directory of projectStructure.directories) {
     graph.addNode(directory.id, {
       size: directory.depth === 0 ? ROOT_DIRECTORY_NODE_SIZE : DIRECTORY_NODE_SIZE,
       color: directory.depth === 0 ? "#79b8ff" : "#50677d",
+      nodeKind: "directory",
       label: directory.label,
       forceLabel: true,
       directoryDepth: directory.depth,
+      descendantProjectFileCount: visibleProjectFilePaths.filter((path) => isProjectFileInDirectory(path, directory.path)).length,
       x: 0,
       y: 0,
     })
@@ -351,26 +423,177 @@ function applyReportView(nextState: ReportViewState): void {
   graphContainer.dataset.structureEdgeWeight = String(STRUCTURE_EDGE_WEIGHT)
   graphContainer.dataset.dependencyEdgeWeight = String(DEPENDENCY_EDGE_WEIGHT)
   graphContainer.dataset.externalDependencyEdgeWeight = String(EXTERNAL_DEPENDENCY_EDGE_WEIGHT)
-  updateDirectoryLabelDiagnostics()
   graphContainer.dataset.visibleNodeColors = JSON.stringify(visibleNodes.map(({ id, color }) => ({ id, color })))
   graphContainer.dataset.layoutSignature = layoutSignature(visibleNodes.map(({ id, size }) => ({ id, size })))
+  markGraphLabelVisibilityDirty()
   renderer.refresh()
-  updateVisibleNodePositionDiagnostics()
 }
 
-function updateDirectoryLabelDiagnostics(): void {
-  const visibleDirectoryLabels: string[] = []
-  graph.forEachNode((_node, attributes) => {
+function markGraphLabelVisibilityDirty(): void {
+  graphLabelVisibilityDirty = true
+}
+
+function synchronizeGraphLabelVisibilityAfterRender(): boolean {
+  if (!graphLabelVisibilityDirty) {
+    return false
+  }
+  graphLabelVisibilityDirty = false
+  const ratio = camera.getState().ratio
+  const nextMaximumDirectoryDepth = visibleDirectoryDepth(ratio)
+  const nextShowFileLabels = fileLabelsAreVisible(ratio)
+  const directoryLabelCandidatesForViewport = directoryLabelCandidates(nextMaximumDirectoryDepth)
+  const nextDirectoryLabels = selectVisibleDirectoryLabels(directoryLabelCandidatesForViewport, renderer.getDimensions())
+  const nextDirectoryLabelIds = new Set(nextDirectoryLabels.map(({ id }) => id))
+  const directoryLabelsChanged = !setsEqual(visibleDirectoryLabelIds, nextDirectoryLabelIds)
+  const fileLabelsChanged = showFileLabels !== nextShowFileLabels
+
+  maximumVisibleDirectoryDepth = nextMaximumDirectoryDepth
+  showFileLabels = nextShowFileLabels
+  visibleDirectoryLabels = nextDirectoryLabels
+  visibleDirectoryLabelIds = nextDirectoryLabelIds
+  updateDirectoryLabelDiagnostics(directoryLabelCandidatesForViewport.length)
+
+  if (fileLabelsChanged) {
+    // A full refresh rebuilds Sigma's label grid when file labels cross their zoom threshold.
+    renderer.scheduleRefresh()
+    return true
+  } else if (directoryLabelsChanged) {
+    renderer.refresh({
+      partialGraph: { nodes: graph.filterNodes((_node, attributes) => attributes.nodeKind === "directory") },
+      schedule: true,
+      skipIndexation: true,
+    })
+    return true
+  }
+  return false
+}
+
+function directoryLabelCandidates(maximumDepth: number): readonly DirectoryLabelCandidate[] {
+  const dimensions = renderer.getDimensions()
+  const candidates: DirectoryLabelCandidate[] = []
+  structureContext.save()
+  structureContext.font = `${LABEL_WEIGHT} ${LABEL_SIZE}px ${LABEL_FONT}`
+  graph.forEachNode((id, attributes) => {
     if (
-      attributes.directoryDepth !== undefined &&
-      attributes.directoryDepth <= maximumVisibleDirectoryDepth &&
-      attributes.label !== undefined
+      attributes.nodeKind !== "directory" ||
+      attributes.directoryDepth === undefined ||
+      attributes.label === undefined ||
+      (attributes.directoryDepth > maximumDepth && id !== hoveredDirectoryNodeId)
     ) {
-      visibleDirectoryLabels.push(attributes.label)
+      return
     }
+
+    const node = renderer.graphToViewport(attributes)
+    const nodeSize = renderer.scaleSize(attributes.size)
+    const text = structureContext.measureText(attributes.label)
+    const baseline = node.y + LABEL_SIZE / 3
+    const bounds = {
+      left: node.x + nodeSize + LABEL_OFFSET - DIRECTORY_LABEL_COLLISION_PADDING,
+      top: baseline - Math.max(text.actualBoundingBoxAscent, LABEL_SIZE) - DIRECTORY_LABEL_COLLISION_PADDING,
+      right: node.x + nodeSize + LABEL_OFFSET + text.width + DIRECTORY_LABEL_COLLISION_PADDING,
+      bottom: baseline + Math.max(text.actualBoundingBoxDescent, 0) + DIRECTORY_LABEL_COLLISION_PADDING,
+    }
+    if (bounds.right <= 0 || bounds.bottom <= 0 || bounds.left >= dimensions.width || bounds.top >= dimensions.height) {
+      return
+    }
+    candidates.push({
+      id,
+      label: attributes.label,
+      depth: attributes.directoryDepth,
+      descendantProjectFileCount: attributes.descendantProjectFileCount ?? 0,
+      hovered: id === hoveredDirectoryNodeId,
+      nodeX: node.x,
+      nodeY: node.y,
+      bounds,
+    })
   })
+  structureContext.restore()
+  return candidates
+}
+
+function updateDirectoryLabelDiagnostics(candidateCount: number): void {
   graphContainer.dataset.visibleDirectoryLabelDepth = String(maximumVisibleDirectoryDepth)
-  graphContainer.dataset.visibleDirectoryLabels = JSON.stringify(visibleDirectoryLabels)
+  graphContainer.dataset.visibleDirectoryLabels = JSON.stringify(visibleDirectoryLabels.map(({ label }) => label))
+  graphContainer.dataset.visibleDirectoryLabelRectangles = JSON.stringify(visibleDirectoryLabels)
+  graphContainer.dataset.directoryLabelCandidateCount = String(candidateCount)
+  graphContainer.dataset.suppressedDirectoryLabelCount = String(candidateCount - visibleDirectoryLabels.length)
+}
+
+function updateRenderedLabelDiagnostics(): void {
+  const renderedFileLabels: string[] = []
+  const renderedDirectoryLabels: string[] = []
+  for (const id of renderer.getNodeDisplayedLabels()) {
+    if (!graph.hasNode(id)) {
+      continue
+    }
+    const attributes = graph.getNodeAttributes(id)
+    if (attributes.label === undefined) {
+      continue
+    }
+    if (attributes.nodeKind === "project-file") {
+      renderedFileLabels.push(attributes.label)
+    } else if (attributes.nodeKind === "directory") {
+      renderedDirectoryLabels.push(attributes.label)
+    }
+  }
+  graphContainer.dataset.renderedFileLabels = JSON.stringify(renderedFileLabels.toSorted())
+  graphContainer.dataset.renderedDirectoryLabels = JSON.stringify(renderedDirectoryLabels.toSorted())
+}
+
+function updateCameraDiagnostics(): void {
+  const state = camera.getState()
+  graphContainer.dataset.cameraState = JSON.stringify(state)
+  graphContainer.dataset.fileLabelVisibility = showFileLabels ? "visible" : "hidden"
+}
+
+function completePendingCameraReset(): void {
+  if (!cameraResetAwaitingSettledRender || !fitCurrentGraphInViewport()) {
+    return
+  }
+  cameraResetAwaitingSettledRender = false
+  graphContainer.dataset.cameraReset = "complete"
+}
+
+function fitCurrentGraphInViewport(): boolean {
+  const dimensions = renderer.getDimensions()
+  const circles = graphNodeCircles()
+  if (
+    circles.every(
+      ({ x, y, radius }) =>
+        x - radius >= GRAPH_FIT_MARGIN &&
+        x + radius <= dimensions.width - GRAPH_FIT_MARGIN &&
+        y - radius >= GRAPH_FIT_MARGIN &&
+        y + radius <= dimensions.height - GRAPH_FIT_MARGIN,
+    )
+  ) {
+    return true
+  }
+
+  let ratioMultiplier = 1
+  for (const { x, y, radius } of circles) {
+    const horizontalHalfExtent = dimensions.width / 2 - GRAPH_FIT_MARGIN
+    const verticalHalfExtent = dimensions.height / 2 - GRAPH_FIT_MARGIN
+    if (horizontalHalfExtent <= 0 || verticalHalfExtent <= 0) {
+      throw new Error("The graph viewport has no drawable area.")
+    }
+    ratioMultiplier = Math.max(
+      ratioMultiplier,
+      graphFitRatioMultiplier(Math.abs(x - dimensions.width / 2), radius, horizontalHalfExtent),
+      graphFitRatioMultiplier(Math.abs(y - dimensions.height / 2), radius, verticalHalfExtent),
+    )
+  }
+  const state = camera.getState()
+  camera.setState({ x: 0.5, y: 0.5, angle: 0, ratio: state.ratio * Math.max(1.01, ratioMultiplier * 1.01) })
+  return false
+}
+
+function graphFitRatioMultiplier(centerDisplacement: number, radius: number, viewportHalfExtent: number): number {
+  // With position-referenced item sizes, a ratio multiplier m scales center
+  // displacement by 1/m and radius by 1/sqrt(m). Solve
+  // displacement/m + radius/sqrt(m) <= viewportHalfExtent for m.
+  const squareRootMultiplier =
+    (radius + Math.sqrt(radius * radius + 4 * viewportHalfExtent * centerDisplacement)) / (2 * viewportHalfExtent)
+  return squareRootMultiplier * squareRootMultiplier
 }
 
 function renderStructureLinks(): void {
@@ -403,6 +626,41 @@ function renderStructureLinks(): void {
   structureContext.strokeStyle = "rgba(111, 130, 149, 0.68)"
   structureContext.stroke()
   structureContext.setLineDash([])
+}
+
+function drawNodeHover(
+  context: Parameters<BrowserNodeHoverDrawingFunction>[0],
+  data: Parameters<BrowserNodeHoverDrawingFunction>[1],
+  settings: Parameters<BrowserNodeHoverDrawingFunction>[2],
+): void {
+  if (typeof data.key !== "string" || !data.key.startsWith("directory:")) {
+    drawDiscNodeHover(context, data, settings)
+    return
+  }
+
+  context.save()
+  context.strokeStyle = DIRECTORY_LABEL_HOVER_FOREGROUND
+  context.lineWidth = 2
+  context.beginPath()
+  context.arc(data.x, data.y, data.size + 3, 0, Math.PI * 2)
+  context.stroke()
+
+  if (typeof data.label === "string") {
+    context.font = `${settings.labelWeight} ${settings.labelSize}px ${settings.labelFont}`
+    const labelX = data.x + data.size + LABEL_OFFSET
+    const labelBaseline = data.y + settings.labelSize / 3
+    const labelWidth = context.measureText(data.label).width
+    context.fillStyle = DIRECTORY_LABEL_HOVER_BACKGROUND
+    context.fillRect(
+      labelX - DIRECTORY_LABEL_COLLISION_PADDING,
+      labelBaseline - settings.labelSize - DIRECTORY_LABEL_COLLISION_PADDING,
+      labelWidth + DIRECTORY_LABEL_COLLISION_PADDING * 2,
+      settings.labelSize + DIRECTORY_LABEL_COLLISION_PADDING * 2,
+    )
+    context.fillStyle = DIRECTORY_LABEL_HOVER_FOREGROUND
+    context.fillText(data.label, labelX, labelBaseline)
+  }
+  context.restore()
 }
 
 function requiredCanvasContext(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
@@ -601,14 +859,22 @@ function bringNodeIntoView(nodeId: string): void {
   delete graphContainer.dataset.cameraFocusedNode
   camera.animate({ x: node.x, y: node.y }, { duration: 250 }, () => {
     graphContainer.dataset.cameraFocusedNode = nodeId
-    updateVisibleNodePositionDiagnostics()
   })
 }
 
-function updateVisibleNodePositionDiagnostics(): void {
-  graphContainer.dataset.visibleNodePositions = JSON.stringify(
-    [...visibleNodeIds].map((id) => ({ id, ...renderer.graphToViewport(graph.getNodeAttributes(id)) })),
-  )
+function updateGraphNodeCircleDiagnostics(): void {
+  graphContainer.dataset.visibleNodePositions = JSON.stringify(graphNodeCircles())
+}
+
+function graphNodeCircles(): readonly GraphNodeCircle[] {
+  return graph.nodes().map((id) => {
+    const attributes = graph.getNodeAttributes(id)
+    return {
+      id,
+      ...renderer.graphToViewport(attributes),
+      radius: renderer.scaleSize(attributes.size),
+    }
+  })
 }
 
 function showTooltip(node: ReportNode): void {
@@ -646,9 +912,18 @@ function visibleRelationships(nodeIds: readonly string[]): readonly string[] {
 }
 
 function clearHover(): void {
+  const directoryLabelVisibilityChanged = hoveredDirectoryNodeId !== undefined
   hoveredNodeId = undefined
+  hoveredDirectoryNodeId = undefined
   tooltip.hidden = true
   delete document.documentElement.dataset.hoveredNode
+  delete graphContainer.dataset.hoveredDirectoryLabel
+  delete graphContainer.dataset.directoryLabelHoverForeground
+  delete graphContainer.dataset.directoryLabelHoverBackground
+  if (directoryLabelVisibilityChanged) {
+    markGraphLabelVisibilityDirty()
+    renderer.scheduleRender()
+  }
 }
 
 function positionTooltip(pointerX: number, pointerY: number): void {
@@ -682,6 +957,18 @@ function selectedLineCategories(): readonly ReportLineCategory[] {
   return lineCategoryControls.filter(({ input }) => input.checked).map(({ category }) => category)
 }
 
+function projectFileLabel(path: string): string {
+  return path.split("/").at(-1) ?? path
+}
+
+function isProjectFileInDirectory(filePath: string, directoryPath: string): boolean {
+  return directoryPath === "" || filePath.startsWith(`${directoryPath}/`)
+}
+
+function setsEqual(left: ReadonlySet<string>, right: ReadonlySet<string>): boolean {
+  return left.size === right.size && [...left].every((value) => right.has(value))
+}
+
 function requiredElement(id: string): HTMLElement {
   // A missing element means the generated HTML shell and embedded browser bundle are incompatible, so fail during boot.
   const element = document.getElementById(id)
@@ -695,6 +982,14 @@ function requiredCheckbox(id: string): HTMLInputElement {
   const element = requiredElement(id)
   if (!(element instanceof HTMLInputElement) || element.type !== "checkbox") {
     throw new Error("Static report #" + id + " is not a checkbox.")
+  }
+  return element
+}
+
+function requiredButton(id: string): HTMLButtonElement {
+  const element = requiredElement(id)
+  if (!(element instanceof HTMLButtonElement)) {
+    throw new Error("Static report #" + id + " is not a button.")
   }
   return element
 }

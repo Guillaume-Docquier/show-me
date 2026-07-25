@@ -34,6 +34,13 @@ header p { margin: 0; color: #8fa3b8; font-size: 12px; }
 .report-controls label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
 .report-controls label:has(input:disabled) { color: #6f8295; cursor: default; }
 .report-controls input { accent-color: #79b8ff; }
+.graph-control-button {
+  border: 1px solid #42556a; border-radius: 5px; padding: 6px 9px;
+  background: #17202a; color: #d3dee9; font: 600 11px Inter, ui-sans-serif, system-ui, sans-serif; cursor: pointer;
+}
+.graph-control-button:hover, .graph-control-button:focus-visible {
+  border-color: #79b8ff; background: #1b2b3d; color: #f5f9ff; outline: none;
+}
 .graph-key, .graph-key span { display: flex; align-items: center; gap: 6px; }
 .graph-key { gap: 12px; color: #8fa3b8; }
 .graph-edge-swatch { display: inline-block; width: 18px; }
