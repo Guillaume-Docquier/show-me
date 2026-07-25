@@ -71,6 +71,85 @@ test("keeps every report region usable together on a large desktop", async ({ pa
   })
 })
 
+test("navigates a collapsible and searchable project-files tree", async ({ page }) => {
+  await withTemporaryDirectory(async (temporaryDirectory) => {
+    const report = await test.step("Generate a real report with nested project files", async () => {
+      const analysis = await analyzeProject({ projectRoot: fixtureProjectPath("static-esm") })
+      Assert.isSuccess(analysis)
+      const browserBundle = await readFile(join(process.cwd(), "dist", "report", "browser.js"), "utf8")
+      const path = join(temporaryDirectory, "files-tree.html")
+      await writeFile(path, buildHtmlReport(analysis.value, browserBundle), "utf8")
+      return { path, fileCount: analysis.value.files.length }
+    })
+
+    await test.step("Expand and collapse directories without changing the visible graph", async () => {
+      await page.goto(pathToFileURL(report.path).href)
+      await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
+      await expect(page.locator("#project-file-count")).toHaveText(`${report.fileCount} / ${report.fileCount} project files`)
+      const srcDirectory = page.locator('[data-directory-path="src"]')
+      const mainFile = page.locator('#file-list button[data-node-id="project-file:src/main.ts"]')
+      await expect(srcDirectory).toHaveAttribute("aria-expanded", "true")
+      await expect(mainFile).toBeVisible()
+      await expect(mainFile).toHaveText("main.ts")
+
+      await srcDirectory.click()
+      await expect(srcDirectory).toHaveAttribute("aria-expanded", "false")
+      await expect(mainFile).toBeHidden()
+      await expect(page.locator("#graph")).toHaveAttribute("data-visible-node-count", String(report.fileCount))
+
+      await srcDirectory.click()
+      await expect(srcDirectory).toHaveAttribute("aria-expanded", "true")
+      await expect(mainFile).toBeVisible()
+    })
+
+    await test.step("Filter by full path while retaining the matching hierarchy", async () => {
+      const search = page.getByRole("searchbox", { name: "Search files" })
+      await search.fill("DIRECTORY/INDEX")
+      await expect(page.locator('#file-list button[data-node-id="project-file:src/directory/index.ts"]')).toBeVisible()
+      await expect(page.locator("#file-list button[data-node-id]")).toHaveCount(1)
+      await expect(page.locator('[data-directory-path="src/directory"]')).toBeVisible()
+      await expect(page.locator("#project-file-count")).toHaveText(`${report.fileCount} / ${report.fileCount} project files`)
+
+      await search.fill("does-not-exist")
+      await expect(page.locator("#file-list")).toBeHidden()
+      await expect(page.locator("#file-tree-empty")).toHaveText("No project files match this search.")
+
+      await search.fill("")
+      await expect(page.locator("#file-tree-empty")).toBeHidden()
+      await expect(page.locator("#file-list button[data-node-id]")).toHaveCount(report.fileCount)
+    })
+
+    await test.step("Bring a hovered file into view without replacing click selection", async () => {
+      const graph = page.locator("#graph")
+      const mainFile = page.locator('#file-list button[data-node-id="project-file:src/main.ts"]')
+      const runtimeFile = page.locator('#file-list button[data-node-id="project-file:src/runtime.ts"]')
+      await mainFile.click()
+      await expect(page.locator("html")).toHaveAttribute("data-selected-node", "project-file:src/main.ts")
+      await expect(graph).toHaveAttribute("data-camera-focused-node", "project-file:src/main.ts")
+
+      await runtimeFile.hover()
+      await expect(graph).toHaveAttribute("data-camera-focused-node", "project-file:src/runtime.ts")
+      await expect(page.locator("html")).toHaveAttribute("data-selected-node", "project-file:src/main.ts")
+      const graphBounds = await graph.boundingBox()
+      const serializedPositions = await graph.getAttribute("data-visible-node-positions")
+      Assert.isDefined(graphBounds)
+      Assert.isDefined(serializedPositions)
+      const runtimePosition =
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- It's a test, malformed diagnostics must fail this browser assertion.
+        (JSON.parse(serializedPositions) as Array<{ readonly id: string; readonly x: number; readonly y: number }>).find(
+          ({ id }) => id === "project-file:src/runtime.ts",
+        )
+      Assert.isDefined(runtimePosition)
+      expect(Math.abs(runtimePosition.x - graphBounds.width / 2)).toBeLessThanOrEqual(2)
+      expect(Math.abs(runtimePosition.y - graphBounds.height / 2)).toBeLessThanOrEqual(2)
+
+      await runtimeFile.click()
+      await expect(page.locator("html")).toHaveAttribute("data-selected-node", "project-file:src/runtime.ts")
+      await expect(runtimeFile).toHaveAttribute("aria-current", "true")
+    })
+  })
+})
+
 test("supports graph hover, selection, clearing, and side-panel navigation", async ({ page }) => {
   await withTemporaryDirectory(async (temporaryDirectory) => {
     const report = await test.step("Generate a raw-analysis report with a long project path", async () => {
@@ -92,7 +171,7 @@ test("supports graph hover, selection, clearing, and side-panel navigation", asy
       await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
       await expect(page).toHaveTitle("project · Show Me")
       await expect(page.locator("#project-name")).toHaveText("project")
-      await expect(page.locator("#project-file-count")).toHaveText("1 project files")
+      await expect(page.locator("#project-file-count")).toHaveText("1 / 1 project file")
       await expect(page.locator("#graph")).toHaveAttribute("data-visible-node-count", "1")
       await expect(page.locator("#graph")).toHaveAttribute("data-visible-edge-count", "0")
       await page.evaluate(async () => {
@@ -532,13 +611,13 @@ test("renders and filters one complete pnpm workspace without mutating its analy
     await test.step("Open with every workspace package and cross-package edge visible", async () => {
       await page.goto(pathToFileURL(reportPath).href)
       await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
-      await expect(page.locator("#project-file-count")).toHaveText("8 project files")
+      await expect(page.locator("#project-file-count")).toHaveText("8 / 8 project files")
       await expect(page.locator("#workspace-package-fieldset")).toBeVisible()
       await expect(page.locator("#workspace-package-controls input")).toHaveCount(4)
       await expect(page.locator("#workspace-package-controls input:checked")).toHaveCount(4)
       await expect(page.locator("#graph")).toHaveAttribute("data-visible-node-count", "8")
       await expect(page.locator("#graph")).toHaveAttribute("data-visible-edge-count", "6")
-      await expect(page.locator("#file-list button")).toHaveCount(8)
+      await expect(page.locator("#file-list button[data-node-id]")).toHaveCount(8)
     })
 
     await test.step("Scope to backend and retain only its external packages", async () => {
@@ -547,7 +626,8 @@ test("renders and filters one complete pnpm workspace without mutating its analy
       await page.getByRole("checkbox", { name: "@fixture/shared", exact: true }).uncheck()
       await expect(page.locator("#graph")).toHaveAttribute("data-visible-node-count", "2")
       await expect(page.locator("#graph")).toHaveAttribute("data-visible-edge-count", "1")
-      await expect(page.locator("#file-list button")).toHaveCount(2)
+      await expect(page.locator("#project-file-count")).toHaveText("2 / 8 project files")
+      await expect(page.locator("#file-list button[data-node-id]")).toHaveCount(2)
       await expect(page.getByRole("button", { name: "apps/frontend/src/main.ts", exact: true })).toHaveCount(0)
       await page.getByRole("checkbox", { name: "External packages" }).check()
       await expect(page.locator("#graph")).toHaveAttribute("data-visible-node-count", "3")
@@ -556,14 +636,24 @@ test("renders and filters one complete pnpm workspace without mutating its analy
       await expect(page.locator("#external-package-list")).not.toContainText("frontend-library")
     })
 
+    await test.step("Hide every workspace and show a deliberate empty state", async () => {
+      await page.getByRole("checkbox", { name: "@fixture/backend", exact: true }).uncheck()
+      await expect(page.locator("#graph")).toHaveAttribute("data-visible-node-count", "0")
+      await expect(page.locator("#project-file-count")).toHaveText("0 / 8 project files")
+      await expect(page.locator("#file-list")).toBeHidden()
+      await expect(page.locator("#file-tree-empty")).toHaveText("No project files are visible. Select a workspace package to show files.")
+    })
+
     await test.step("Restore the complete immutable analysis", async () => {
       await page.getByRole("checkbox", { name: "External packages" }).uncheck()
       await page.getByRole("checkbox", { name: "@fixture/root", exact: true }).check()
+      await page.getByRole("checkbox", { name: "@fixture/backend", exact: true }).check()
       await page.getByRole("checkbox", { name: "@fixture/frontend", exact: true }).check()
       await page.getByRole("checkbox", { name: "@fixture/shared", exact: true }).check()
       await expect(page.locator("#graph")).toHaveAttribute("data-visible-node-count", "8")
       await expect(page.locator("#graph")).toHaveAttribute("data-visible-edge-count", "6")
-      await expect(page.locator("#file-list button")).toHaveCount(8)
+      await expect(page.locator("#project-file-count")).toHaveText("8 / 8 project files")
+      await expect(page.locator("#file-list button[data-node-id]")).toHaveCount(8)
     })
   })
 })
@@ -590,9 +680,10 @@ test("opens an empty report generated by the built CLI and real browser bundle",
       expect(report.execution.stderr).toBe("")
       expect(report.execution.stdout).toContain("Report written to " + report.reportPath)
       await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
-      await expect(page.locator("header p")).toHaveText("0 project files")
+      await expect(page.locator("header p")).toHaveText("0 / 0 project files")
       await expect(page.locator("#selected-empty")).toBeVisible()
-      await expect(page.locator("#file-list button")).toHaveCount(0)
+      await expect(page.locator("#file-tree-empty")).toHaveText("This report contains no project files.")
+      await expect(page.locator("#file-list button[data-node-id]")).toHaveCount(0)
       expect(pageErrors).toEqual([])
     })
   })

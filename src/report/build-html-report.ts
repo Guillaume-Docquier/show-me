@@ -38,6 +38,11 @@ export function buildHtmlReport(analysis: ProjectAnalysis, browserBundle: string
 <main>
   <aside id="files" aria-labelledby="files-heading">
     <h2 id="files-heading">Project files</h2>
+    <label class="file-search" for="file-search">
+      <span>Search files</span>
+      <input id="file-search" type="search" placeholder="Filter by path" autocomplete="off">
+    </label>
+    <p id="file-tree-empty" class="file-tree-empty" role="status" hidden></p>
     <ol id="file-list" class="file-list node-list"></ol>
     <section id="external-package-section" hidden>
       <h2><span class="package-swatch" aria-hidden="true"></span>External packages</h2>

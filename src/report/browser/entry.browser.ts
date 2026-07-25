@@ -15,6 +15,7 @@ import { createEdgeArrowProgram } from "sigma/rendering"
 import type { NodeDisplayData } from "sigma/types"
 import { type ProjectAnalysis } from "../../analysis/project-analysis.js"
 import { visibleDirectoryDepth } from "./directory-label-visibility.js"
+import { buildProjectFileTree, type ProjectFileTreeEntry, type ProjectFileTreeFile } from "./project-file-tree.js"
 import { buildProjectStructure, type ProjectStructureEdge } from "./project-structure.js"
 import {
   activeLineCount,
@@ -80,6 +81,8 @@ const selectedCoverage = requiredElement("selected-coverage")
 const selectedDependencyNodes = requiredElement("selected-dependency-nodes")
 const selectedConsumerNodes = requiredElement("selected-consumer-files")
 const clearSelection = requiredElement("clear-selection")
+const fileSearch = requiredSearchInput("file-search")
+const fileTreeEmpty = requiredElement("file-tree-empty")
 const fileList = requiredElement("file-list")
 const externalPackageSection = requiredElement("external-package-section")
 const externalPackageList = requiredElement("external-package-list")
@@ -93,7 +96,6 @@ const lineCategoryControls = REPORT_LINE_CATEGORIES.map((category) => ({
 const projectFileDetailElements = document.querySelectorAll<HTMLElement>("[data-project-file-detail]")
 document.title = `${presentation.projectName} · Show Me`
 projectName.textContent = presentation.projectName
-projectFileCount.textContent = `${analysis.files.length} project files`
 
 // This index covers the complete derived presentation. The Graphology graph and
 // visibleNodeIds below contain only the projection selected by the current view.
@@ -102,6 +104,7 @@ const graph = new DirectedGraph<BrowserNodeAttributes>()
 let selectedNodeId: string | undefined
 let hoveredNodeId: string | undefined
 let visibleNodeIds = new Set<string>()
+const collapsedDirectoryPaths = new Set<string>()
 let viewState: ReportViewState = {
   lineCategories: ["code"],
   externalPackages: false,
@@ -187,6 +190,10 @@ const workspacePackageInputs = presentation.workspacePackages.map((workspacePack
   return input
 })
 workspacePackageFieldset.hidden = workspacePackageInputs.length === 0
+fileSearch.addEventListener("input", () => {
+  collapsedDirectoryPaths.clear()
+  renderProjectFileList()
+})
 
 renderer.on("enterNode", ({ node, event }) => {
   const reportNode = nodeById.get(node)
@@ -326,6 +333,9 @@ function applyReportView(nextState: ReportViewState): void {
   for (const input of workspacePackageInputs) {
     input.checked = viewState.workspacePackages.has(input.dataset.workspacePackage ?? "")
   }
+  const visibleProjectFileCount = visibleProjectNodeIds.size
+  const projectFileNoun = analysis.files.length === 1 ? "project file" : "project files"
+  projectFileCount.textContent = `${visibleProjectFileCount} / ${analysis.files.length} ${projectFileNoun}`
   renderProjectFileList()
   renderExternalPackageList()
   renderSelection()
@@ -345,9 +355,7 @@ function applyReportView(nextState: ReportViewState): void {
   graphContainer.dataset.visibleNodeColors = JSON.stringify(visibleNodes.map(({ id, color }) => ({ id, color })))
   graphContainer.dataset.layoutSignature = layoutSignature(visibleNodes.map(({ id, size }) => ({ id, size })))
   renderer.refresh()
-  graphContainer.dataset.visibleNodePositions = JSON.stringify(
-    visibleNodes.map(({ id }) => ({ id, ...renderer.graphToViewport(graph.getNodeAttributes(id)) })),
-  )
+  updateVisibleNodePositionDiagnostics()
 }
 
 function updateDirectoryLabelDiagnostics(): void {
@@ -407,11 +415,78 @@ function requiredCanvasContext(canvas: HTMLCanvasElement): CanvasRenderingContex
 
 function renderProjectFileList(): void {
   fileList.replaceChildren()
-  for (const node of presentation.nodes) {
-    if (node.kind === "project-file" && visibleNodeIds.has(node.id)) {
-      fileList.append(nodeListItem(node))
-    }
+  const visibleProjectFiles = presentation.nodes.filter(
+    (node): node is ReportProjectFileNode => node.kind === "project-file" && visibleNodeIds.has(node.id),
+  )
+  const tree = buildProjectFileTree(visibleProjectFiles, fileSearch.value)
+  fileList.append(...tree.map(projectFileTreeItem))
+
+  const emptyMessage = projectFileTreeEmptyMessage(visibleProjectFiles.length, tree.length)
+  fileTreeEmpty.hidden = emptyMessage === undefined
+  fileList.hidden = emptyMessage !== undefined
+  if (emptyMessage !== undefined) {
+    fileTreeEmpty.textContent = emptyMessage
   }
+}
+
+function projectFileTreeItem(entry: ProjectFileTreeEntry): HTMLLIElement {
+  if (entry.kind === "file") {
+    return projectFileTreeFileItem(entry)
+  }
+
+  const item = document.createElement("li")
+  item.className = "file-tree-directory"
+  const button = document.createElement("button")
+  button.type = "button"
+  button.className = "file-tree-directory-toggle"
+  button.textContent = entry.name
+  button.title = entry.path
+  button.dataset.directoryPath = entry.path
+  const children = document.createElement("ol")
+  children.className = "file-tree-children"
+  children.append(...entry.children.map(projectFileTreeItem))
+  const expanded = !collapsedDirectoryPaths.has(entry.path)
+  button.setAttribute("aria-expanded", String(expanded))
+  children.hidden = !expanded
+  button.addEventListener("click", () => {
+    if (collapsedDirectoryPaths.has(entry.path)) {
+      collapsedDirectoryPaths.delete(entry.path)
+    } else {
+      collapsedDirectoryPaths.add(entry.path)
+    }
+    renderProjectFileList()
+  })
+  item.append(button, children)
+  return item
+}
+
+function projectFileTreeFileItem(entry: ProjectFileTreeFile): HTMLLIElement {
+  const node = nodeById.get(entry.id)
+  if (node === undefined || node.kind !== "project-file") {
+    throw new Error(`Files tree references missing project node ${entry.id}.`)
+  }
+
+  const item = document.createElement("li")
+  item.className = "file-tree-file"
+  const button = nodeListButton(node, entry.name)
+  button.setAttribute("aria-label", node.displayName)
+  button.addEventListener("pointerenter", () => {
+    bringNodeIntoView(node.id)
+  })
+  item.append(button)
+  return item
+}
+
+function projectFileTreeEmptyMessage(visibleFileCount: number, treeEntryCount: number): string | undefined {
+  if (visibleFileCount === 0) {
+    return analysis.files.length === 0
+      ? "This report contains no project files."
+      : "No project files are visible. Select a workspace package to show files."
+  }
+  if (treeEntryCount === 0) {
+    return "No project files match this search."
+  }
+  return undefined
 }
 
 function selectNode(nodeId: string | undefined): void {
@@ -421,7 +496,7 @@ function selectNode(nodeId: string | undefined): void {
 }
 
 function renderSelection(): void {
-  for (const button of document.querySelectorAll<HTMLElement>(".node-list button")) {
+  for (const button of document.querySelectorAll<HTMLElement>(".node-list button[data-node-id]")) {
     button.setAttribute("aria-current", button.dataset.nodeId === selectedNodeId ? "true" : "false")
   }
 
@@ -494,9 +569,14 @@ function renderExternalPackageList(): void {
 function nodeListItem(node: ReportNode): HTMLLIElement {
   // DOM list buttons are keyboard-accessible navigation counterparts to the WebGL nodes.
   const item = document.createElement("li")
+  item.append(nodeListButton(node, node.displayName))
+  return item
+}
+
+function nodeListButton(node: ReportNode, label: string): HTMLButtonElement {
   const button = document.createElement("button")
   button.type = "button"
-  button.append(document.createTextNode(node.displayName))
+  button.append(document.createTextNode(label))
   if (node.kind === "external-package") {
     const kind = document.createElement("span")
     kind.className = "node-kind-label"
@@ -505,11 +585,30 @@ function nodeListItem(node: ReportNode): HTMLLIElement {
   }
   button.title = node.displayName
   button.dataset.nodeId = node.id
+  button.setAttribute("aria-current", node.id === selectedNodeId ? "true" : "false")
   button.addEventListener("click", () => {
     selectNode(node.id)
   })
-  item.append(button)
-  return item
+  return button
+}
+
+function bringNodeIntoView(nodeId: string): void {
+  const node = renderer.getNodeDisplayData(nodeId)
+  if (node === undefined) {
+    return
+  }
+
+  delete graphContainer.dataset.cameraFocusedNode
+  camera.animate({ x: node.x, y: node.y }, { duration: 250 }, () => {
+    graphContainer.dataset.cameraFocusedNode = nodeId
+    updateVisibleNodePositionDiagnostics()
+  })
+}
+
+function updateVisibleNodePositionDiagnostics(): void {
+  graphContainer.dataset.visibleNodePositions = JSON.stringify(
+    [...visibleNodeIds].map((id) => ({ id, ...renderer.graphToViewport(graph.getNodeAttributes(id)) })),
+  )
 }
 
 function showTooltip(node: ReportNode): void {
@@ -596,6 +695,14 @@ function requiredCheckbox(id: string): HTMLInputElement {
   const element = requiredElement(id)
   if (!(element instanceof HTMLInputElement) || element.type !== "checkbox") {
     throw new Error("Static report #" + id + " is not a checkbox.")
+  }
+  return element
+}
+
+function requiredSearchInput(id: string): HTMLInputElement {
+  const element = requiredElement(id)
+  if (!(element instanceof HTMLInputElement) || element.type !== "search") {
+    throw new Error("Static report #" + id + " is not a search input.")
   }
   return element
 }

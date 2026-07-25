@@ -51,6 +51,15 @@ main {
 #files h2, #details h2, .report-controls h2 {
   margin: 0 0 12px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: #8fa3b8;
 }
+.file-search { display: grid; gap: 6px; margin-bottom: 14px; color: #8fa3b8; font-size: 11px; }
+.file-search input {
+  width: 100%; border: 1px solid #344456; border-radius: 5px; padding: 8px 9px;
+  background: #0d141c; color: #e7edf4; font: 11px ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+.file-search input::placeholder { color: #6f8295; }
+.file-search input:focus-visible { border-color: #79b8ff; outline: 1px solid #79b8ff; outline-offset: 1px; }
+.file-tree-empty { margin: 4px 0 0; color: #8fa3b8; font-size: 11px; line-height: 1.5; }
+.file-tree-empty[hidden], .file-list[hidden] { display: none; }
 .report-controls h2 { margin: 0; padding-right: 18px; border-right: 1px solid #25303b; white-space: nowrap; }
 #details h3 { margin: 16px 0 7px; font-size: 11px; color: #8fa3b8; }
 #selected-empty { color: #6f8295; line-height: 1.5; }
@@ -61,11 +70,16 @@ main {
 dl { display: grid; grid-template-columns: 1fr auto; gap: 7px 16px; margin: 16px 0 22px; font-size: 12px; }
 dt { color: #8fa3b8; } dd { margin: 0; font-variant-numeric: tabular-nums; }
 .file-list { display: grid; gap: 5px; padding: 0; margin: 0; list-style: none; }
+.file-tree-children { display: grid; gap: 3px; margin: 3px 0 0 9px; padding: 0 0 0 9px; border-left: 1px solid #25303b; list-style: none; }
+.file-tree-children[hidden] { display: none; }
 .file-list button {
   width: 100%; border: 1px solid transparent; border-radius: 5px; padding: 7px 8px;
   background: transparent; color: #aebdca; text-align: left; font: 11px ui-monospace, SFMono-Regular, Consolas, monospace;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer;
 }
+.file-list .file-tree-directory-toggle { color: #d3dee9; font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-weight: 600; }
+.file-tree-directory-toggle::before { display: inline-block; width: 12px; margin-right: 3px; color: #6f8295; content: "▾"; }
+.file-tree-directory-toggle[aria-expanded="false"]::before { content: "▸"; }
 .file-list button:hover, .file-list button:focus-visible { border-color: #42556a; background: #18222d; outline: none; }
 .relationship-list { margin-bottom: 10px; }
 .relationship-empty { padding: 5px 8px; color: #6f8295; font-size: 11px; }
