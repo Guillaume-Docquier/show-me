@@ -1,9 +1,5 @@
 import { Result } from "@guillaume-docquier/tools-ts"
-import {
-  DEFAULT_PROJECT_FILE_SELECTION,
-  ProjectFileSelection,
-  type InvalidProjectFileExclusionPattern,
-} from "../project-files/project-file-selection.js"
+import { ProjectFileSelection, type InvalidProjectFileExclusionPattern } from "../project-files/project-file-selection.js"
 
 /**
  * A command accepted by the Show Me CLI.
@@ -16,7 +12,7 @@ export type CliCommand =
       readonly projectPath: string
       readonly outputPath: string | undefined
       readonly coveragePath: string | undefined
-      readonly fileSelection: ProjectFileSelection
+      readonly fileSelectionOverride: ProjectFileSelection | undefined
     }
 
 /**
@@ -108,12 +104,11 @@ export function parseCliArguments(arguments_: readonly string[]): Result<CliComm
     hasProjectPath = true
   }
 
-  const fileSelection =
-    exclusionPatterns === undefined ? Result.Success(DEFAULT_PROJECT_FILE_SELECTION) : ProjectFileSelection.parse(exclusionPatterns)
-  if (Result.isFailure(fileSelection)) {
+  const fileSelectionOverride = exclusionPatterns === undefined ? undefined : ProjectFileSelection.parse(exclusionPatterns)
+  if (fileSelectionOverride !== undefined && Result.isFailure(fileSelectionOverride)) {
     return Result.Failure({
       _tag: "InvalidCliArguments",
-      message: formatInvalidExclusionPattern(fileSelection.error),
+      message: formatInvalidExclusionPattern(fileSelectionOverride.error),
     })
   }
 
@@ -122,7 +117,7 @@ export function parseCliArguments(arguments_: readonly string[]): Result<CliComm
     projectPath,
     outputPath,
     coveragePath,
-    fileSelection: fileSelection.value,
+    fileSelectionOverride: fileSelectionOverride?.value,
   })
 }
 

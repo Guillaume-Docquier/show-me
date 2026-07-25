@@ -1,0 +1,4 @@
+{
+  // Replace the built-in test and spec exclusions.
+  "exclude": ["*.generated.*"],
+}

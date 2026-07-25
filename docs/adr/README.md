@@ -10,6 +10,7 @@ This index summarizes all accepted ADRs. When applying the concepts, read the re
 | [004](./004-generate-one-self-contained-html-report.md)     | Publish a scoped npm package whose CLI writes one offline HTML report.                           | Changing package identity, CLI output behavior, report packaging, or browser-launch behavior. |
 | [005](./005-publish-dogfood-report-with-github-pages.md)    | Publish the latest validated, coverage-enriched repository report through GitHub Pages.          | Changing public report delivery, deployment gates, Pages artifacts, or workflow permissions.  |
 | [006](./006-use-yaml-and-tinyglobby-for-pnpm-workspaces.md) | Parse pnpm workspace YAML and expand package globs with focused libraries.                       | Changing pnpm workspace discovery, package-pattern parsing, or its dependencies.              |
+| [007](./007-use-jsonc-and-zod-for-project-configuration.md) | Parse one root JSONC file strictly and translate it into typed application inputs.               | Changing project-configuration discovery, schema parsing, precedence, or dependencies.        |
 
 ## Deprecated / Superseded ADRs
 

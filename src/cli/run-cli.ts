@@ -3,8 +3,10 @@ import { resolve } from "node:path"
 import { Result, Time, Timer, UnitOfTime } from "@guillaume-docquier/tools-ts"
 import packageMetadata from "../../package.json" with { type: "json" }
 import { analyzeProject, type AnalyzeProjectError } from "../analysis/analyze-project.js"
+import { loadProjectConfiguration, type ProjectConfigurationError } from "../configuration/project-configuration.js"
 import { importCoverage, importDiscoveredCoverage, type CoverageImportError } from "../coverage/import-coverage.js"
 import type { PerformanceProfiler } from "../performance/performance-profiler.js"
+import { DEFAULT_PROJECT_FILE_SELECTION, type InvalidProjectFileExclusionPattern } from "../project-files/project-file-selection.js"
 import { buildHtmlReport, loadBrowserBundle, type BrowserBundleReadError } from "../report/build-html-report.js"
 import { parseCliArguments } from "./parse-cli-arguments.js"
 
@@ -35,7 +37,7 @@ const HELP = `Usage: show-me [project-path] [options]
 Options:
   --output <path>      Write the report to this path
   --coverage <path>    Read one explicit Istanbul or LCOV report
-  --exclude <pattern>  Replace built-in exclusions; repeat for more patterns
+  --exclude <pattern>  Replace configured or built-in exclusions; repeat for more
   -h, --help           Show this help
   -v, --version        Show the version
 `
@@ -68,9 +70,16 @@ export async function runCli(arguments_: readonly string[], output: CliOutput, o
   const startedAt = Timer.start()
   const currentDirectory = options.currentDirectory ?? process.cwd()
   const projectRoot = resolve(currentDirectory, command.value.projectPath)
+  const projectConfiguration = await loadProjectConfiguration(projectRoot)
+  if (Result.isFailure(projectConfiguration)) {
+    output.writeStandardError(`${formatProjectConfigurationError(projectConfiguration.error)}\n`)
+    return 1
+  }
+
+  const fileSelection = command.value.fileSelectionOverride ?? projectConfiguration.value.fileSelection ?? DEFAULT_PROJECT_FILE_SELECTION
   const analysis = await analyzeProject({
     projectRoot,
-    fileSelection: command.value.fileSelection,
+    fileSelection,
     ...(options.performanceProfiler === undefined ? {} : { performanceProfiler: options.performanceProfiler }),
   })
 
@@ -141,6 +150,43 @@ export async function runCli(arguments_: readonly string[], output: CliOutput, o
   output.writeStandardOutput(`Report written to ${outputPath}\n`)
   output.writeStandardOutput(`Completed in ${elapsedMilliseconds.toFixed(1)} ms.\n`)
   return 0
+}
+
+function formatProjectConfigurationError(error: ProjectConfigurationError): string {
+  switch (error._tag) {
+    case "ProjectConfigurationReadFailed":
+      return `Could not read project configuration ${error.configurationFile}: ${error.cause.message}`
+    case "ProjectConfigurationJsonInvalid":
+      return `Could not parse project configuration ${error.configurationFile}: ${error.issues
+        .map((issue) => `${issue.code} at offset ${issue.offset}`)
+        .join(", ")}.`
+    case "ProjectConfigurationSchemaInvalid":
+      return `Invalid project configuration ${error.configurationFile}: ${error.issues
+        .map((issue) => `${issue.path}: ${issue.message}`)
+        .join(", ")}.`
+    case "ProjectConfigurationFileSelectionInvalid":
+      return `Invalid project configuration ${error.configurationFile}: ${formatConfiguredExclusionPattern(error.cause)}`
+  }
+}
+
+function formatConfiguredExclusionPattern(error: InvalidProjectFileExclusionPattern): string {
+  const pattern = JSON.stringify(error.pattern)
+  switch (error.reason) {
+    case "empty":
+      return "exclude patterns must be non-empty."
+    case "multiline":
+      return `exclude pattern ${pattern} must contain exactly one line.`
+    case "comment":
+      return `exclude pattern ${pattern} is a comment rather than an exclusion.`
+    case "negated":
+      return `exclude pattern ${pattern} uses unsupported negation.`
+    case "backslash":
+      return `exclude pattern ${pattern} must use forward slashes.`
+    case "absolute":
+      return `exclude pattern ${pattern} must be project-relative.`
+    case "dot-segment":
+      return `exclude pattern ${pattern} must not contain dot path segments.`
+  }
 }
 
 function formatAnalysisError(error: AnalyzeProjectError): string {

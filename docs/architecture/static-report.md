@@ -23,12 +23,13 @@ Defaults and path rules:
 - The project root defaults to the directory where the command is invoked.
 - The report defaults to `show-me.html` in the directory where the command is invoked.
 - A relative `--output` path is resolved from the invocation directory.
+- The analyzed project root may contain one automatically discovered `show-me.config.json` JSONC file.
 - Repeatable `--exclude` patterns replace the built-in `*.test.*` and `*.spec.*` exclusions for that invocation.
 - The output file is overwritten without requiring a force flag.
 - The command never opens a browser and no browser-opening option is planned.
 - Success prints the resolved output path and total execution time, then exits.
 
-The CLI surface contains the optional project path, `--output`, `--coverage`, repeatable `--exclude`, `--help`, and `--version`. Exclusion patterns use the project-relative semantics documented in [analysis architecture](./analysis.md). There is no Show Me configuration file yet; persistent selection belongs to [milestone 015](../tasks/015-project-configuration.md).
+The CLI surface contains the optional project path, `--output`, `--coverage`, repeatable `--exclude`, `--help`, and `--version`. Exclusion patterns use the project-relative semantics documented in [analysis architecture](./analysis.md). Project configuration supplies the same complete pattern set when the CLI option is absent; CLI values replace configured values, configured values replace built-in defaults, and defined arrays are never additive.
 
 ## Published repository report
 

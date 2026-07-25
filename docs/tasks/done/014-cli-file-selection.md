@@ -45,4 +45,4 @@ One CLI invocation can replace Show Me's built-in test and spec exclusions with 
 
 ## Discovered gaps
 
-- Persistent settings belong to [milestone 015](../015-project-configuration.md); this milestone does not introduce implicit config loading.
+- Persistent settings belong to [milestone 015](./015-project-configuration.md); this milestone does not introduce implicit config loading.

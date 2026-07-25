@@ -6,7 +6,6 @@ This directory tracks milestones, implementation progress, verification evidence
 
 | Milestone                                                                       | Status      | Outcome                                                        |
 | ------------------------------------------------------------------------------- | ----------- | -------------------------------------------------------------- |
-| [015 Project configuration](./015-project-configuration.md)                     | Not started | Persist file-selection settings with explicit CLI precedence.  |
 | [020 Configurable coverage locations](./020-configurable-coverage-locations.md) | Not started | Configure per-package locations and multiple explicit reports. |
 
 ## Done
@@ -29,6 +28,7 @@ Completed milestone files are retained under [`done/`](./done/) as implementatio
 | [012 GitHub Pages report](./done/012-github-pages-report.md)                   | 2026-07-16 | Publishes a validated live visualization of the repository.            |
 | [013 Default test-file exclusions](./done/013-default-test-file-exclusions.md) | 2026-07-16 | Removes conventionally named test files from default analysis.         |
 | [014 CLI file selection](./done/014-cli-file-selection.md)                     | 2026-07-25 | Replaces built-in test exclusions with one-invocation patterns.        |
+| [015 Project configuration](./done/015-project-configuration.md)               | 2026-07-25 | Persists file-selection settings with explicit CLI precedence.         |
 | [016 Codebase consolidation](./done/016-codebase-consolidation.md)             | 2026-07-16 | Hardened analysis, report, CLI, build, and package boundaries.         |
 | [017 Browser-owned presentation](./done/017-browser-owned-presentation.md)     | 2026-07-18 | Embeds raw analysis and derives presentation in the browser.           |
 | [018 LCOV coverage](./done/018-lcov-coverage.md)                               | 2026-07-18 | Imports LCOV and deterministically selects one coverage report.        |

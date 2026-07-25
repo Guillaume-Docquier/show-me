@@ -44,7 +44,7 @@ describe("runCli", () => {
 Options:
   --output <path>      Write the report to this path
   --coverage <path>    Read one explicit Istanbul or LCOV report
-  --exclude <pattern>  Replace built-in exclusions; repeat for more patterns
+  --exclude <pattern>  Replace configured or built-in exclusions; repeat for more
   -h, --help           Show this help
   -v, --version        Show the version
 `,

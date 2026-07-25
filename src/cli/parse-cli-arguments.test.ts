@@ -1,6 +1,5 @@
 import { Result } from "@guillaume-docquier/tools-ts"
 import { expect, it } from "vitest"
-import { DEFAULT_PROJECT_FILE_SELECTION } from "../project-files/project-file-selection.js"
 import { parseCliArguments } from "./parse-cli-arguments.js"
 
 it("uses the current directory when the project path is omitted", () => {
@@ -14,7 +13,7 @@ it("uses the current directory when the project path is omitted", () => {
       projectPath: ".",
       outputPath: undefined,
       coveragePath: undefined,
-      fileSelection: DEFAULT_PROJECT_FILE_SELECTION,
+      fileSelectionOverride: undefined,
     }),
   )
 })
@@ -30,7 +29,7 @@ it("parses the project, output, and coverage paths", () => {
       projectPath: "../project",
       outputPath: "report.html",
       coveragePath: "coverage.json",
-      fileSelection: DEFAULT_PROJECT_FILE_SELECTION,
+      fileSelectionOverride: undefined,
     }),
   )
 })
@@ -46,7 +45,7 @@ it("accepts options before the project path", () => {
       projectPath: "../project",
       outputPath: "report.html",
       coveragePath: "coverage.json",
-      fileSelection: DEFAULT_PROJECT_FILE_SELECTION,
+      fileSelectionOverride: undefined,
     }),
   )
 })
@@ -62,7 +61,7 @@ it("replaces the built-in exclusions with repeated patterns", () => {
       projectPath: ".",
       outputPath: undefined,
       coveragePath: undefined,
-      fileSelection: {
+      fileSelectionOverride: {
         exclusionPatterns: ["generated/**", "vendor/*.ts"],
       },
     }),

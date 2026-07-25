@@ -10,7 +10,7 @@ Repositories can configure different coverage-report locations for the project r
 
 ## Dependencies
 
-- [Milestone 015](./015-project-configuration.md) establishes persistent project configuration and CLI precedence.
+- [Milestone 015](./done/015-project-configuration.md) establishes persistent project configuration and CLI precedence.
 - [Milestone 019](./done/019-monorepo-coverage-discovery.md) establishes automatic multi-root discovery and report merging.
 
 ## Tasks
