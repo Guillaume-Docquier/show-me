@@ -458,7 +458,7 @@ test("shows, distinguishes, filters, and deterministically restores type-only de
       await expect(page.locator(".type-only-dependency-edge-swatch")).toBeVisible()
 
       const renderedEdges = await readJsonAttribute<readonly DependencyEdgeDiagnostic[]>(graph, "data-rendered-dependency-edges")
-      expect(new Set(renderedEdges.map(({ color }) => color))).toEqual(new Set(["rgba(98, 139, 181, 0.32)", "rgba(45, 212, 191, 0.5)"]))
+      expect(new Set(renderedEdges.map(({ color }) => color))).toEqual(new Set(["rgba(98, 139, 181, 0.32)", "rgba(163, 230, 53, 0.5)"]))
 
       await page.locator("#file-list").getByRole("button", { name: "src/main.ts", exact: true }).click()
       await expect(page.locator("#selected-dependencies")).toHaveText("9")
@@ -499,7 +499,7 @@ test("shows, distinguishes, filters, and deterministically restores type-only de
       ])
       const renderedEdges = await readJsonAttribute<readonly DependencyEdgeDiagnostic[]>(graph, "data-rendered-dependency-edges")
       expect(new Set(renderedEdges.map(({ color }) => color))).toEqual(
-        new Set(["rgba(98, 139, 181, 0.32)", "rgba(154, 104, 193, 0.38)", "rgba(45, 212, 191, 0.5)"]),
+        new Set(["rgba(98, 139, 181, 0.32)", "rgba(154, 104, 193, 0.38)", "rgba(163, 230, 53, 0.5)"]),
       )
       await page.getByRole("checkbox", { name: "Type-only dependencies" }).uncheck()
       await expect(graph).toHaveAttribute("data-visible-edge-count", "14")

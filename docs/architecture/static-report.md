@@ -85,7 +85,7 @@ Package nodes use a fixed size and a distinct purple appearance. Color is not th
 
 ## Type-only dependency control
 
-Explicitly type-only dependencies are visible by default and use teal arrows distinct from runtime project-file, runtime external-package, and structure edges. Their relationship entries are labeled in node details. A checked independent control removes type-only edges from the current view without changing the embedded analysis; project-file nodes remain visible, while an external package disappears when all of its currently eligible relationships are type-only.
+Explicitly type-only dependencies are visible by default and use lime arrows distinct from runtime project-file, runtime external-package, and structure edges. Their relationship entries are labeled in node details. A checked independent control removes type-only edges from the current view without changing the embedded analysis; project-file nodes remain visible, while an external package disappears when all of its currently eligible relationships are type-only.
 
 Type-only visibility participates in the same report-view transition as workspace-package and external-package visibility. Returning to an earlier combination reconstructs the same ordered node and edge inputs before deterministic layout. The render-only dependency-edge control remains broader and hides both runtime and type-only arrows without rebuilding the graph.
 
