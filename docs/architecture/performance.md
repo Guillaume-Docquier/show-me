@@ -46,7 +46,7 @@ The final pairwise collision check is quadratic but runs once, rather than on ev
 
 ## Reproducible benchmarks and budgets
 
-Run `pnpm test:performance` for the automated 300-file, 163,950-line sentinel. It is part of `pnpm checks`. Run `pnpm benchmark:full` for the 1,000-file, 5,046,995-line workload; CI runs this full benchmark after the browser suite on every push to `main`. The CI step is informational because hosted-runner timing varies. Budget overruns appear in the GitHub job summary but do not block the validated repository report or Pages deployment. Generated projects, reports, and JSON evidence are written under ignored `.benchmark/<kind>/` directories.
+Run `pnpm test:performance` for the automated 300-file, 163,950-line sentinel. It is part of `pnpm checks`. Run `pnpm benchmark:full` for the 1,000-file, 5,046,995-line workload; CI runs this full benchmark after the browser suite on every push to `main`. The full budgets currently track the documented development workstation with narrow headroom. The CI step is informational because no hosted-runner budgets have been established yet. Budget overruns appear in the GitHub job summary but do not block the validated repository report or Pages deployment. Generated projects, reports, and JSON evidence are written under ignored `.benchmark/<kind>/` directories.
 
 The full command runs isolated cold-process and warm-filesystem-cache CLI scenarios plus two fresh Chromium sessions. It records phase timings, peak RSS, report size, complete embedded-analysis and browser-presentation signatures, graph geometry, and pan, zoom, hover, and selection durations.
 
@@ -54,14 +54,14 @@ Budgets were established on Windows 10.0.26200 with an Intel Core i7-13700K, 24 
 
 | Measurement               | Full budget | Measured baseline  |
 | ------------------------- | ----------- | ------------------ |
-| CLI duration              | 15,000 ms   | 7,144.7–7,187.0 ms |
-| CLI peak RSS              | 1,250 MiB   | 745.3–747.0 MiB    |
-| Report size               | 2 MiB       | 0.818 MiB          |
-| Browser ready             | 15,000 ms   | 608.9–611.6 ms     |
-| Browser layout            | 10,000 ms   | 450.1–451.5 ms     |
-| Each measured interaction | 1,000 ms    | 26.1–114.0 ms      |
+| CLI duration              | 7,500 ms    | 6,939.8–7,234.8 ms |
+| CLI peak RSS              | 775 MiB     | 745.3–751.6 MiB    |
+| Report size               | 0.85 MiB    | 0.818 MiB          |
+| Browser ready             | 900 ms      | 603.2–838.6 ms     |
+| Browser layout            | 500 ms      | 436.0–451.5 ms     |
+| Each measured interaction | 800 ms      | 14.3–716.8 ms      |
 
-The timing ceilings deliberately leave room for ordinary machine noise. Deterministic analysis hashes, complete presentation signatures, bounded layout work, and collision assertions catch meaningful semantic and algorithmic regressions independently of timing.
+These workstation ceilings leave limited room for ordinary machine noise. They are intentionally not portable to shared CI hardware. Hosted-runner budgets should be established separately after enough CI evidence has been collected. Deterministic analysis hashes, complete presentation signatures, bounded layout work, and collision assertions catch meaningful semantic and algorithmic regressions independently of timing.
 
 Parsing is the largest remaining CLI phase at approximately 6.08 seconds. Peak RSS remains within budget while source texts are retained through language analysis. Streaming, concurrency, and workers remain unjustified until a future workload exceeds these measured budgets.
 

@@ -33,12 +33,12 @@ const dimensions = benchmarkKind === "full" ? { fileCount: 1_000, minimumLineCou
 const budgets =
   benchmarkKind === "full"
     ? {
-        cliMilliseconds: 15_000,
-        peakRssMiB: 1_250,
-        reportSizeMiB: 2,
-        browserReadyMilliseconds: 15_000,
-        browserLayoutMilliseconds: 10_000,
-        interactionMilliseconds: 1_000,
+        cliMilliseconds: 7_500,
+        peakRssMiB: 775,
+        reportSizeMiB: 0.85,
+        browserReadyMilliseconds: 900,
+        browserLayoutMilliseconds: 500,
+        interactionMilliseconds: 800,
       }
     : {
         cliMilliseconds: 8_000,

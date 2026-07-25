@@ -11,12 +11,12 @@ describe("renderBenchmarkSummary", () => {
         totalLineCount: 5_046_995,
       },
       budgets: {
-        cliMilliseconds: 15_000,
-        peakRssMiB: 1_250,
-        reportSizeMiB: 2,
-        browserReadyMilliseconds: 15_000,
-        browserLayoutMilliseconds: 10_000,
-        interactionMilliseconds: 1_000,
+        cliMilliseconds: 7_500,
+        peakRssMiB: 775,
+        reportSizeMiB: 0.85,
+        browserReadyMilliseconds: 900,
+        browserLayoutMilliseconds: 500,
+        interactionMilliseconds: 800,
       },
       coldCli: cliResult("cold-process", 13_350.6),
       warmCli: cliResult("warm-filesystem-cache", 13_197.8),
@@ -30,8 +30,8 @@ describe("renderBenchmarkSummary", () => {
     // Assert
     expect(markdown).toContain("> ⚠️ At least one benchmark budget or scenario failed.")
     expect(markdown).toContain("**1,000 files**, **5,046,995 lines**")
-    expect(markdown).toContain("| First browser | ✅ 1,291.6 / 15,000.0 ms | ✅ 742.8 / 10,000.0 ms")
-    expect(markdown).toContain("⚠️ 1,029.6 / 1,000.0 ms")
+    expect(markdown).toContain("| First browser | ⚠️ 1,291.6 / 900.0 ms | ⚠️ 742.8 / 500.0 ms")
+    expect(markdown).toContain("⚠️ 1,029.6 / 800.0 ms")
     expect(markdown).toContain("- Analysis deterministic: ✅ matched")
     expect(markdown).toContain("- Browser presentation deterministic: ✅ matched")
   })
