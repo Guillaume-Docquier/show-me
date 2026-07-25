@@ -33,3 +33,11 @@ Native bindings add packaging and cross-platform verification work. Resolution d
 The JavaScript and TypeScript language module now retains explicitly type-only static ESM imports and re-exports alongside runtime relationships. Classification remains syntax-only: ordinary imports are runtime dependencies even when their bindings are used only in type positions, and any runtime declaration or specifier takes precedence when a source-target pair also has a type-only declaration.
 
 Type-only requests use the same Oxc resolver, project-file discovery boundary, configured-alias precedence, workspace-package fallback, and external-package classification as runtime requests. The versioned language-neutral analysis distinguishes `runtime` from `type-only`; no Oxc AST value crosses that boundary. This amendment supersedes the original decision only where it excluded explicitly type-only dependencies.
+
+### 2026-07-25 import-compatibility amendment
+
+The JavaScript and TypeScript language module also recognizes CommonJS calls whose callee is the identifier `require` and dynamic `import()` expressions when their dependency argument is a string literal. Both forms create runtime dependencies and use the same project, workspace, and external-package resolution path as static ESM. Repeated declarations still collapse to one source-target relationship, and runtime still takes precedence over type-only when forms are mixed.
+
+Non-literal `require()` and `import()` expressions produce one recoverable diagnostic per form and source file rather than guessing an edge. Template literals are intentionally non-literal even when they contain no substitutions. Classification remains syntax-only: Show Me does not type-check dependency usage or infer possible runtime values.
+
+Automatically discovered project configurations continue to guide Oxc resolution before external-package classification. This includes unaliased project-owned bare requests resolved through `baseUrl`, in addition to configured path aliases and project references.

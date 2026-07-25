@@ -113,6 +113,48 @@ describe("analyzeJavaScriptTypeScript", () => {
     )
   })
 
+  it("analyzes literal CommonJS and dynamic dependencies while diagnosing non-literal expressions", async () => {
+    // Arrange
+    const projectRoot = fixtureProjectPath("import-compatibility")
+    const files = await readDiscoveredSourceFiles(projectRoot)
+
+    // Act
+    const result = analyzeJavaScriptTypeScript(projectRoot, files)
+
+    // Assert
+    expect(Result.isSuccess(result)).toBe(true)
+    if (Result.isSuccess(result)) {
+      expect(result.value.dependencies).toEqual([
+        { source: "src/commonjs-entry.cjs", target: "src/commonjs-target.cts", kind: "runtime" },
+        { source: "src/entry.ts", target: "src/base-url-target.ts", kind: "runtime" },
+        { source: "src/entry.ts", target: "src/conditional-alternate.ts", kind: "runtime" },
+        { source: "src/entry.ts", target: "src/conditional.ts", kind: "runtime" },
+        { source: "src/entry.ts", target: "src/dynamic.ts", kind: "runtime" },
+        { source: "src/entry.ts", target: "src/esm.ts", kind: "runtime" },
+        { source: "src/entry.ts", target: "src/mixed.ts", kind: "runtime" },
+        { source: "src/entry.ts", target: "src/nested.ts", kind: "runtime" },
+        { source: "src/module-entry.mjs", target: "src/module-target.mts", kind: "runtime" },
+      ])
+      expect(result.value.externalPackages).toEqual([{ name: "commonjs-package" }, { name: "dynamic-package" }])
+      expect(result.value.externalPackageDependencies).toEqual([
+        { source: "src/entry.ts", target: "commonjs-package", kind: "runtime" },
+        { source: "src/entry.ts", target: "dynamic-package", kind: "runtime" },
+      ])
+      expect(result.value.diagnostics).toEqual([
+        {
+          code: "NON_LITERAL_COMMONJS_REQUIRE",
+          message: "Could not analyze CommonJS require dependency because its argument is not a string literal.",
+          file: "src/entry.ts",
+        },
+        {
+          code: "NON_LITERAL_DYNAMIC_IMPORT",
+          message: "Could not analyze dynamic import dependency because its argument is not a string literal.",
+          file: "src/entry.ts",
+        },
+      ])
+    }
+  })
+
   it("resolves path aliases from the project configuration that applies to each source file", async () => {
     // Arrange
     const projectRoot = fixtureProjectPath("path-aliases")

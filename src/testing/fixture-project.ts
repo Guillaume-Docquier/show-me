@@ -8,6 +8,7 @@ export type FixtureProjectName =
   | "coverage-project"
   | "discovery"
   | "external-packages"
+  | "import-compatibility"
   | "minimal-javascript"
   | "minimal-typescript"
   | "path-aliases"

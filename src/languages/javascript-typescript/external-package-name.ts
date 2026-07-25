@@ -3,12 +3,12 @@ import { Result } from "@guillaume-docquier/tools-ts"
 import { ExternalPackageName } from "../../analysis/external-package-name.js"
 
 /**
- * Collapse a static runtime request to its canonical npm package root.
+ * Collapse a JavaScript or TypeScript dependency request to its canonical npm package root.
  *
  * Relative, absolute, package-import, protocol, malformed, and Node built-in
  * requests are not external npm packages.
  *
- * @param request - Static runtime module request from JavaScript or TypeScript.
+ * @param request - Dependency request from JavaScript or TypeScript.
  * @returns The unscoped first segment or scoped first two segments.
  */
 export function externalPackageNameFromRequest(request: string): ExternalPackageName | undefined {

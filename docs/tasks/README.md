@@ -6,7 +6,6 @@ This directory tracks milestones, implementation progress, verification evidence
 
 | Milestone                                                                       | Status      | Outcome                                                                |
 | ------------------------------------------------------------------------------- | ----------- | ---------------------------------------------------------------------- |
-| [009 Import compatibility](./009-import-compatibility.md)                       | In progress | Add CommonJS, dynamic imports, and broader resolution behavior.        |
 | [011 Large-codebase performance](./011-large-codebase-performance.md)           | Not started | Profile and optimize analysis and rendering for large projects.        |
 | [014 CLI file selection](./014-cli-file-selection.md)                           | Not started | Include default-excluded tests and add one-invocation ignore patterns. |
 | [015 Project configuration](./015-project-configuration.md)                     | Not started | Persist file-selection settings with explicit CLI precedence.          |
@@ -26,6 +25,7 @@ Completed milestone files are retained under [`done/`](./done/) as implementatio
 | [006 CLOC line breakdown](./done/006-cloc-line-breakdown.md)                   | 2026-07-16 | Added exclusive line categories and interactive node sizing.          |
 | [007 External packages](./done/007-external-packages.md)                       | 2026-07-16 | Added optional package nodes without analyzing installed code.        |
 | [008 pnpm workspaces](./done/008-pnpm-workspaces.md)                           | 2026-07-18 | Analyzes and filters all packages in one pnpm workspace.              |
+| [009 Import compatibility](./done/009-import-compatibility.md)                 | 2026-07-25 | Adds CommonJS, dynamic imports, and broader resolution behavior.      |
 | [010 Visualization and UX](./done/010-visualization-and-ux.md)                 | 2026-07-25 | Delivers large-desktop navigation, interpretation, and graph focus.   |
 | [012 GitHub Pages report](./done/012-github-pages-report.md)                   | 2026-07-16 | Publishes a validated live visualization of the repository.           |
 | [013 Default test-file exclusions](./done/013-default-test-file-exclusions.md) | 2026-07-16 | Removes conventionally named test files from default analysis.        |

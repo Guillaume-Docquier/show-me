@@ -4,7 +4,7 @@ Analysis converts files on disk into an internal, language-neutral description t
 
 ## Current implementation
 
-Filesystem and pnpm workspace discovery, normalized project-file paths, CLOC-style physical-line categories, static runtime and explicitly type-only ESM project and external-package dependency analysis, and Istanbul or LCOV line-coverage enrichment are implemented.
+Filesystem and pnpm workspace discovery, normalized project-file paths, CLOC-style physical-line categories, static ESM, CommonJS, and dynamic-import project and external-package dependency analysis, and Istanbul or LCOV line-coverage enrichment are implemented.
 
 ## Project discovery
 
@@ -53,20 +53,22 @@ Workspace package paths are stable project-relative identities. Package names re
 
 The JavaScript and TypeScript analyzer keeps ordinary Oxc resolution first, preserving the `tsconfig.json` or `jsconfig.json` applicable to each source file. If an otherwise bare request names a workspace package, its package exports or conventional source entry point resolve against analyzed files before external-package classification. A matched but unresolved workspace request produces a diagnostic rather than an external-package fact.
 
-## Initial JavaScript and TypeScript dependency rules
+## JavaScript and TypeScript dependency rules
 
-The initial JavaScript and TypeScript analyzer recognizes:
+The JavaScript and TypeScript analyzer recognizes:
 
 - static ESM imports;
 - side-effect ESM imports;
 - static runtime named re-exports;
-- static runtime wildcard re-exports.
+- static runtime wildcard re-exports;
+- CommonJS `require()` calls with a string-literal first argument;
+- dynamic `import()` expressions with a string-literal source.
 
 Explicitly type-only imports and re-exports create type-only dependencies. A mixed declaration remains a runtime dependency when at least one specifier is not marked as type-only. Repeated source-target relationships collapse to one edge, with runtime taking precedence if any declaration for that pair is runtime. This rule is syntax-based: Show Me does not type-check ordinary imports to determine whether a compiler may later erase them.
 
-Runtime and type-only requests use the same resolution precedence: discovered project files through Oxc resolution, configured aliases, workspace-package exports or source entry points, and finally canonical external packages. Unresolved executable-code requests produce diagnostics whose code and message preserve the classified dependency kind.
+Runtime and type-only requests use the same resolution precedence: discovered project files through Oxc resolution, configured aliases and unaliased project-owned bare requests such as `baseUrl` paths, workspace-package exports or source entry points, and finally canonical external packages. Unresolved executable-code requests produce diagnostics whose code and message preserve the classified dependency kind.
 
-CommonJS `require()`, dynamic `import()`, and non-literal dependency expressions are separate future work.
+CommonJS and dynamic-import dependencies are classified as runtime. Conditional, nested, repeated, and mixed forms follow the same edge rules as static ESM: one source-target relationship is retained, with runtime taking precedence over type-only. A non-literal `require()` or `import()` expression produces one recoverable diagnostic per form and source file; Show Me does not guess the possible runtime targets. This classification is syntax-only and does not type-check values or dependency usage.
 
 Imports that resolve to unsupported asset types are ignored. An import that should resolve to executable project code but cannot be resolved produces a diagnostic rather than a fabricated edge.
 

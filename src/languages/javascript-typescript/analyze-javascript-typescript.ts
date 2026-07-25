@@ -12,7 +12,7 @@ import { ProjectFilePath } from "../../project-files/project-file-path.js"
 import { compareText } from "../../text/compare-text.js"
 import type { WorkspacePackageDefinition } from "../../workspaces/pnpm-workspace.js"
 import { classifyJavaScriptTypeScriptLines } from "./classify-javascript-typescript-lines.js"
-import { collectStaticDependencyRequests, type StaticDependencyRequestSource } from "./collect-static-dependency-requests.js"
+import { collectDependencyRequests, type DependencyRequestSource } from "./collect-dependency-requests.js"
 import { externalPackageNameFromRequest } from "./external-package-name.js"
 import {
   hasJavaScriptTypeScriptExecutableExtension,
@@ -24,7 +24,7 @@ import { createJavaScriptTypeScriptResolver, type JavaScriptTypeScriptResolver }
 /**
  * Source input understood by the internal JavaScript and TypeScript language module.
  */
-export type JavaScriptTypeScriptSourceFile = StaticDependencyRequestSource & {
+export type JavaScriptTypeScriptSourceFile = DependencyRequestSource & {
   readonly language: JavaScriptTypeScriptLanguageId
   readonly workspacePackage?: string
 }
@@ -62,7 +62,7 @@ export type JavaScriptTypeScriptAnalysisError =
     }
 
 /**
- * Analyze files and static ESM relationships without exposing parser or resolver values.
+ * Analyze files and syntax-level dependency relationships without exposing parser or resolver values.
  *
  * @param projectRoot - Root of the project being analyzed.
  * @param files - Discovered JavaScript and TypeScript source files.
@@ -90,7 +90,7 @@ export function analyzeJavaScriptTypeScript(
   const analyzedFiles: ProjectFileAnalysis[] = []
 
   for (const file of files) {
-    const requests = collectStaticDependencyRequests(file)
+    const requests = collectDependencyRequests(file)
     if (Result.isFailure(requests)) {
       return Result.Failure({
         _tag: "JavaScriptTypeScriptParserFailed",

@@ -1,4 +1,4 @@
-import { Result } from "@guillaume-docquier/tools-ts"
+import { Result, TypeGuard } from "@guillaume-docquier/tools-ts"
 import { parseSync, Visitor } from "oxc-parser"
 import type { AnalysisDiagnostic, DependencyKind } from "../../analysis/project-analysis.js"
 import type { ProjectFilePath } from "../../project-files/project-file-path.js"
@@ -10,35 +10,35 @@ import type {
 /**
  * Source data required for syntax-level dependency-request collection.
  */
-export type StaticDependencyRequestSource = {
+export type DependencyRequestSource = {
   readonly path: ProjectFilePath
   readonly absolutePath: string
   readonly sourceText: string
 }
 
 /**
- * One static ESM request classified without type checking.
+ * One statically analyzable dependency request classified without type checking.
  */
-export type StaticDependencyRequest = {
+export type DependencyRequest = {
   readonly request: string
   readonly kind: DependencyKind
 }
 
 /** Dependency requests and recoverable parser diagnostics from one source file. */
-export type StaticDependencyRequestCollection = {
-  readonly requests: readonly StaticDependencyRequest[]
+export type DependencyRequestCollection = {
+  readonly requests: readonly DependencyRequest[]
   readonly comments: readonly JavaScriptTypeScriptCommentSpan[]
   readonly jsxCommentContainers: readonly JavaScriptTypeScriptJsxCommentContainerSpan[]
   readonly diagnostics: readonly AnalysisDiagnostic[]
 }
 
 /**
- * Collect static ESM requests without exposing Oxc AST values.
+ * Collect statically analyzable ESM, CommonJS, and dynamic-import requests without exposing Oxc AST values.
  *
  * @param file - Complete source input for one project file.
  * @returns Classified requests and diagnostics, or an unexpected parser-boundary failure.
  */
-export function collectStaticDependencyRequests(file: StaticDependencyRequestSource): Result<StaticDependencyRequestCollection, Error> {
+export function collectDependencyRequests(file: DependencyRequestSource): Result<DependencyRequestCollection, Error> {
   const parsed = Result.tryCatch(() => parseSync(file.absolutePath, file.sourceText, { sourceType: "unambiguous" }))
   if (Result.isFailure(parsed)) {
     return parsed
@@ -60,6 +60,9 @@ export function collectStaticDependencyRequests(file: StaticDependencyRequestSou
     }
   }
 
+  let hasNonLiteralCommonJsRequire = false
+  let hasNonLiteralDynamicImport = false
+
   const comments: readonly JavaScriptTypeScriptCommentSpan[] = parsed.value.comments.map((comment) => ({
     start: comment.start,
     end: comment.end,
@@ -67,6 +70,25 @@ export function collectStaticDependencyRequests(file: StaticDependencyRequestSou
   }))
   const jsxExpressionContainers: Array<{ readonly start: number; readonly end: number }> = []
   new Visitor({
+    CallExpression(expression): void {
+      if (expression.callee.type !== "Identifier" || expression.callee.name !== "require") {
+        return
+      }
+
+      const argument = expression.arguments[0]
+      if (argument?.type === "Literal" && TypeGuard.isString(argument.value)) {
+        retainRequest(requestKindByRequest, argument.value, "runtime")
+      } else {
+        hasNonLiteralCommonJsRequire = true
+      }
+    },
+    ImportExpression(expression): void {
+      if (expression.source.type === "Literal" && TypeGuard.isString(expression.source.value)) {
+        retainRequest(requestKindByRequest, expression.source.value, "runtime")
+      } else {
+        hasNonLiteralDynamicImport = true
+      }
+    },
     JSXExpressionContainer(container): void {
       if (container.expression.type === "JSXEmptyExpression") {
         jsxExpressionContainers.push({ start: container.start, end: container.end })
@@ -74,15 +96,31 @@ export function collectStaticDependencyRequests(file: StaticDependencyRequestSou
     },
   }).visit(parsed.value.program)
 
+  const diagnostics: AnalysisDiagnostic[] = parsed.value.errors.map((error) => ({
+    code: "JAVASCRIPT_TYPESCRIPT_PARSE_ERROR",
+    message: error.message,
+    file: file.path,
+  }))
+  if (hasNonLiteralCommonJsRequire) {
+    diagnostics.push({
+      code: "NON_LITERAL_COMMONJS_REQUIRE",
+      message: "Could not analyze CommonJS require dependency because its argument is not a string literal.",
+      file: file.path,
+    })
+  }
+  if (hasNonLiteralDynamicImport) {
+    diagnostics.push({
+      code: "NON_LITERAL_DYNAMIC_IMPORT",
+      message: "Could not analyze dynamic import dependency because its argument is not a string literal.",
+      file: file.path,
+    })
+  }
+
   return Result.Success({
     requests: [...requestKindByRequest].map(([request, kind]) => ({ request, kind })),
     comments,
     jsxCommentContainers: collectJsxCommentContainers(file.sourceText, comments, jsxExpressionContainers),
-    diagnostics: parsed.value.errors.map((error) => ({
-      code: "JAVASCRIPT_TYPESCRIPT_PARSE_ERROR",
-      message: error.message,
-      file: file.path,
-    })),
+    diagnostics,
   })
 }
 
