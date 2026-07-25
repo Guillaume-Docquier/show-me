@@ -58,6 +58,14 @@ const DIRECTORY_LABEL_COLLISION_PADDING = 4
 const DIRECTORY_LABEL_HOVER_FOREGROUND = "#f5f9ff"
 const DIRECTORY_LABEL_HOVER_BACKGROUND = "#111821"
 const GRAPH_FIT_MARGIN = 1
+const HOVERED_NODE_FOCUS_COLOR = "#f5f9ff"
+const DEPENDENCY_FOCUS_COLOR = "#46d7c6"
+const CONSUMER_FOCUS_COLOR = "#ff9b71"
+const DEPENDENCY_FOCUS_EDGE_SIZE = 4.4
+const CONSUMER_FOCUS_EDGE_SIZE = 5.2
+const FOCUS_RING_OFFSET = 5
+const FOCUS_RING_SEPARATION = 5
+const FOCUS_RING_WIDTH = 3
 
 type BrowserNodeAttributes = {
   readonly size: number
@@ -103,6 +111,12 @@ type EdgeVisibilityState = {
   readonly structureEdges: boolean
   /** Render-only visibility; dependency edges remain graph members even while hidden. */
   readonly dependencyEdges: boolean
+}
+
+type DependencyFocus = {
+  readonly nodeId: string
+  readonly dependencyNodeIds: ReadonlySet<string>
+  readonly consumerNodeIds: ReadonlySet<string>
 }
 
 const analysis = window.showMeAnalysis
@@ -153,6 +167,7 @@ const graph = new DirectedGraph<BrowserNodeAttributes, BrowserEdgeAttributes>()
 let selectedNodeId: string | undefined
 let hoveredNodeId: string | undefined
 let hoveredDirectoryNodeId: string | undefined
+let dependencyFocus: DependencyFocus | undefined
 let visibleNodeIds = new Set<string>()
 const collapsedDirectoryPaths = new Set<string>()
 let viewState: ReportViewState = {
@@ -175,8 +190,22 @@ const renderer = new Sigma<BrowserNodeAttributes, BrowserEdgeAttributes>(graph, 
   allowInvalidContainer: false,
   defaultEdgeType: "arrow",
   edgeProgramClasses: { arrow: createEdgeArrowProgram<BrowserNodeAttributes, BrowserEdgeAttributes>() },
-  edgeReducer(_edge, attributes): Partial<EdgeDisplayData> {
-    return attributes.edgeKind === "dependency" && !edgeVisibilityState.dependencyEdges ? { ...attributes, hidden: true } : attributes
+  edgeReducer(edge, attributes): Partial<EdgeDisplayData> {
+    if (attributes.edgeKind !== "dependency") {
+      return attributes
+    }
+    if (attributes.hidden === true || !edgeVisibilityState.dependencyEdges) {
+      return { ...attributes, hidden: true }
+    }
+
+    const relationship = focusedDependencyEdgeRelationship(edge)
+    if (relationship === "dependency") {
+      return { ...attributes, color: DEPENDENCY_FOCUS_COLOR, size: DEPENDENCY_FOCUS_EDGE_SIZE, zIndex: 1 }
+    }
+    if (relationship === "consumer") {
+      return { ...attributes, color: CONSUMER_FOCUS_COLOR, size: CONSUMER_FOCUS_EDGE_SIZE, zIndex: 1 }
+    }
+    return attributes
   },
   labelColor: { color: "#aebdca" },
   defaultDrawNodeHover: drawNodeHover,
@@ -203,6 +232,11 @@ const structureLayer = renderer.createCanvas("structure", {
   style: { pointerEvents: "none" },
 })
 const structureContext = requiredCanvasContext(structureLayer)
+const dependencyFocusLayer = renderer.createCanvas("dependency-focus", {
+  afterLayer: "hoverNodes",
+  style: { pointerEvents: "none" },
+})
+const dependencyFocusContext = requiredCanvasContext(dependencyFocusLayer)
 const camera = renderer.getCamera()
 maximumVisibleDirectoryDepth = visibleDirectoryDepth(camera.getState().ratio)
 showFileLabels = fileLabelsAreVisible(camera.getState().ratio)
@@ -213,6 +247,7 @@ renderer.resize(true)
 renderer.on("resize", markGraphLabelVisibilityDirty)
 renderer.on("afterRender", () => {
   renderStructureLinks()
+  renderDependencyFocus()
   updateDependencyEdgeDiagnostics()
   const labelRefreshScheduled = synchronizeGraphLabelVisibilityAfterRender()
   updateCameraDiagnostics()
@@ -291,9 +326,12 @@ renderer.on("enterNode", ({ node, event }) => {
     return
   }
   hoveredNodeId = node
+  dependencyFocus = reportNode.kind === "project-file" ? dependencyFocusFor(reportNode) : undefined
+  updateDependencyFocusDiagnostics()
   showTooltip(reportNode)
   positionTooltip(event.x, event.y)
   document.documentElement.dataset.hoveredNode = node
+  refreshDependencyEdges()
 })
 renderer.on("moveBody", ({ event }) => {
   if (hoveredNodeId !== undefined) {
@@ -444,6 +482,10 @@ function applyReportView(nextState: ReportViewState): void {
   }
   if (hoveredNodeId !== undefined && !visibleNodeIds.has(hoveredNodeId)) {
     clearHover()
+  } else if (hoveredNodeId !== undefined) {
+    const hoveredNode = nodeById.get(hoveredNodeId)
+    dependencyFocus = hoveredNode?.kind === "project-file" ? dependencyFocusFor(hoveredNode) : undefined
+    updateDependencyFocusDiagnostics()
   }
   for (const control of lineCategoryControls) {
     control.input.disabled = viewState.lineCategories.length === 1 && control.input.checked
@@ -681,6 +723,60 @@ function renderStructureLinks(): void {
   graphContainer.dataset.renderedStructureEdgeCount = String(renderedEdgeCount)
 }
 
+function renderDependencyFocus(): void {
+  const { width, height } = renderer.getDimensions()
+  const pixelRatio = window.devicePixelRatio
+  const pixelWidth = Math.max(1, Math.round(width * pixelRatio))
+  const pixelHeight = Math.max(1, Math.round(height * pixelRatio))
+  if (dependencyFocusLayer.width !== pixelWidth || dependencyFocusLayer.height !== pixelHeight) {
+    dependencyFocusLayer.width = pixelWidth
+    dependencyFocusLayer.height = pixelHeight
+  }
+  dependencyFocusContext.setTransform(1, 0, 0, 1, 0, 0)
+  dependencyFocusContext.clearRect(0, 0, dependencyFocusLayer.width, dependencyFocusLayer.height)
+  dependencyFocusContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0)
+
+  let renderedRingCount = 0
+  if (dependencyFocus !== undefined) {
+    renderedRingCount += drawDependencyFocusRing(dependencyFocus.nodeId, HOVERED_NODE_FOCUS_COLOR, FOCUS_RING_OFFSET, [])
+    const neighborNodeIds = new Set([...dependencyFocus.dependencyNodeIds, ...dependencyFocus.consumerNodeIds])
+    for (const nodeId of neighborNodeIds) {
+      const dependency = dependencyFocus.dependencyNodeIds.has(nodeId)
+      const consumer = dependencyFocus.consumerNodeIds.has(nodeId)
+      if (dependency) {
+        renderedRingCount += drawDependencyFocusRing(nodeId, DEPENDENCY_FOCUS_COLOR, FOCUS_RING_OFFSET, [])
+      }
+      if (consumer) {
+        renderedRingCount += drawDependencyFocusRing(
+          nodeId,
+          CONSUMER_FOCUS_COLOR,
+          FOCUS_RING_OFFSET + (dependency ? FOCUS_RING_SEPARATION : 0),
+          [4, 3],
+        )
+      }
+    }
+  }
+  dependencyFocusContext.setLineDash([])
+  graphContainer.dataset.renderedDependencyFocusRingCount = String(renderedRingCount)
+}
+
+function drawDependencyFocusRing(nodeId: string, color: string, offset: number, lineDash: readonly number[]): number {
+  if (!graph.hasNode(nodeId)) {
+    return 0
+  }
+  const attributes = graph.getNodeAttributes(nodeId)
+  const node = renderer.graphToViewport(attributes)
+  const radius = renderer.scaleSize(attributes.size) + offset
+  dependencyFocusContext.beginPath()
+  dependencyFocusContext.setLineDash([...lineDash])
+  dependencyFocusContext.lineCap = "round"
+  dependencyFocusContext.lineWidth = FOCUS_RING_WIDTH
+  dependencyFocusContext.strokeStyle = color
+  dependencyFocusContext.arc(node.x, node.y, radius, 0, Math.PI * 2)
+  dependencyFocusContext.stroke()
+  return 1
+}
+
 function updateDependencyEdgeDiagnostics(): void {
   const renderedEdges = dependencyEdgeIds().flatMap((edge) => {
     const displayData = renderer.getEdgeDisplayData(edge)
@@ -693,6 +789,49 @@ function updateDependencyEdgeDiagnostics(): void {
 
 function dependencyEdgeIds(): string[] {
   return graph.filterEdges((_edge, attributes) => attributes.edgeKind === "dependency")
+}
+
+function focusedDependencyEdgeRelationship(edge: string): "dependency" | "consumer" | undefined {
+  if (dependencyFocus === undefined) {
+    return undefined
+  }
+  const source = graph.source(edge)
+  const target = graph.target(edge)
+  if (source === dependencyFocus.nodeId && dependencyFocus.dependencyNodeIds.has(target)) {
+    return "dependency"
+  }
+  if (target === dependencyFocus.nodeId && dependencyFocus.consumerNodeIds.has(source)) {
+    return "consumer"
+  }
+  return undefined
+}
+
+function dependencyFocusFor(node: ReportProjectFileNode): DependencyFocus {
+  return {
+    nodeId: node.id,
+    dependencyNodeIds: new Set(visibleRelationships(node.dependencyNodeIds).filter((nodeId) => nodeId !== node.id)),
+    consumerNodeIds: new Set(visibleRelationships(node.consumerNodeIds).filter((nodeId) => nodeId !== node.id)),
+  }
+}
+
+function updateDependencyFocusDiagnostics(): void {
+  if (dependencyFocus === undefined) {
+    delete graphContainer.dataset.dependencyFocus
+    return
+  }
+  graphContainer.dataset.dependencyFocus = JSON.stringify({
+    nodeId: dependencyFocus.nodeId,
+    dependencyNodeIds: [...dependencyFocus.dependencyNodeIds],
+    consumerNodeIds: [...dependencyFocus.consumerNodeIds],
+  })
+}
+
+function refreshDependencyEdges(): void {
+  renderer.refresh({
+    partialGraph: { edges: dependencyEdgeIds() },
+    schedule: true,
+    skipIndexation: true,
+  })
 }
 
 function drawNodeHover(
@@ -1010,13 +1149,19 @@ function visibleRelationships(nodeIds: readonly string[]): readonly string[] {
 
 function clearHover(): void {
   const directoryLabelVisibilityChanged = hoveredDirectoryNodeId !== undefined
+  const dependencyFocusChanged = dependencyFocus !== undefined
   hoveredNodeId = undefined
   hoveredDirectoryNodeId = undefined
+  dependencyFocus = undefined
   tooltip.hidden = true
   delete document.documentElement.dataset.hoveredNode
   delete graphContainer.dataset.hoveredDirectoryLabel
   delete graphContainer.dataset.directoryLabelHoverForeground
   delete graphContainer.dataset.directoryLabelHoverBackground
+  updateDependencyFocusDiagnostics()
+  if (dependencyFocusChanged) {
+    refreshDependencyEdges()
+  }
   if (directoryLabelVisibilityChanged) {
     markGraphLabelVisibilityDirty()
     renderer.scheduleRender()

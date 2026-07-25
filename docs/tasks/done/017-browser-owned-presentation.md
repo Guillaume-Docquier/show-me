@@ -25,7 +25,7 @@ The current user-visible report behavior remains unchanged. Coverage remains the
 - [x] Derive dependency and consumer lists from authoritative analysis edges in the browser instead of embedding duplicated relationship arrays.
 - [x] Derive project-file sizes from raw line metrics for every view transition; keep code lines as the initial selection and preserve every non-empty line-category combination.
 - [x] Derive project-file colors from raw optional coverage in the browser; keep the current neutral and red-yellow-green behavior without adding color configuration in this milestone.
-- [x] Preserve raw diagnostics in the embedded analysis without adding diagnostics UI; presentation of diagnostics remains milestone 010.
+- [x] Preserve raw diagnostics in the embedded analysis without adding diagnostics UI; presentation of diagnostics remains outside this milestone.
 - [x] Remove the Node-owned report-presentation schema and production transformation once no report path depends on them.
 - [x] Keep project source text and analyzer-specific values out of the generated report.
 - [x] Update architecture, glossary, performance, and testing documentation to describe the new data boundary and browser-side presentation phase.
@@ -55,5 +55,5 @@ The current user-visible report behavior remains unchanged. Coverage remains the
 
 ## Discovered gaps
 
-- User-configurable color inputs and palettes belong to [milestone 010](../010-visualization-and-ux.md); this milestone only moves the existing coverage-color policy into the browser.
-- Surfacing non-fatal analysis diagnostics remains a separate milestone-010 product and accessibility decision.
+- User-configurable color inputs and palettes remain unplanned; this milestone only moves the existing coverage-color policy into the browser.
+- Surfacing non-fatal analysis diagnostics remains an unplanned product and accessibility decision.

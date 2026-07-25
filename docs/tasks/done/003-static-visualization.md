@@ -46,5 +46,5 @@ Running `show-me` generates one offline HTML report containing an automatically 
 
 - Project dependency edges remain empty until static runtime ESM analysis is implemented in milestone 004.
 - Coverage discovery and `--coverage` import remain owned by milestone 005; an explicit coverage option currently returns a clear unsupported-feature error.
-- Dependency-neighborhood emphasis and richer graph navigation remain owned by milestone 010.
+- Dependency-neighborhood emphasis and richer graph navigation were delivered by milestone 010.
 - Collision-safe ForceAtlas2 currently uses a fixed synchronous exact-repulsion pass because the library's Barnes-Hut path ignores node radii. Milestone 011 owns profiling and a size-aware large-graph optimization.

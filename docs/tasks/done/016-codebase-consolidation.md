@@ -45,5 +45,5 @@ The implemented analysis, report, CLI, build, and package pipelines have cohesiv
 
 - Milestone 014 still owns user-facing CLI file-selection options and additional ignore-pattern semantics.
 - Milestone 015 still owns configuration-file discovery, schema, parsing, and precedence.
-- Milestone 010 owns the product decision for surfacing non-fatal analysis diagnostics.
+- Surfacing non-fatal analysis diagnostics remains an unplanned product decision.
 - Milestone 011 owns measurement of the current all-source-text memory lifetime before any concurrency or streaming change.

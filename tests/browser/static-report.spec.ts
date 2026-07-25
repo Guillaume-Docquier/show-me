@@ -573,6 +573,223 @@ test("uses weighted folder nodes as the primary force graph under dependency arr
   })
 })
 
+test("focuses only the hovered file's direct dependency neighborhood", async ({ page }) => {
+  await withTemporaryDirectory(async (temporaryDirectory) => {
+    const report = await test.step("Generate a real project with direct, transitive, and unrelated dependencies", async () => {
+      const projectDirectory = join(temporaryDirectory, "dependency-neighborhood")
+      const sourceDirectory = join(projectDirectory, "src")
+      await mkdir(sourceDirectory, { recursive: true })
+      await Promise.all([
+        writeFile(
+          join(sourceDirectory, "consumer.ts"),
+          'import { hovered } from "./hovered.js"\nexport const consumer = hovered\n',
+          "utf8",
+        ),
+        writeFile(
+          join(sourceDirectory, "hovered.ts"),
+          'import { dependency } from "./dependency.js"\nexport const hovered = dependency\n',
+          "utf8",
+        ),
+        writeFile(
+          join(sourceDirectory, "dependency.ts"),
+          'import { transitive } from "./transitive.js"\nexport const dependency = transitive\n',
+          "utf8",
+        ),
+        writeFile(join(sourceDirectory, "transitive.ts"), 'export const transitive = "transitive"\n', "utf8"),
+        writeFile(
+          join(sourceDirectory, "unrelated-source.ts"),
+          'import { unrelatedTarget } from "./unrelated-target.js"\nexport const unrelatedSource = unrelatedTarget\n',
+          "utf8",
+        ),
+        writeFile(join(sourceDirectory, "unrelated-target.ts"), 'export const unrelatedTarget = "unrelated"\n', "utf8"),
+      ])
+      const analysis = await analyzeProject({ projectRoot: projectDirectory })
+      Assert.isSuccess(analysis)
+      const coverageByPath = new Map([
+        ["src/hovered.ts", 100],
+        ["src/dependency.ts", 50],
+        ["src/consumer.ts", 0],
+        ["src/transitive.ts", 25],
+        ["src/unrelated-source.ts", 75],
+        ["src/unrelated-target.ts", 10],
+      ])
+      const analysisWithCoverage = {
+        ...analysis.value,
+        files: analysis.value.files.map((file) => {
+          const coverage = coverageByPath.get(file.path)
+          Assert.isDefined(coverage)
+          return { ...file, coverage: { lines: coverage } }
+        }),
+      }
+      const dependencyEdgeId = (source: string, target: string): string => {
+        const index = analysis.value.dependencies.findIndex((dependency) => dependency.source === source && dependency.target === target)
+        if (index === -1) {
+          throw new Error(`Expected the real analyzer to resolve ${source} -> ${target}.`)
+        }
+        return `project-dependency-${index}`
+      }
+      const browserBundle = await readFile(join(process.cwd(), "dist", "report", "browser.js"), "utf8")
+      const path = join(temporaryDirectory, "dependency-neighborhood.html")
+      await writeFile(path, buildHtmlReport(analysisWithCoverage, browserBundle), "utf8")
+      return {
+        path,
+        edgeIds: {
+          consumer: dependencyEdgeId("src/consumer.ts", "src/hovered.ts"),
+          dependency: dependencyEdgeId("src/hovered.ts", "src/dependency.ts"),
+          transitive: dependencyEdgeId("src/dependency.ts", "src/transitive.ts"),
+          unrelated: dependencyEdgeId("src/unrelated-source.ts", "src/unrelated-target.ts"),
+        },
+      }
+    })
+
+    await test.step("Render distinct direct-neighborhood treatments without changing coverage fills", async () => {
+      await page.setViewportSize({ width: 1920, height: 1080 })
+      await page.goto(pathToFileURL(report.path).href)
+      await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
+      const graph = page.locator("#graph")
+      const structureEdges = page.getByRole("checkbox", { name: "Structure edges" })
+      const dependencyEdges = page.getByRole("checkbox", { name: "Dependency edges" })
+      await structureEdges.uncheck()
+      await expect(graph).toHaveAttribute("data-rendered-structure-edge-count", "0")
+
+      const circles = await readJsonAttribute<readonly NodeCircleDiagnostic[]>(graph, "data-visible-node-positions")
+      const circleById = new Map(circles.map((circle) => [circle.id, circle]))
+      const hovered = circleById.get("project-file:src/hovered.ts")
+      const dependency = circleById.get("project-file:src/dependency.ts")
+      const consumer = circleById.get("project-file:src/consumer.ts")
+      const transitive = circleById.get("project-file:src/transitive.ts")
+      const unrelated = circleById.get("project-file:src/unrelated-source.ts")
+      Assert.isDefined(hovered)
+      Assert.isDefined(dependency)
+      Assert.isDefined(consumer)
+      Assert.isDefined(transitive)
+      Assert.isDefined(unrelated)
+      const colors = await readJsonAttribute<readonly NodeColorDiagnostic[]>(graph, "data-visible-node-colors")
+      expect(colors).toEqual(
+        expect.arrayContaining([
+          { id: hovered.id, color: "#16a34a" },
+          { id: dependency.id, color: "#eab308" },
+          { id: consumer.id, color: "#dc2626" },
+        ]),
+      )
+      const baselineScreenshot = await graph.screenshot()
+      const graphBounds = await graph.boundingBox()
+      Assert.isDefined(graphBounds)
+      await page.mouse.move(graphBounds.x + hovered.x, graphBounds.y + hovered.y)
+      await expect(page.locator("html")).toHaveAttribute("data-hovered-node", hovered.id)
+      await expect(graph).toHaveAttribute("data-rendered-dependency-focus-ring-count", "3")
+
+      const focus = await readJsonAttribute<DependencyFocusDiagnostic>(graph, "data-dependency-focus")
+      expect(focus).toEqual({
+        nodeId: hovered.id,
+        dependencyNodeIds: [dependency.id],
+        consumerNodeIds: [consumer.id],
+      })
+      expect(focus.dependencyNodeIds).not.toContain(transitive.id)
+      expect(focus.consumerNodeIds).not.toContain(transitive.id)
+      expect([...focus.dependencyNodeIds, ...focus.consumerNodeIds]).not.toContain(unrelated.id)
+
+      const renderedEdges = await readJsonAttribute<readonly DependencyEdgeDiagnostic[]>(graph, "data-rendered-dependency-edges")
+      const renderedEdgeById = new Map(renderedEdges.map((edge) => [edge.id, edge]))
+      expect(renderedEdgeById.get(report.edgeIds.consumer)).toEqual({
+        id: report.edgeIds.consumer,
+        color: "#ff9b71",
+        size: 5.2,
+      })
+      expect(renderedEdgeById.get(report.edgeIds.dependency)).toEqual({
+        id: report.edgeIds.dependency,
+        color: "#46d7c6",
+        size: 4.4,
+      })
+      expect(renderedEdgeById.get(report.edgeIds.transitive)).toEqual({
+        id: report.edgeIds.transitive,
+        color: "rgba(98, 139, 181, 0.32)",
+        size: 2.4,
+      })
+      expect(renderedEdgeById.get(report.edgeIds.unrelated)).toEqual({
+        id: report.edgeIds.unrelated,
+        color: "rgba(98, 139, 181, 0.32)",
+        size: 2.4,
+      })
+      const focusedScreenshot = await graph.screenshot()
+
+      await dependencyEdges.evaluate((element) => {
+        if (!(element instanceof HTMLInputElement)) {
+          throw new Error("Dependency edge control is not a checkbox.")
+        }
+        element.click()
+      })
+      await expect(dependencyEdges).not.toBeChecked()
+      await expect(page.locator("html")).toHaveAttribute("data-hovered-node", hovered.id)
+      await expect(graph).toHaveAttribute("data-dependency-edges", "hidden")
+      await expect(graph).toHaveAttribute("data-rendered-dependency-edge-count", "0")
+      await expect(graph).toHaveAttribute("data-rendered-structure-edge-count", "0")
+      await expect(graph).toHaveAttribute("data-rendered-dependency-focus-ring-count", "3")
+      const hiddenEdgesScreenshot = await graph.screenshot()
+
+      const pixels = await sampleDependencyFocusPixels(
+        graph,
+        [hovered, dependency, consumer, transitive, unrelated],
+        [
+          { id: report.edgeIds.consumer, source: consumer, target: hovered, expected: [255, 155, 113] },
+          { id: report.edgeIds.dependency, source: hovered, target: dependency, expected: [70, 215, 198] },
+        ],
+        baselineScreenshot,
+        focusedScreenshot,
+        hiddenEdgesScreenshot,
+      )
+      const nodePixelsById = new Map(pixels.nodes.map((node) => [node.id, node]))
+      const hoveredPixels = nodePixelsById.get(hovered.id)
+      const dependencyPixels = nodePixelsById.get(dependency.id)
+      const consumerPixels = nodePixelsById.get(consumer.id)
+      const transitivePixels = nodePixelsById.get(transitive.id)
+      const unrelatedPixels = nodePixelsById.get(unrelated.id)
+      Assert.isDefined(hoveredPixels)
+      Assert.isDefined(dependencyPixels)
+      Assert.isDefined(consumerPixels)
+      Assert.isDefined(transitivePixels)
+      Assert.isDefined(unrelatedPixels)
+      expectRgbNear(hoveredPixels.baselineCenter, "#16a34a")
+      expectRgbNear(hoveredPixels.focusedCenter, "#16a34a")
+      expectRgbNear(dependencyPixels.baselineCenter, "#eab308")
+      expectRgbNear(dependencyPixels.focusedCenter, "#eab308")
+      expectRgbNear(consumerPixels.baselineCenter, "#dc2626")
+      expectRgbNear(consumerPixels.focusedCenter, "#dc2626")
+      expect(hoveredPixels.focusRingPixelCounts.hovered).toBeGreaterThan(0)
+      expect(dependencyPixels.focusRingPixelCounts.dependency).toBeGreaterThan(0)
+      expect(consumerPixels.focusRingPixelCounts.consumer).toBeGreaterThan(0)
+      expect(transitivePixels.focusRingPixelCounts.dependency).toBe(0)
+      expect(transitivePixels.focusRingPixelCounts.consumer).toBe(0)
+      expect(unrelatedPixels.focusRingPixelCounts.dependency).toBe(0)
+      expect(unrelatedPixels.focusRingPixelCounts.consumer).toBe(0)
+      for (const edge of pixels.edges) {
+        expect(edge.focusedToHiddenPixelCount, JSON.stringify(edge)).toBeGreaterThan(0)
+      }
+
+      await dependencyEdges.evaluate((element) => {
+        if (!(element instanceof HTMLInputElement)) {
+          throw new Error("Dependency edge control is not a checkbox.")
+        }
+        element.click()
+      })
+      await expect(dependencyEdges).toBeChecked()
+      await expect(graph).toHaveAttribute("data-rendered-dependency-edge-count", "4")
+      const restoredEdges = await readJsonAttribute<readonly DependencyEdgeDiagnostic[]>(graph, "data-rendered-dependency-edges")
+      expect(restoredEdges).toEqual(renderedEdges)
+
+      await page.locator("header").hover()
+      await expect(page.locator("html")).not.toHaveAttribute("data-hovered-node", hovered.id)
+      await expect(graph).not.toHaveAttribute("data-dependency-focus", /.+/u)
+      await expect(graph).toHaveAttribute("data-rendered-dependency-focus-ring-count", "0")
+      const clearedEdges = await readJsonAttribute<readonly DependencyEdgeDiagnostic[]>(graph, "data-rendered-dependency-edges")
+      const clearedEdgeById = new Map(clearedEdges.map((edge) => [edge.id, edge]))
+      for (const edgeId of Object.values(report.edgeIds)) {
+        expect(clearedEdgeById.get(edgeId)).toEqual({ id: edgeId, color: "rgba(98, 139, 181, 0.32)", size: 2.4 })
+      }
+    })
+  })
+})
+
 test("keeps dense orientation labels collision-free and readable on directory hover", async ({ page }) => {
   await withTemporaryDirectory(async (temporaryDirectory) => {
     const reportPath = await test.step("Generate a report with many long sibling directory labels", async () => {
@@ -972,6 +1189,36 @@ type NodeCircleDiagnostic = {
   readonly radius: number
 }
 
+type NodeColorDiagnostic = {
+  readonly id: string
+  readonly color: string
+}
+
+type DependencyFocusDiagnostic = {
+  readonly nodeId: string
+  readonly dependencyNodeIds: readonly string[]
+  readonly consumerNodeIds: readonly string[]
+}
+
+type DependencyFocusPixelDiagnostic = {
+  readonly nodes: ReadonlyArray<{
+    readonly id: string
+    readonly baselineCenter: RgbDiagnostic
+    readonly focusedCenter: RgbDiagnostic
+    readonly focusRingPixelCounts: {
+      readonly hovered: number
+      readonly dependency: number
+      readonly consumer: number
+    }
+  }>
+  readonly edges: ReadonlyArray<{
+    readonly id: string
+    readonly focusedToHiddenPixelCount: number
+    readonly closestFocused: RgbDiagnostic
+    readonly closestHidden: RgbDiagnostic
+  }>
+}
+
 type DependencyEdgeDiagnostic = {
   readonly id: string
   readonly color: string
@@ -1112,6 +1359,163 @@ async function sampleDirectoryHoverPixels(
       }
     },
     { label: directoryLabel, screenshotBase64: screenshot.toString("base64") },
+  )
+}
+
+async function sampleDependencyFocusPixels(
+  graph: Locator,
+  nodes: readonly NodeCircleDiagnostic[],
+  edges: ReadonlyArray<{
+    readonly id: string
+    readonly source: NodeCircleDiagnostic
+    readonly target: NodeCircleDiagnostic
+    readonly expected: readonly [number, number, number]
+  }>,
+  baselineScreenshot: Buffer,
+  focusedScreenshot: Buffer,
+  hiddenEdgesScreenshot: Buffer,
+): Promise<DependencyFocusPixelDiagnostic> {
+  return await graph.evaluate(
+    async (container, diagnostic): Promise<DependencyFocusPixelDiagnostic> => {
+      const loadScreenshot = async (screenshotBase64: string): Promise<CanvasRenderingContext2D> => {
+        const image = new Image()
+        image.src = `data:image/png;base64,${screenshotBase64}`
+        await image.decode()
+        const canvas = document.createElement("canvas")
+        canvas.width = image.naturalWidth
+        canvas.height = image.naturalHeight
+        const context = canvas.getContext("2d", { willReadFrequently: true })
+        if (context === null) {
+          throw new Error("Dependency-focus screenshot is not readable.")
+        }
+        context.drawImage(image, 0, 0)
+        return context
+      }
+      const [baseline, focused, hidden] = await Promise.all([
+        loadScreenshot(diagnostic.baselineScreenshotBase64),
+        loadScreenshot(diagnostic.focusedScreenshotBase64),
+        loadScreenshot(diagnostic.hiddenEdgesScreenshotBase64),
+      ])
+      if (
+        container.clientWidth === 0 ||
+        container.clientHeight === 0 ||
+        baseline.canvas.width !== focused.canvas.width ||
+        baseline.canvas.height !== focused.canvas.height ||
+        baseline.canvas.width !== hidden.canvas.width ||
+        baseline.canvas.height !== hidden.canvas.height
+      ) {
+        throw new Error("Dependency-focus screenshots do not share one stable viewport.")
+      }
+
+      const scaleX = focused.canvas.width / container.clientWidth
+      const scaleY = focused.canvas.height / container.clientHeight
+      const pixelAt = (context: CanvasRenderingContext2D, x: number, y: number): RgbDiagnostic => {
+        const pixel = context.getImageData(
+          Math.max(0, Math.min(context.canvas.width - 1, Math.round(x * scaleX))),
+          Math.max(0, Math.min(context.canvas.height - 1, Math.round(y * scaleY))),
+          1,
+          1,
+        ).data
+        return { red: pixel[0] ?? 0, green: pixel[1] ?? 0, blue: pixel[2] ?? 0, alpha: pixel[3] ?? 0 }
+      }
+      const colorDistance = (color: RgbDiagnostic, target: readonly [number, number, number]): number =>
+        Math.hypot(color.red - target[0], color.green - target[1], color.blue - target[2])
+      const focusColors = {
+        hovered: [245, 249, 255],
+        dependency: [70, 215, 198],
+        consumer: [255, 155, 113],
+      } as const
+      const nodeSamples = diagnostic.nodes.map((node) => {
+        const focusRingPixelCounts = { hovered: 0, dependency: 0, consumer: 0 }
+        const innerRadius = node.radius + 2
+        const outerRadius = node.radius + 12
+        const left = Math.max(0, Math.floor((node.x - outerRadius) * scaleX))
+        const right = Math.min(focused.canvas.width - 1, Math.ceil((node.x + outerRadius) * scaleX))
+        const top = Math.max(0, Math.floor((node.y - outerRadius) * scaleY))
+        const bottom = Math.min(focused.canvas.height - 1, Math.ceil((node.y + outerRadius) * scaleY))
+        for (let pixelY = top; pixelY <= bottom; pixelY += 1) {
+          for (let pixelX = left; pixelX <= right; pixelX += 1) {
+            const viewportX = pixelX / scaleX
+            const viewportY = pixelY / scaleY
+            const distanceFromNode = Math.hypot(viewportX - node.x, viewportY - node.y)
+            if (distanceFromNode < innerRadius || distanceFromNode > outerRadius) {
+              continue
+            }
+            const pixel = focused.getImageData(pixelX, pixelY, 1, 1).data
+            const color = { red: pixel[0] ?? 0, green: pixel[1] ?? 0, blue: pixel[2] ?? 0, alpha: pixel[3] ?? 0 }
+            if (color.alpha < 200) {
+              continue
+            }
+            if (colorDistance(color, focusColors.hovered) <= 18) {
+              focusRingPixelCounts.hovered += 1
+            }
+            if (colorDistance(color, focusColors.dependency) <= 18) {
+              focusRingPixelCounts.dependency += 1
+            }
+            if (colorDistance(color, focusColors.consumer) <= 18) {
+              focusRingPixelCounts.consumer += 1
+            }
+          }
+        }
+        return {
+          id: node.id,
+          baselineCenter: pixelAt(baseline, node.x, node.y),
+          focusedCenter: pixelAt(focused, node.x, node.y),
+          focusRingPixelCounts,
+        }
+      })
+
+      const graphBackground = [13, 17, 23] as const
+      const edgeSamples = diagnostic.edges.map((edge) => {
+        const deltaX = edge.target.x - edge.source.x
+        const deltaY = edge.target.y - edge.source.y
+        const segmentLength = Math.hypot(deltaX, deltaY)
+        if (segmentLength === 0) {
+          throw new Error(`Dependency-focus edge ${edge.id} has coincident endpoints.`)
+        }
+        const perpendicularX = -deltaY / segmentLength
+        const perpendicularY = deltaX / segmentLength
+        const sampledCoordinates = new Set<string>()
+        let focusedToHiddenPixelCount = 0
+        let closestFocused = { red: 0, green: 0, blue: 0, alpha: 0 }
+        let closestHidden = { red: 0, green: 0, blue: 0, alpha: 0 }
+        let closestScore = Number.POSITIVE_INFINITY
+        for (let step = 0; step <= 80; step += 1) {
+          const progress = 0.25 + (step / 80) * 0.5
+          for (let offset = -4; offset <= 4; offset += 0.5) {
+            const x = edge.source.x + deltaX * progress + perpendicularX * offset
+            const y = edge.source.y + deltaY * progress + perpendicularY * offset
+            const coordinate = `${Math.round(x * scaleX)},${Math.round(y * scaleY)}`
+            if (sampledCoordinates.has(coordinate)) {
+              continue
+            }
+            sampledCoordinates.add(coordinate)
+            const focusedPixel = pixelAt(focused, x, y)
+            const hiddenPixel = pixelAt(hidden, x, y)
+            const focusedDistance = colorDistance(focusedPixel, edge.expected)
+            const hiddenDistance = colorDistance(hiddenPixel, graphBackground)
+            if (focusedDistance <= 18 && hiddenDistance <= 4) {
+              focusedToHiddenPixelCount += 1
+            }
+            const score = focusedDistance + hiddenDistance
+            if (score < closestScore) {
+              closestScore = score
+              closestFocused = focusedPixel
+              closestHidden = hiddenPixel
+            }
+          }
+        }
+        return { id: edge.id, focusedToHiddenPixelCount, closestFocused, closestHidden }
+      })
+      return { nodes: nodeSamples, edges: edgeSamples }
+    },
+    {
+      nodes,
+      edges,
+      baselineScreenshotBase64: baselineScreenshot.toString("base64"),
+      focusedScreenshotBase64: focusedScreenshot.toString("base64"),
+      hiddenEdgesScreenshotBase64: hiddenEdgesScreenshot.toString("base64"),
+    },
   )
 }
 
