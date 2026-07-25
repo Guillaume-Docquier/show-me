@@ -46,7 +46,7 @@ The final pairwise collision check is quadratic but runs once, rather than on ev
 
 ## Reproducible benchmarks and budgets
 
-Run `pnpm test:performance` for the automated 300-file, 163,950-line sentinel. It is part of `pnpm checks`. Run `pnpm benchmark:full` for the 1,000-file, 5,046,995-line workload; CI runs this full benchmark after the browser suite on every push to `main`. Generated projects, reports, and JSON evidence are written under ignored `.benchmark/<kind>/` directories.
+Run `pnpm test:performance` for the automated 300-file, 163,950-line sentinel. It is part of `pnpm checks`. Run `pnpm benchmark:full` for the 1,000-file, 5,046,995-line workload; CI runs this full benchmark after the browser suite on every push to `main`. The CI step is informational because hosted-runner timing varies. Budget overruns appear in the GitHub job summary but do not block the validated repository report or Pages deployment. Generated projects, reports, and JSON evidence are written under ignored `.benchmark/<kind>/` directories.
 
 The full command runs isolated cold-process and warm-filesystem-cache CLI scenarios plus two fresh Chromium sessions. It records phase timings, peak RSS, report size, complete embedded-analysis and browser-presentation signatures, graph geometry, and pan, zoom, hover, and selection durations.
 

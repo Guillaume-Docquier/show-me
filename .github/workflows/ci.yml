@@ -54,7 +54,15 @@ jobs:
         run: pnpm test:browser
 
       - name: Run full performance benchmark
+        id: full_performance_benchmark
+        continue-on-error: true
         run: pnpm benchmark:full
+
+      - name: Add performance benchmark to job summary
+        if: ${{ always() }}
+        env:
+          BENCHMARK_OUTCOME: ${{ steps.full_performance_benchmark.outcome }}
+        run: node benchmarks/write-github-summary.ts
 
       - name: Generate repository report
         run: |

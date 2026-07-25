@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process"
-import { mkdir, readFile, writeFile } from "node:fs/promises"
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises"
 import { resolve } from "node:path"
 import { TypeGuard } from "@guillaume-docquier/tools-ts"
 import { generateCorpus } from "./generated-corpus.ts"
@@ -51,7 +51,9 @@ const budgets =
 const benchmarkDirectory = resolve(".benchmark", benchmarkKind)
 const projectDirectory = resolve(benchmarkDirectory, "project")
 const reportPath = resolve(benchmarkDirectory, "show-me.html")
+const summaryPath = resolve(benchmarkDirectory, "summary.json")
 await mkdir(benchmarkDirectory, { recursive: true })
+await rm(summaryPath, { force: true })
 const workload = await generateCorpus({
   outputDirectory: projectDirectory,
   fileCount: dimensions.fileCount,
@@ -71,13 +73,6 @@ const coldCli = parseCliBenchmarkResult(await readJson(coldCliPath))
 const warmCli = parseCliBenchmarkResult(await readJson(warmCliPath))
 const firstBrowser = parseBrowserBenchmarkResult(await readJson(firstBrowserPath))
 const repeatedBrowser = parseBrowserBenchmarkResult(await readJson(repeatedBrowserPath))
-if (coldCli.analysisSha256 !== warmCli.analysisSha256) {
-  throw new Error("Cold and warm CLI runs produced different embedded analysis.")
-}
-if (firstBrowser.presentationSha256 !== repeatedBrowser.presentationSha256) {
-  throw new Error("Repeated browser runs produced different presentation facts.")
-}
-
 const summary = {
   benchmarkKind,
   workload,
@@ -86,6 +81,13 @@ const summary = {
   warmCli,
   firstBrowser,
   repeatedBrowser,
+}
+await writeFile(summaryPath, `${JSON.stringify(summary, undefined, 2)}\n`, "utf8")
+if (coldCli.analysisSha256 !== warmCli.analysisSha256) {
+  throw new Error("Cold and warm CLI runs produced different embedded analysis.")
+}
+if (firstBrowser.presentationSha256 !== repeatedBrowser.presentationSha256) {
+  throw new Error("Repeated browser runs produced different presentation facts.")
 }
 assertAtMost("cold CLI duration", coldCli.durationMilliseconds, budgets.cliMilliseconds)
 assertAtMost("warm CLI duration", warmCli.durationMilliseconds, budgets.cliMilliseconds)
@@ -104,8 +106,6 @@ for (const browser of [firstBrowser, repeatedBrowser]) {
   }
 }
 
-const summaryPath = resolve(benchmarkDirectory, "summary.json")
-await writeFile(summaryPath, `${JSON.stringify(summary, undefined, 2)}\n`, "utf8")
 process.stdout.write(`Performance benchmark passed. Evidence: ${summaryPath}\n`)
 
 async function runScenario(script: string, arguments_: readonly string[]): Promise<void> {
