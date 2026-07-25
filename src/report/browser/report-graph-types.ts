@@ -1,3 +1,5 @@
+import type { DependencyKind } from "../../analysis/project-analysis.js"
+
 /** Graphology/Sigma-only node attributes for the visible report projection. */
 export type BrowserNodeAttributes = {
   readonly size: number
@@ -14,7 +16,8 @@ export type BrowserNodeAttributes = {
 /** Graphology/Sigma-only edge attributes for layout and rendering. */
 export type BrowserEdgeAttributes = {
   readonly edgeKind: "structure" | "dependency"
-  readonly dependencyKind?: "project-file" | "external-package"
+  readonly dependencyTargetKind?: "project-file" | "external-package"
+  readonly dependencyKind?: DependencyKind
   readonly weight: number
   readonly color?: string
   readonly hidden?: boolean

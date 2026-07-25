@@ -6,7 +6,7 @@ import {
   type JavaScriptTypeScriptCommentSpan,
   type JavaScriptTypeScriptJsxCommentContainerSpan,
 } from "./classify-javascript-typescript-lines.js"
-import { collectStaticRuntimeRequests } from "./collect-static-runtime-requests.js"
+import { collectStaticDependencyRequests } from "./collect-static-dependency-requests.js"
 
 describe("classifyJavaScriptTypeScriptLines", () => {
   it.each([
@@ -122,7 +122,7 @@ function parseSyntax(
   if (Result.isFailure(path)) {
     throw new Error("Invalid test path: " + fileName)
   }
-  const syntax = collectStaticRuntimeRequests({ path: path.value, absolutePath: fileName, sourceText })
+  const syntax = collectStaticDependencyRequests({ path: path.value, absolutePath: fileName, sourceText })
   if (Result.isFailure(syntax)) {
     throw syntax.error
   }

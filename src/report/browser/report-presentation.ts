@@ -37,8 +37,6 @@ export type ReportNodeLineMetrics = {
 type ReportNodeBase = {
   readonly id: string
   readonly displayName: string
-  readonly dependencyNodeIds: readonly string[]
-  readonly consumerNodeIds: readonly string[]
   readonly color: string
   readonly size: number
 }
@@ -64,7 +62,8 @@ export type ReportNode = ReportProjectFileNode | ReportExternalPackageNode
 /** One browser-derived dependency between presentation nodes. */
 export type ReportEdge = {
   readonly id: string
-  readonly kind: "project-file" | "external-package"
+  readonly targetKind: "project-file" | "external-package"
+  readonly dependencyKind: ProjectAnalysis["dependencies"][number]["kind"]
   readonly source: string
   readonly target: string
 }
@@ -81,28 +80,24 @@ export type BrowserPresentation = {
  * Derive deterministic, renderer-neutral browser presentation from the embedded analysis.
  *
  * @param analysis - Complete language-neutral project analysis.
- * @returns Browser-owned identities, display metadata, and relationship indexes.
+ * @returns Browser-owned identities, display metadata, and classified relationship edges.
  */
 export function buildBrowserPresentation(analysis: ProjectAnalysis): BrowserPresentation {
-  const dependencyNodeIdsBySource = new Map<string, string[]>()
-  const consumerNodeIdsByTarget = new Map<string, string[]>()
   const projectEdges: ReportEdge[] = analysis.dependencies.map((dependency, index) => ({
     id: `project-dependency-${index}`,
-    kind: "project-file",
+    targetKind: "project-file",
+    dependencyKind: dependency.kind,
     source: projectFileNodeId(dependency.source),
     target: projectFileNodeId(dependency.target),
   }))
   const externalPackageEdges: ReportEdge[] = analysis.externalPackageDependencies.map((dependency, index) => ({
     id: `external-package-dependency-${index}`,
-    kind: "external-package",
+    targetKind: "external-package",
+    dependencyKind: dependency.kind,
     source: projectFileNodeId(dependency.source),
     target: externalPackageNodeId(dependency.target),
   }))
   const edges = [...projectEdges, ...externalPackageEdges]
-  for (const edge of edges) {
-    appendMapValue(dependencyNodeIdsBySource, edge.source, edge.target)
-    appendMapValue(consumerNodeIdsByTarget, edge.target, edge.source)
-  }
 
   const nodes: ReportNode[] = [
     ...analysis.files.map((file): ReportProjectFileNode => {
@@ -114,8 +109,6 @@ export function buildBrowserPresentation(analysis: ProjectAnalysis): BrowserPres
         path: file.path,
         workspacePackage: file.workspacePackage,
         lineMetrics: file.lines,
-        dependencyNodeIds: dependencyNodeIdsBySource.get(id) ?? [],
-        consumerNodeIds: consumerNodeIdsByTarget.get(id) ?? [],
         coverage: file.coverage?.lines,
         color: coverageColor(file.coverage?.lines),
         size: nodeSizeForLines(file.lines.code),
@@ -128,8 +121,6 @@ export function buildBrowserPresentation(analysis: ProjectAnalysis): BrowserPres
         kind: "external-package",
         displayName: externalPackage.name,
         packageName: externalPackage.name,
-        dependencyNodeIds: [],
-        consumerNodeIds: consumerNodeIdsByTarget.get(id) ?? [],
         color: EXTERNAL_PACKAGE_NODE_COLOR,
         size: EXTERNAL_PACKAGE_NODE_SIZE,
       }
@@ -184,15 +175,6 @@ function projectFileNodeId(path: string): string {
 
 function externalPackageNodeId(name: string): string {
   return `external-package:${name}`
-}
-
-function appendMapValue(valuesByKey: Map<string, string[]>, key: string, value: string): void {
-  const values = valuesByKey.get(key)
-  if (values === undefined) {
-    valuesByKey.set(key, [value])
-  } else {
-    values.push(value)
-  }
 }
 
 function interpolateColor(start: string, end: string, progress: number): string {

@@ -11,29 +11,29 @@ This directory tracks milestones, implementation progress, verification evidence
 | [014 CLI file selection](./014-cli-file-selection.md)                           | Not started | Include default-excluded tests and add one-invocation ignore patterns. |
 | [015 Project configuration](./015-project-configuration.md)                     | Not started | Persist file-selection settings with explicit CLI precedence.          |
 | [020 Configurable coverage locations](./020-configurable-coverage-locations.md) | Not started | Configure per-package locations and multiple explicit reports.         |
-| [021 Type-only dependencies](./021-type-only-dependencies.md)                   | Not started | Track, distinguish, and filter explicitly type-only dependencies.      |
 
 ## Done
 
 Completed milestone files are retained under [`done/`](./done/) as implementation history and verification evidence.
 
-| Milestone                                                                      | Completed  | Outcome                                                             |
-| ------------------------------------------------------------------------------ | ---------- | ------------------------------------------------------------------- |
-| [001 Foundation](./done/001-foundation.md)                                     | 2026-07-15 | Established build boundaries, fixtures, and test infrastructure.    |
-| [002 File discovery and LOC](./done/002-file-discovery-and-loc.md)             | 2026-07-15 | Added executable-file discovery and deterministic non-blank LOC.    |
-| [003 Static visualization](./done/003-static-visualization.md)                 | 2026-07-16 | Added the self-contained interactive graph and hardened its layout. |
-| [004 Static ESM imports](./done/004-static-esm-imports.md)                     | 2026-07-16 | Added static runtime ESM dependencies and relationship details.     |
-| [005 Coverage](./done/005-coverage.md)                                         | 2026-07-16 | Added optional Istanbul line coverage and coverage-colored nodes.   |
-| [006 CLOC line breakdown](./done/006-cloc-line-breakdown.md)                   | 2026-07-16 | Added exclusive line categories and interactive node sizing.        |
-| [007 External packages](./done/007-external-packages.md)                       | 2026-07-16 | Added optional package nodes without analyzing installed code.      |
-| [008 pnpm workspaces](./done/008-pnpm-workspaces.md)                           | 2026-07-18 | Analyzes and filters all packages in one pnpm workspace.            |
-| [010 Visualization and UX](./done/010-visualization-and-ux.md)                 | 2026-07-25 | Delivers large-desktop navigation, interpretation, and graph focus. |
-| [012 GitHub Pages report](./done/012-github-pages-report.md)                   | 2026-07-16 | Publishes a validated live visualization of the repository.         |
-| [013 Default test-file exclusions](./done/013-default-test-file-exclusions.md) | 2026-07-16 | Removes conventionally named test files from default analysis.      |
-| [016 Codebase consolidation](./done/016-codebase-consolidation.md)             | 2026-07-16 | Hardened analysis, report, CLI, build, and package boundaries.      |
-| [017 Browser-owned presentation](./done/017-browser-owned-presentation.md)     | 2026-07-18 | Embeds raw analysis and derives presentation in the browser.        |
-| [018 LCOV coverage](./done/018-lcov-coverage.md)                               | 2026-07-18 | Imports LCOV and deterministically selects one coverage report.     |
-| [019 Monorepo coverage discovery](./done/019-monorepo-coverage-discovery.md)   | 2026-07-18 | Combines conventional coverage from project and package roots.      |
+| Milestone                                                                      | Completed  | Outcome                                                               |
+| ------------------------------------------------------------------------------ | ---------- | --------------------------------------------------------------------- |
+| [001 Foundation](./done/001-foundation.md)                                     | 2026-07-15 | Established build boundaries, fixtures, and test infrastructure.      |
+| [002 File discovery and LOC](./done/002-file-discovery-and-loc.md)             | 2026-07-15 | Added executable-file discovery and deterministic non-blank LOC.      |
+| [003 Static visualization](./done/003-static-visualization.md)                 | 2026-07-16 | Added the self-contained interactive graph and hardened its layout.   |
+| [004 Static ESM imports](./done/004-static-esm-imports.md)                     | 2026-07-16 | Added static runtime ESM dependencies and relationship details.       |
+| [005 Coverage](./done/005-coverage.md)                                         | 2026-07-16 | Added optional Istanbul line coverage and coverage-colored nodes.     |
+| [006 CLOC line breakdown](./done/006-cloc-line-breakdown.md)                   | 2026-07-16 | Added exclusive line categories and interactive node sizing.          |
+| [007 External packages](./done/007-external-packages.md)                       | 2026-07-16 | Added optional package nodes without analyzing installed code.        |
+| [008 pnpm workspaces](./done/008-pnpm-workspaces.md)                           | 2026-07-18 | Analyzes and filters all packages in one pnpm workspace.              |
+| [010 Visualization and UX](./done/010-visualization-and-ux.md)                 | 2026-07-25 | Delivers large-desktop navigation, interpretation, and graph focus.   |
+| [012 GitHub Pages report](./done/012-github-pages-report.md)                   | 2026-07-16 | Publishes a validated live visualization of the repository.           |
+| [013 Default test-file exclusions](./done/013-default-test-file-exclusions.md) | 2026-07-16 | Removes conventionally named test files from default analysis.        |
+| [016 Codebase consolidation](./done/016-codebase-consolidation.md)             | 2026-07-16 | Hardened analysis, report, CLI, build, and package boundaries.        |
+| [017 Browser-owned presentation](./done/017-browser-owned-presentation.md)     | 2026-07-18 | Embeds raw analysis and derives presentation in the browser.          |
+| [018 LCOV coverage](./done/018-lcov-coverage.md)                               | 2026-07-18 | Imports LCOV and deterministically selects one coverage report.       |
+| [019 Monorepo coverage discovery](./done/019-monorepo-coverage-discovery.md)   | 2026-07-18 | Combines conventional coverage from project and package roots.        |
+| [021 Type-only dependencies](./done/021-type-only-dependencies.md)             | 2026-07-25 | Tracks, distinguishes, and filters explicitly type-only dependencies. |
 
 ## Workflow
 

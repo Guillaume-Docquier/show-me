@@ -5,11 +5,15 @@ import defaultValue from "./default-export.js"
 import "./side-effect.js"
 import { indexedValue } from "./directory"
 import { type MixedType, mixedRuntimeValue } from "./mixed.js"
+import type { AliasedType } from "@lib/type-only"
 // oxlint-disable-next-line typescript/consistent-type-imports -- The fixture proves that ordinary imports used only as types remain runtime dependencies.
 import { OrdinaryType } from "./ordinary-type.js"
 import { runtimeValue } from "./runtime"
 import { runtimeValue as duplicateRuntimeValue } from "./runtime.js"
 import type { OnlyType } from "./types-only.js"
+import type { ExternalType } from "type-only-package/subpath"
+import type { MissingAliasType } from "@lib/missing-type"
+import type { MissingRelativeType } from "./missing-type.js"
 // oxlint-disable-next-line import/no-unassigned-import -- The fixture proves that resolved non-code assets are ignored.
 import "./data.json"
 import "./styles.css"
@@ -18,6 +22,6 @@ import "external-package"
 // oxlint-disable-next-line import/no-unassigned-import -- The fixture proves that unresolved executable targets produce diagnostics.
 import "./missing.js"
 
-export type MainType = OnlyType & MixedType & OrdinaryType
+export type MainType = OnlyType & MixedType & OrdinaryType & AliasedType & ExternalType & MissingAliasType & MissingRelativeType
 export const mainValue =
   defaultValue + runtimeValue + duplicateRuntimeValue + mixedRuntimeValue + indexedValue + aliasedValue + missingValue

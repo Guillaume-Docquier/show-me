@@ -66,6 +66,7 @@ The initial graph is flat:
 - external-package nodes have one fixed size and a distinct non-coverage color and type label;
 - project files with coverage use a red-yellow-green scale while missing coverage remains neutral gray;
 - edges point from a consumer to its dependency;
+- runtime project-file, runtime external-package, type-only, and structure arrows use distinct graph-key treatments;
 - pan, zoom, hover, and selection are supported.
 
 Sigma renders node size relative to layout positions so its radii use the same coordinate system as ForceAtlas2's size adjustment. Sigma fits the browser-owned coordinates from the current Graphology graph. The embedded analysis contains no presentation identities or layout coordinates; the browser derives renderer-neutral presentation before creating Graphology and Sigma state.
@@ -81,6 +82,12 @@ Changing the active categories recomputes node sizes and browser layout through 
 External-package nodes and their edges are hidden by default, so package facts do not perturb the initial file-only layout or relationship counts. An accessible unchecked control reveals the canonical package roots referenced by currently visible project files. The same report-view transition rebuilds and lays out the visible Graphology subgraph, combining package visibility with the active line categories and workspace-package filters.
 
 Package nodes use a fixed size and a distinct purple appearance. Color is not their only cue: the package list and node-details panel identify them as external packages. Package details show the project files that consume the package and never fabricate line metrics, coverage, or installed-package contents. Hiding packages clears package hover or selection while preserving a selected project file.
+
+## Type-only dependency control
+
+Explicitly type-only dependencies are visible by default and use teal arrows distinct from runtime project-file, runtime external-package, and structure edges. Their relationship entries are labeled in node details. A checked independent control removes type-only edges from the current view without changing the embedded analysis; project-file nodes remain visible, while an external package disappears when all of its currently eligible relationships are type-only.
+
+Type-only visibility participates in the same report-view transition as workspace-package and external-package visibility. Returning to an earlier combination reconstructs the same ordered node and edge inputs before deterministic layout. The render-only dependency-edge control remains broader and hides both runtime and type-only arrows without rebuilding the graph.
 
 ## Workspace-package controls
 

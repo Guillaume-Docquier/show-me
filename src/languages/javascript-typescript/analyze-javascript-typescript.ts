@@ -3,6 +3,7 @@ import { Result, TypeGuard } from "@guillaume-docquier/tools-ts"
 import { ExternalPackageName } from "../../analysis/external-package-name.js"
 import type {
   AnalysisDiagnostic,
+  DependencyKind,
   ExternalPackageDependency,
   ProjectDependency,
   ProjectFileAnalysis,
@@ -11,7 +12,7 @@ import { ProjectFilePath } from "../../project-files/project-file-path.js"
 import { compareText } from "../../text/compare-text.js"
 import type { WorkspacePackageDefinition } from "../../workspaces/pnpm-workspace.js"
 import { classifyJavaScriptTypeScriptLines } from "./classify-javascript-typescript-lines.js"
-import { collectStaticRuntimeRequests, type StaticRuntimeRequestSource } from "./collect-static-runtime-requests.js"
+import { collectStaticDependencyRequests, type StaticDependencyRequestSource } from "./collect-static-dependency-requests.js"
 import { externalPackageNameFromRequest } from "./external-package-name.js"
 import {
   hasJavaScriptTypeScriptExecutableExtension,
@@ -23,7 +24,7 @@ import { createJavaScriptTypeScriptResolver, type JavaScriptTypeScriptResolver }
 /**
  * Source input understood by the internal JavaScript and TypeScript language module.
  */
-export type JavaScriptTypeScriptSourceFile = StaticRuntimeRequestSource & {
+export type JavaScriptTypeScriptSourceFile = StaticDependencyRequestSource & {
   readonly language: JavaScriptTypeScriptLanguageId
   readonly workspacePackage?: string
 }
@@ -61,7 +62,7 @@ export type JavaScriptTypeScriptAnalysisError =
     }
 
 /**
- * Analyze files and static runtime ESM relationships without exposing parser or resolver values.
+ * Analyze files and static ESM relationships without exposing parser or resolver values.
  *
  * @param projectRoot - Root of the project being analyzed.
  * @param files - Discovered JavaScript and TypeScript source files.
@@ -89,7 +90,7 @@ export function analyzeJavaScriptTypeScript(
   const analyzedFiles: ProjectFileAnalysis[] = []
 
   for (const file of files) {
-    const requests = collectStaticRuntimeRequests(file)
+    const requests = collectStaticDependencyRequests(file)
     if (Result.isFailure(requests)) {
       return Result.Failure({
         _tag: "JavaScriptTypeScriptParserFailed",
@@ -106,14 +107,14 @@ export function analyzeJavaScriptTypeScript(
       coverage: undefined,
       ...(file.workspacePackage === undefined ? {} : { workspacePackage: file.workspacePackage }),
     })
-    for (const request of requests.value.requests) {
-      const dependency = resolveProjectDependency(file, request, resolverResult.value, discoveredPathByAbsolutePath)
+    for (const { request, kind } of requests.value.requests) {
+      const dependency = resolveProjectDependency(file, request, kind, resolverResult.value, discoveredPathByAbsolutePath)
       if (Result.isFailure(dependency)) {
         return dependency
       }
       if (dependency.value._tag === "Dependency") {
         const resolvedDependency = dependency.value.dependency
-        dependencyByKey.set(`${resolvedDependency.source}\u0000${resolvedDependency.target}`, resolvedDependency)
+        retainPreferredDependency(dependencyByKey, resolvedDependency)
         continue
       }
 
@@ -123,13 +124,13 @@ export function analyzeJavaScriptTypeScript(
           const target = resolveWorkspacePackageTarget(workspacePackage, request, discoveredPathByAbsolutePath)
           if (target === undefined) {
             diagnostics.push({
-              code: "UNRESOLVED_RUNTIME_DEPENDENCY",
-              message: `Could not resolve runtime dependency ${JSON.stringify(request)}.`,
+              code: unresolvedDependencyCode(kind),
+              message: `Could not resolve ${dependencyKindLabel(kind)} dependency ${JSON.stringify(request)}.`,
               file: file.path,
             })
           } else {
-            const workspaceDependency: ProjectDependency = { source: file.path, target, kind: "runtime" }
-            dependencyByKey.set(`${workspaceDependency.source}\u0000${workspaceDependency.target}`, workspaceDependency)
+            const workspaceDependency: ProjectDependency = { source: file.path, target, kind }
+            retainPreferredDependency(dependencyByKey, workspaceDependency)
           }
           continue
         }
@@ -140,17 +141,17 @@ export function analyzeJavaScriptTypeScript(
           const externalDependency: ExternalPackageDependency = {
             source: file.path,
             target: externalPackageName,
-            kind: "runtime",
+            kind,
           }
-          externalPackageDependencyByKey.set(`${externalDependency.source}\u0000${externalDependency.target}`, externalDependency)
+          retainPreferredExternalDependency(externalPackageDependencyByKey, externalDependency)
           continue
         }
       }
 
       if (dependency.value._tag === "Unresolved" && shouldDiagnoseUnresolvedRequest(request, dependency.value.matchesConfiguredAlias)) {
         diagnostics.push({
-          code: "UNRESOLVED_RUNTIME_DEPENDENCY",
-          message: `Could not resolve runtime dependency ${JSON.stringify(request)}.`,
+          code: unresolvedDependencyCode(kind),
+          message: `Could not resolve ${dependencyKindLabel(kind)} dependency ${JSON.stringify(request)}.`,
           file: file.path,
         })
       }
@@ -269,6 +270,7 @@ function discoveredTargetForCandidate(
 function resolveProjectDependency(
   file: JavaScriptTypeScriptSourceFile,
   request: string,
+  kind: DependencyKind,
   resolver: JavaScriptTypeScriptResolver,
   discoveredPathByAbsolutePath: ReadonlyMap<string, ProjectFilePath>,
 ): Result<ProjectDependencyResolution, JavaScriptTypeScriptAnalysisError> {
@@ -299,9 +301,34 @@ function resolveProjectDependency(
         dependency: {
           source: file.path,
           target,
-          kind: "runtime",
+          kind,
         },
       })
+}
+
+function retainPreferredDependency(dependencies: Map<string, ProjectDependency>, dependency: ProjectDependency): void {
+  const key = `${dependency.source}\u0000${dependency.target}`
+  if (dependencies.get(key)?.kind !== "runtime") {
+    dependencies.set(key, dependency)
+  }
+}
+
+function retainPreferredExternalDependency(
+  dependencies: Map<string, ExternalPackageDependency>,
+  dependency: ExternalPackageDependency,
+): void {
+  const key = `${dependency.source}\u0000${dependency.target}`
+  if (dependencies.get(key)?.kind !== "runtime") {
+    dependencies.set(key, dependency)
+  }
+}
+
+function unresolvedDependencyCode(kind: DependencyKind): string {
+  return kind === "runtime" ? "UNRESOLVED_RUNTIME_DEPENDENCY" : "UNRESOLVED_TYPE_ONLY_DEPENDENCY"
+}
+
+function dependencyKindLabel(kind: DependencyKind): string {
+  return kind === "runtime" ? "runtime" : "type-only"
 }
 
 type ProjectDependencyResolution =

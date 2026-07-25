@@ -64,6 +64,7 @@ export function buildHtmlReport(analysis: ProjectAnalysis, browserBundle: string
         <legend>Show</legend>
         <label><input id="structure-edges-toggle" type="checkbox" checked>Structure edges</label>
         <label><input id="dependency-edges-toggle" type="checkbox" checked>Dependency edges</label>
+        <label><input id="type-only-dependencies-toggle" type="checkbox" checked>Type-only dependencies</label>
         <label><input id="external-packages-toggle" type="checkbox">External packages</label>
       </fieldset>
       <fieldset id="workspace-package-fieldset" hidden>
@@ -72,7 +73,9 @@ export function buildHtmlReport(analysis: ProjectAnalysis, browserBundle: string
       </fieldset>
       <div class="graph-key" aria-label="Graph edge types">
         <span><i class="graph-edge-swatch structure-edge-swatch" aria-hidden="true"></i>Structure</span>
-        <span><i class="graph-edge-swatch dependency-edge-swatch" aria-hidden="true"></i>Dependency</span>
+        <span><i class="graph-edge-swatch dependency-edge-swatch" aria-hidden="true"></i>Runtime</span>
+        <span><i class="graph-edge-swatch external-dependency-edge-swatch" aria-hidden="true"></i>External runtime</span>
+        <span><i class="graph-edge-swatch type-only-dependency-edge-swatch" aria-hidden="true"></i>Type only</span>
       </div>
       <div id="coverage-legend" class="coverage-legend" aria-label="Project-file coverage colors"></div>
     </div>

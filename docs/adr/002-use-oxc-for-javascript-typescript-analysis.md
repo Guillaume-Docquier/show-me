@@ -27,3 +27,9 @@ No Oxc AST or resolver type may cross into the language-neutral analysis model.
 The first analyzer gets a fast standards-oriented parser without paying for editing or type-checking features it does not use. Oxc remains replaceable because it is isolated behind the language module.
 
 Native bindings add packaging and cross-platform verification work. Resolution differences or unsupported edge cases must be discovered through real fixtures rather than assumed from parser success. Supporting type-semantic dependency questions would require a separate decision because the chosen initial analysis is intentionally syntax-based.
+
+### 2026-07-25 type-only dependency amendment
+
+The JavaScript and TypeScript language module now retains explicitly type-only static ESM imports and re-exports alongside runtime relationships. Classification remains syntax-only: ordinary imports are runtime dependencies even when their bindings are used only in type positions, and any runtime declaration or specifier takes precedence when a source-target pair also has a type-only declaration.
+
+Type-only requests use the same Oxc resolver, project-file discovery boundary, configured-alias precedence, workspace-package fallback, and external-package classification as runtime requests. The versioned language-neutral analysis distinguishes `runtime` from `type-only`; no Oxc AST value crosses that boundary. This amendment supersedes the original decision only where it excluded explicitly type-only dependencies.

@@ -394,7 +394,7 @@ test("keeps packages hidden by default and rebuilds one combined metric and pack
   })
 })
 
-test("derives project-file edges and relationship indexes in the browser", async ({ page }) => {
+test("derives project-file edges and relationships in the browser", async ({ page }) => {
   await withTemporaryDirectory(async (temporaryDirectory) => {
     const reportPath = await test.step("Generate the static-ESM report", async () => {
       const analysis = await analyzeProject({ projectRoot: fixtureProjectPath("static-esm") })
@@ -408,23 +408,105 @@ test("derives project-file edges and relationship indexes in the browser", async
     await test.step("Inspect browser-derived dependency and consumer navigation", async () => {
       await page.goto(pathToFileURL(reportPath).href)
       await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
-      await expect(page.locator("#graph")).toHaveAttribute("data-visible-edge-count", "13")
+      await expect(page.locator("#graph")).toHaveAttribute("data-visible-edge-count", "16")
       await page.locator("#file-list").getByRole("button", { name: "src/main.ts", exact: true }).click()
       await expect(page.getByRole("heading", { name: "Dependencies", exact: true })).toBeVisible()
       await expect(page.getByText("Imports", { exact: true })).toHaveCount(0)
-      await expect(page.locator("#selected-dependencies")).toHaveText("7")
+      await expect(page.locator("#selected-dependencies")).toHaveText("9")
       await expect(page.locator("#selected-dependency-nodes button")).toHaveText([
         "src/default-export.ts",
         "src/directory/index.ts",
         "src/lib/aliased.ts",
+        "src/lib/type-only.tsType only",
         "src/mixed.ts",
         "src/ordinary-type.ts",
         "src/runtime.ts",
         "src/side-effect.js",
+        "src/types-only.tsType only",
       ])
       await page.locator("#selected-dependency-nodes").getByRole("button", { name: "src/runtime.ts", exact: true }).click()
       await expect(page.locator("#selected-consumers")).toHaveText("2")
       await expect(page.locator("#selected-consumer-files button")).toHaveText(["src/main.ts", "src/reexports.ts"])
+    })
+  })
+})
+
+test("shows, distinguishes, filters, and deterministically restores type-only dependencies", async ({ page }) => {
+  await withTemporaryDirectory(async (temporaryDirectory) => {
+    const reportPath = await test.step("Generate a report containing project and external type-only relationships", async () => {
+      const analysis = await analyzeProject({ projectRoot: fixtureProjectPath("static-esm") })
+      Assert.isSuccess(analysis)
+      const browserBundle = await readFile(join(process.cwd(), "dist", "report", "browser.js"), "utf8")
+      const path = join(temporaryDirectory, "type-only-dependencies.html")
+      await writeFile(path, buildHtmlReport(analysis.value, browserBundle), "utf8")
+      return path
+    })
+
+    const initialLayoutSignature = await test.step("Open with distinct type-only arrows and relationship details visible", async () => {
+      await page.goto(pathToFileURL(reportPath).href)
+      await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
+      const graph = page.locator("#graph")
+      const typeOnlyDependencies = page.getByRole("checkbox", { name: "Type-only dependencies" })
+      await expect(typeOnlyDependencies).toBeChecked()
+      await expect(page.locator("html")).toHaveAttribute("data-type-only-dependencies", "visible")
+      await expect(graph).toHaveAttribute("data-visible-edge-count", "16")
+      await expect(graph).toHaveAttribute("data-rendered-dependency-edge-count", "16")
+      await expect(page.locator(".graph-key")).toContainText("Structure")
+      await expect(page.locator(".graph-key")).toContainText("Runtime")
+      await expect(page.locator(".graph-key")).toContainText("External runtime")
+      await expect(page.locator(".graph-key")).toContainText("Type only")
+      await expect(page.locator(".type-only-dependency-edge-swatch")).toBeVisible()
+
+      const renderedEdges = await readJsonAttribute<readonly DependencyEdgeDiagnostic[]>(graph, "data-rendered-dependency-edges")
+      expect(new Set(renderedEdges.map(({ color }) => color))).toEqual(new Set(["rgba(98, 139, 181, 0.32)", "rgba(45, 212, 191, 0.5)"]))
+
+      await page.locator("#file-list").getByRole("button", { name: "src/main.ts", exact: true }).click()
+      await expect(page.locator("#selected-dependencies")).toHaveText("9")
+      await expect(page.locator("#selected-dependency-nodes")).toContainText("Type only")
+      return await graph.getAttribute("data-layout-signature")
+    })
+
+    await test.step("Hide type-only project relationships independently", async () => {
+      const graph = page.locator("#graph")
+      await page.getByRole("checkbox", { name: "Type-only dependencies" }).uncheck()
+      await expect(page.locator("html")).toHaveAttribute("data-type-only-dependencies", "hidden")
+      await expect(graph).toHaveAttribute("data-visible-edge-count", "13")
+      await expect(graph).toHaveAttribute("data-rendered-dependency-edge-count", "13")
+      await expect(page.locator("#selected-dependencies")).toHaveText("7")
+      await expect(page.locator("#selected-dependency-nodes")).not.toContainText("Type only")
+      expect(await graph.getAttribute("data-layout-signature")).not.toBe(initialLayoutSignature)
+    })
+
+    await test.step("Restore type-only project relationships deterministically", async () => {
+      const graph = page.locator("#graph")
+      await page.getByRole("checkbox", { name: "Type-only dependencies" }).check()
+      await expect(graph).toHaveAttribute("data-visible-edge-count", "16")
+      await expect(page.locator("#selected-dependencies")).toHaveText("9")
+      await expect(page.locator("#selected-dependency-nodes")).toContainText("Type only")
+      await expect(graph).toHaveAttribute("data-layout-signature", initialLayoutSignature ?? "")
+    })
+
+    await test.step("Compose type-only filtering with external-package visibility", async () => {
+      const graph = page.locator("#graph")
+      await graph.click({ position: { x: 2, y: 2 } })
+      await expect(page.locator("html")).not.toHaveAttribute("data-selected-node", /.+/u)
+      await page.getByRole("checkbox", { name: "External packages" }).check()
+      await expect(graph).toHaveAttribute("data-visible-edge-count", "18")
+      await expect(graph).toHaveAttribute("data-rendered-dependency-edge-count", "18")
+      await expect(page.locator("#external-package-list button")).toHaveText([
+        "external-packageExternal package",
+        "type-only-packageExternal package",
+      ])
+      const renderedEdges = await readJsonAttribute<readonly DependencyEdgeDiagnostic[]>(graph, "data-rendered-dependency-edges")
+      expect(new Set(renderedEdges.map(({ color }) => color))).toEqual(
+        new Set(["rgba(98, 139, 181, 0.32)", "rgba(154, 104, 193, 0.38)", "rgba(45, 212, 191, 0.5)"]),
+      )
+      await page.getByRole("checkbox", { name: "Type-only dependencies" }).uncheck()
+      await expect(graph).toHaveAttribute("data-visible-edge-count", "14")
+      await expect(page.locator("#external-package-list button")).toHaveText(["external-packageExternal package"])
+      await expect(page.locator("#external-package-list")).not.toContainText("type-only-package")
+      await page.locator("#file-list").getByRole("button", { name: "src/main.ts", exact: true }).click()
+      await expect(page.locator("#selected-dependencies")).toHaveText("8")
     })
   })
 })
@@ -1164,8 +1246,17 @@ test("renders and filters one complete pnpm workspace without mutating its analy
       await expect(page.locator("#workspace-package-controls input")).toHaveCount(4)
       await expect(page.locator("#workspace-package-controls input:checked")).toHaveCount(4)
       await expect(page.locator("#graph")).toHaveAttribute("data-visible-node-count", "8")
-      await expect(page.locator("#graph")).toHaveAttribute("data-visible-edge-count", "6")
+      await expect(page.locator("#graph")).toHaveAttribute("data-visible-edge-count", "7")
       await expect(page.locator('#file-list button[data-node-id^="project-file:"]')).toHaveCount(8)
+      await page.getByRole("button", { name: "apps/frontend/src/main.ts", exact: true }).click()
+      await expect(page.locator("#selected-dependencies")).toHaveText("3")
+      await expect(page.locator("#selected-dependency-nodes")).toContainText("Type only")
+      await page.getByRole("checkbox", { name: "Type-only dependencies" }).uncheck()
+      await expect(page.locator("#graph")).toHaveAttribute("data-visible-edge-count", "6")
+      await expect(page.locator("#selected-dependencies")).toHaveText("2")
+      await page.getByRole("checkbox", { name: "Type-only dependencies" }).check()
+      await expect(page.locator("#graph")).toHaveAttribute("data-visible-edge-count", "7")
+      await expect(page.locator("#selected-dependencies")).toHaveText("3")
     })
 
     await test.step("Scope to backend and retain only its external packages", async () => {
@@ -1244,7 +1335,7 @@ test("renders and filters one complete pnpm workspace without mutating its analy
       await page.getByRole("checkbox", { name: "@fixture/frontend", exact: true }).check()
       await page.getByRole("checkbox", { name: "@fixture/shared", exact: true }).check()
       await expect(page.locator("#graph")).toHaveAttribute("data-visible-node-count", "8")
-      await expect(page.locator("#graph")).toHaveAttribute("data-visible-edge-count", "6")
+      await expect(page.locator("#graph")).toHaveAttribute("data-visible-edge-count", "7")
       await expect(page.locator("#project-file-count")).toHaveText("8 / 8 project files")
       await expect(page.locator('#file-list button[data-node-id^="project-file:"]')).toHaveCount(8)
     })

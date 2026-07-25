@@ -51,12 +51,12 @@ it.each([
   expect(lines).toBe(expectedLines)
 })
 
-it("derives deterministic identities, display data, and relationship indexes from analysis", () => {
+it("derives deterministic identities, display data, and dependency kinds from analysis", () => {
   // Arrange
   const sourcePath = parseProjectFilePath("src/source.ts")
   const targetPath = parseProjectFilePath("src/deep/target.ts")
   const analysis: ProjectAnalysis = {
-    schemaVersion: 4,
+    schemaVersion: 5,
     project: { name: "deterministic" },
     workspacePackages: [],
     files: [
@@ -93,8 +93,6 @@ it("derives deterministic identities, display data, and relationship indexes fro
         kind: "project-file",
         path: "src/source.ts",
         lineMetrics: { code: 4, comment: 2, blank: 1 },
-        dependencyNodeIds: ["project-file:src/deep/target.ts"],
-        consumerNodeIds: [],
         color: "#8fa3b8",
       },
       {
@@ -102,15 +100,14 @@ it("derives deterministic identities, display data, and relationship indexes fro
         kind: "project-file",
         path: "src/deep/target.ts",
         lineMetrics: { code: 16, comment: 4, blank: 2 },
-        dependencyNodeIds: [],
-        consumerNodeIds: ["project-file:src/source.ts"],
         color: "#80ab29",
       },
     ],
     edges: [
       {
         id: "project-dependency-0",
-        kind: "project-file",
+        targetKind: "project-file",
+        dependencyKind: "runtime",
         source: "project-file:src/source.ts",
         target: "project-file:src/deep/target.ts",
       },

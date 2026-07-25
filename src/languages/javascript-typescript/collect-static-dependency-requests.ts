@@ -1,6 +1,6 @@
 import { Result } from "@guillaume-docquier/tools-ts"
 import { parseSync, Visitor } from "oxc-parser"
-import type { AnalysisDiagnostic } from "../../analysis/project-analysis.js"
+import type { AnalysisDiagnostic, DependencyKind } from "../../analysis/project-analysis.js"
 import type { ProjectFilePath } from "../../project-files/project-file-path.js"
 import type {
   JavaScriptTypeScriptCommentSpan,
@@ -8,46 +8,54 @@ import type {
 } from "./classify-javascript-typescript-lines.js"
 
 /**
- * Source data required for syntax-level runtime-request collection.
+ * Source data required for syntax-level dependency-request collection.
  */
-export type StaticRuntimeRequestSource = {
+export type StaticDependencyRequestSource = {
   readonly path: ProjectFilePath
   readonly absolutePath: string
   readonly sourceText: string
 }
 
 /**
- * Runtime requests and recoverable parser diagnostics from one source file.
+ * One static ESM request classified without type checking.
  */
-export type StaticRuntimeRequestCollection = {
-  readonly requests: readonly string[]
+export type StaticDependencyRequest = {
+  readonly request: string
+  readonly kind: DependencyKind
+}
+
+/** Dependency requests and recoverable parser diagnostics from one source file. */
+export type StaticDependencyRequestCollection = {
+  readonly requests: readonly StaticDependencyRequest[]
   readonly comments: readonly JavaScriptTypeScriptCommentSpan[]
   readonly jsxCommentContainers: readonly JavaScriptTypeScriptJsxCommentContainerSpan[]
   readonly diagnostics: readonly AnalysisDiagnostic[]
 }
 
 /**
- * Collect static runtime ESM requests without exposing Oxc AST values.
+ * Collect static ESM requests without exposing Oxc AST values.
  *
  * @param file - Complete source input for one project file.
- * @returns Runtime requests and diagnostics, or an unexpected parser-boundary failure.
+ * @returns Classified requests and diagnostics, or an unexpected parser-boundary failure.
  */
-export function collectStaticRuntimeRequests(file: StaticRuntimeRequestSource): Result<StaticRuntimeRequestCollection, Error> {
+export function collectStaticDependencyRequests(file: StaticDependencyRequestSource): Result<StaticDependencyRequestCollection, Error> {
   const parsed = Result.tryCatch(() => parseSync(file.absolutePath, file.sourceText, { sourceType: "unambiguous" }))
   if (Result.isFailure(parsed)) {
     return parsed
   }
 
-  const requests = new Set<string>()
+  const requestKindByRequest = new Map<string, DependencyKind>()
   for (const importDeclaration of parsed.value.module.staticImports) {
-    if (importDeclaration.entries.length === 0 || importDeclaration.entries.some((entry) => !entry.isType)) {
-      requests.add(importDeclaration.moduleRequest.value)
-    }
+    retainRequest(
+      requestKindByRequest,
+      importDeclaration.moduleRequest.value,
+      importDeclaration.entries.length === 0 || importDeclaration.entries.some((entry) => !entry.isType) ? "runtime" : "type-only",
+    )
   }
   for (const exportDeclaration of parsed.value.module.staticExports) {
     for (const entry of exportDeclaration.entries) {
-      if (!entry.isType && entry.moduleRequest !== null) {
-        requests.add(entry.moduleRequest.value)
+      if (entry.moduleRequest !== null) {
+        retainRequest(requestKindByRequest, entry.moduleRequest.value, entry.isType ? "type-only" : "runtime")
       }
     }
   }
@@ -67,7 +75,7 @@ export function collectStaticRuntimeRequests(file: StaticRuntimeRequestSource): 
   }).visit(parsed.value.program)
 
   return Result.Success({
-    requests: [...requests],
+    requests: [...requestKindByRequest].map(([request, kind]) => ({ request, kind })),
     comments,
     jsxCommentContainers: collectJsxCommentContainers(file.sourceText, comments, jsxExpressionContainers),
     diagnostics: parsed.value.errors.map((error) => ({
@@ -76,6 +84,12 @@ export function collectStaticRuntimeRequests(file: StaticRuntimeRequestSource): 
       file: file.path,
     })),
   })
+}
+
+function retainRequest(requests: Map<string, DependencyKind>, request: string, kind: DependencyKind): void {
+  if (requests.get(request) !== "runtime") {
+    requests.set(request, kind)
+  }
 }
 
 function collectJsxCommentContainers(

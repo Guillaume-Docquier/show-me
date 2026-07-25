@@ -6,7 +6,7 @@ import { fixtureProjectPath } from "../../testing/fixture-project.js"
 import { analyzeJavaScriptTypeScript, type JavaScriptTypeScriptSourceFile } from "./analyze-javascript-typescript.js"
 
 describe("analyzeJavaScriptTypeScript", () => {
-  it("returns only language-neutral runtime dependencies and diagnostics for every supported static ESM form", async () => {
+  it("returns language-neutral runtime and type-only dependencies for every supported static ESM form", async () => {
     // Arrange
     const projectRoot = fixtureProjectPath("static-esm")
     const files = await readDiscoveredSourceFiles(projectRoot)
@@ -21,7 +21,7 @@ describe("analyzeJavaScriptTypeScript", () => {
           {
             path: "src/runtime.ts",
             language: "typescript",
-            lines: { code: 1, comment: 0, blank: 0 },
+            lines: { code: 2, comment: 0, blank: 0 },
             coverage: undefined,
           },
           {
@@ -37,17 +37,23 @@ describe("analyzeJavaScriptTypeScript", () => {
           { source: "src/main.ts", target: "src/default-export.ts", kind: "runtime" },
           { source: "src/main.ts", target: "src/directory/index.ts", kind: "runtime" },
           { source: "src/main.ts", target: "src/lib/aliased.ts", kind: "runtime" },
+          { source: "src/main.ts", target: "src/lib/type-only.ts", kind: "type-only" },
           { source: "src/main.ts", target: "src/mixed.ts", kind: "runtime" },
           { source: "src/main.ts", target: "src/ordinary-type.ts", kind: "runtime" },
           { source: "src/main.ts", target: "src/runtime.ts", kind: "runtime" },
           { source: "src/main.ts", target: "src/side-effect.js", kind: "runtime" },
+          { source: "src/main.ts", target: "src/types-only.ts", kind: "type-only" },
           { source: "src/reexports.ts", target: "src/mixed.ts", kind: "runtime" },
           { source: "src/reexports.ts", target: "src/runtime.ts", kind: "runtime" },
+          { source: "src/reexports.ts", target: "src/types-only.ts", kind: "type-only" },
           { source: "src/reexports.ts", target: "src/wildcard.ts", kind: "runtime" },
           { source: "src/self.ts", target: "src/self.ts", kind: "runtime" },
         ],
-        externalPackages: [{ name: "external-package" }],
-        externalPackageDependencies: [{ source: "src/main.ts", target: "external-package", kind: "runtime" }],
+        externalPackages: [{ name: "external-package" }, { name: "type-only-package" }],
+        externalPackageDependencies: [
+          { source: "src/main.ts", target: "external-package", kind: "runtime" },
+          { source: "src/main.ts", target: "type-only-package", kind: "type-only" },
+        ],
         diagnostics: [
           {
             code: "UNRESOLVED_RUNTIME_DEPENDENCY",
@@ -57,6 +63,16 @@ describe("analyzeJavaScriptTypeScript", () => {
           {
             code: "UNRESOLVED_RUNTIME_DEPENDENCY",
             message: 'Could not resolve runtime dependency "@lib/missing".',
+            file: "src/main.ts",
+          },
+          {
+            code: "UNRESOLVED_TYPE_ONLY_DEPENDENCY",
+            message: 'Could not resolve type-only dependency "./missing-type.js".',
+            file: "src/main.ts",
+          },
+          {
+            code: "UNRESOLVED_TYPE_ONLY_DEPENDENCY",
+            message: 'Could not resolve type-only dependency "@lib/missing-type".',
             file: "src/main.ts",
           },
         ],

@@ -16,7 +16,7 @@ it("opens a real fixture through the analysis application seam", async () => {
   // Assert
   expect(result).toEqual(
     Result.Success({
-      schemaVersion: 4,
+      schemaVersion: 5,
       project: {
         name: "minimal-javascript",
       },
@@ -68,6 +68,7 @@ it("analyzes one pnpm workspace with ownership, package aliases, and cross-packa
       { source: "apps/backend/src/api.ts", target: "packages/platform/shared/src/value.ts", kind: "runtime" },
       { source: "apps/frontend/src/main.ts", target: "apps/frontend/src/value.ts", kind: "runtime" },
       { source: "apps/frontend/src/main.ts", target: "packages/platform/shared/src/index.ts", kind: "runtime" },
+      { source: "apps/frontend/src/main.ts", target: "packages/platform/shared/src/value.ts", kind: "type-only" },
       {
         source: "packages/platform/shared/src/index.ts",
         target: "packages/platform/shared/src/value.ts",
@@ -135,6 +136,11 @@ it("integrates language-module dependencies and diagnostics into the project ana
       target: "src/runtime.ts",
       kind: "runtime",
     })
+    expect(result.value.dependencies).toContainEqual({
+      source: "src/main.ts",
+      target: "src/types-only.ts",
+      kind: "type-only",
+    })
     expect(result.value.diagnostics).toEqual([
       {
         code: "UNRESOLVED_RUNTIME_DEPENDENCY",
@@ -144,6 +150,16 @@ it("integrates language-module dependencies and diagnostics into the project ana
       {
         code: "UNRESOLVED_RUNTIME_DEPENDENCY",
         message: 'Could not resolve runtime dependency "@lib/missing".',
+        file: "src/main.ts",
+      },
+      {
+        code: "UNRESOLVED_TYPE_ONLY_DEPENDENCY",
+        message: 'Could not resolve type-only dependency "./missing-type.js".',
+        file: "src/main.ts",
+      },
+      {
+        code: "UNRESOLVED_TYPE_ONLY_DEPENDENCY",
+        message: 'Could not resolve type-only dependency "@lib/missing-type".',
         file: "src/main.ts",
       },
     ])

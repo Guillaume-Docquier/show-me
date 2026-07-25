@@ -14,6 +14,8 @@ export type ReportViewState = {
   readonly lineCategories: readonly ReportLineCategory[]
   /** Controls graph membership and therefore which relationships are visible. */
   readonly externalPackages: boolean
+  /** Whether explicitly type-only relationships participate in the visible graph. */
+  readonly typeOnlyDependencies: boolean
   /** Workspace packages whose owned project files participate in the visible graph. */
   readonly workspacePackages: ReadonlySet<string>
 }
@@ -48,6 +50,7 @@ export function initialReportViewState(presentation: BrowserPresentation): Repor
   return {
     lineCategories: ["code"],
     externalPackages: false,
+    typeOnlyDependencies: true,
     workspacePackages: new Set(presentation.workspacePackages.map(({ path }) => path)),
   }
 }
@@ -67,10 +70,13 @@ export function buildReportView(presentation: BrowserPresentation, state: Report
       )
       .map(({ id }) => id),
   )
+  const visiblePresentationEdges = presentation.edges.filter(
+    ({ dependencyKind }) => dependencyKind === "runtime" || state.typeOnlyDependencies,
+  )
   const visibleExternalPackageNodeIds = new Set(
     state.externalPackages
-      ? presentation.edges
-          .filter((edge) => edge.kind === "external-package" && visibleProjectNodeIds.has(edge.source))
+      ? visiblePresentationEdges
+          .filter((edge) => edge.targetKind === "external-package" && visibleProjectNodeIds.has(edge.source))
           .map(({ target }) => target)
       : [],
   )
@@ -92,7 +98,7 @@ export function buildReportView(presentation: BrowserPresentation, state: Report
       }),
     )
   const nodeIds = new Set(nodes.map(({ id }) => id))
-  const dependencyEdges = presentation.edges.filter(({ source, target }) => nodeIds.has(source) && nodeIds.has(target))
+  const dependencyEdges = visiblePresentationEdges.filter(({ source, target }) => nodeIds.has(source) && nodeIds.has(target))
   const visibleProjectFiles = nodes.flatMap(({ id, reportNode }) =>
     reportNode.kind === "project-file" ? [{ id, path: reportNode.path }] : [],
   )
@@ -117,9 +123,27 @@ export function buildReportView(presentation: BrowserPresentation, state: Report
   }
 }
 
-/** Return only relationships whose other endpoint participates in this view. */
-export function visibleRelationships(view: ReportView, nodeIds: readonly string[]): readonly string[] {
-  return nodeIds.filter((nodeId) => view.nodeIds.has(nodeId))
+/** One currently visible relationship from the inspected node's perspective. */
+export type VisibleRelationship = {
+  readonly nodeId: string
+  readonly kind: ReportEdge["dependencyKind"]
+}
+
+/** Derive visible relationship details from the current edge projection. */
+export function visibleRelationships(
+  view: ReportView,
+  nodeId: string,
+  direction: "dependency" | "consumer",
+): readonly VisibleRelationship[] {
+  return view.dependencyEdges.flatMap((edge) => {
+    if (direction === "dependency" && edge.source === nodeId) {
+      return [{ nodeId: edge.target, kind: edge.dependencyKind }]
+    }
+    if (direction === "consumer" && edge.target === nodeId) {
+      return [{ nodeId: edge.source, kind: edge.dependencyKind }]
+    }
+    return []
+  })
 }
 
 /**
@@ -130,7 +154,11 @@ export function visibleRelationships(view: ReportView, nodeIds: readonly string[
  */
 export function reportViewLayoutSignature(view: ReportView): string {
   let hash = 2_166_136_261
-  for (const character of JSON.stringify(view.nodes.map(({ id, size }) => ({ id, size })))) {
+  const layoutInputs = {
+    nodes: view.nodes.map(({ id, size }) => ({ id, size })),
+    edges: view.dependencyEdges.map(({ id }) => id),
+  }
+  for (const character of JSON.stringify(layoutInputs)) {
     hash ^= character.charCodeAt(0)
     hash = Math.imul(hash, 16_777_619)
   }

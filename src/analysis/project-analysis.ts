@@ -4,7 +4,7 @@ import type { ExternalPackageName } from "./external-package-name.js"
 /**
  * The schema version of the internal project analysis model.
  */
-export const PROJECT_ANALYSIS_SCHEMA_VERSION = 4
+export const PROJECT_ANALYSIS_SCHEMA_VERSION = 5
 
 /**
  * A language family understood by a language module.
@@ -58,13 +58,16 @@ export type WorkspacePackageAnalysis = {
 }
 
 /**
- * A directed runtime dependency between two project files.
+ * A directed dependency between two project files.
  */
 export type ProjectDependency = {
   readonly source: ProjectFilePath
   readonly target: ProjectFilePath
-  readonly kind: "runtime"
+  readonly kind: DependencyKind
 }
+
+/** Syntax-level dependency kinds shared by every language module. */
+export type DependencyKind = "runtime" | "type-only"
 
 /**
  * One external package referenced by project code without analyzing package files.
@@ -74,12 +77,12 @@ export type ExternalPackageAnalysis = {
 }
 
 /**
- * A directed runtime dependency from a project file to an external package.
+ * A directed dependency from a project file to an external package.
  */
 export type ExternalPackageDependency = {
   readonly source: ProjectFilePath
   readonly target: ExternalPackageName
-  readonly kind: "runtime"
+  readonly kind: DependencyKind
 }
 
 /**

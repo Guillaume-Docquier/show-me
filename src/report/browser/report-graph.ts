@@ -19,10 +19,13 @@ const ROOT_DIRECTORY_NODE_SIZE = 15
 const STRUCTURE_EDGE_WEIGHT = 6
 const DEPENDENCY_EDGE_WEIGHT = 0.25
 const EXTERNAL_DEPENDENCY_EDGE_WEIGHT = 1.2
+const TYPE_ONLY_DEPENDENCY_EDGE_WEIGHT = 0.18
 const DEPENDENCY_EDGE_COLOR = "rgba(98, 139, 181, 0.32)"
 const EXTERNAL_DEPENDENCY_EDGE_COLOR = "rgba(154, 104, 193, 0.38)"
+const TYPE_ONLY_DEPENDENCY_EDGE_COLOR = "rgba(45, 212, 191, 0.5)"
 const DIMMED_DEPENDENCY_EDGE_COLOR = "rgba(98, 139, 181, 0.18)"
 const DIMMED_EXTERNAL_DEPENDENCY_EDGE_COLOR = "rgba(154, 104, 193, 0.21)"
+const DIMMED_TYPE_ONLY_DEPENDENCY_EDGE_COLOR = "rgba(45, 212, 191, 0.24)"
 const GRAPH_FIT_MARGIN = 1
 const DEPENDENCY_FOCUS_EDGE_SIZE = 4.4
 const CONSUMER_FOCUS_EDGE_SIZE = 5.2
@@ -149,14 +152,16 @@ export class ReportGraph {
       })
     }
     for (const edge of view.dependencyEdges) {
-      const externalPackage = edge.kind === "external-package"
+      const externalPackage = edge.targetKind === "external-package"
+      const typeOnly = edge.dependencyKind === "type-only"
       this.#graph.addDirectedEdgeWithKey(edge.id, edge.source, edge.target, {
         edgeKind: "dependency",
-        dependencyKind: edge.kind,
+        dependencyTargetKind: edge.targetKind,
+        dependencyKind: edge.dependencyKind,
         type: "arrow",
-        color: externalPackage ? EXTERNAL_DEPENDENCY_EDGE_COLOR : DEPENDENCY_EDGE_COLOR,
-        size: externalPackage ? 2 : 2.4,
-        weight: externalPackage ? EXTERNAL_DEPENDENCY_EDGE_WEIGHT : DEPENDENCY_EDGE_WEIGHT,
+        color: typeOnly ? TYPE_ONLY_DEPENDENCY_EDGE_COLOR : externalPackage ? EXTERNAL_DEPENDENCY_EDGE_COLOR : DEPENDENCY_EDGE_COLOR,
+        size: typeOnly || externalPackage ? 2 : 2.4,
+        weight: typeOnly ? TYPE_ONLY_DEPENDENCY_EDGE_WEIGHT : externalPackage ? EXTERNAL_DEPENDENCY_EDGE_WEIGHT : DEPENDENCY_EDGE_WEIGHT,
       })
     }
 
@@ -320,7 +325,12 @@ export class ReportGraph {
     if (this.#hasEdgeFocus()) {
       return {
         ...attributes,
-        color: attributes.dependencyKind === "external-package" ? DIMMED_EXTERNAL_DEPENDENCY_EDGE_COLOR : DIMMED_DEPENDENCY_EDGE_COLOR,
+        color:
+          attributes.dependencyKind === "type-only"
+            ? DIMMED_TYPE_ONLY_DEPENDENCY_EDGE_COLOR
+            : attributes.dependencyTargetKind === "external-package"
+              ? DIMMED_EXTERNAL_DEPENDENCY_EDGE_COLOR
+              : DIMMED_DEPENDENCY_EDGE_COLOR,
       }
     }
     return attributes
@@ -359,6 +369,7 @@ export class ReportGraph {
     }
     this.#root.dataset.activeLineCategories = view.state.lineCategories.join(",")
     this.#root.dataset.externalPackages = view.state.externalPackages ? "visible" : "hidden"
+    this.#root.dataset.typeOnlyDependencies = view.state.typeOnlyDependencies ? "visible" : "hidden"
     this.#root.dataset.workspacePackages = JSON.stringify([...view.state.workspacePackages])
     this.#diagnostics.writeView(view)
     this.#diagnostics.writeGraphWeights({
@@ -435,8 +446,12 @@ export class ReportGraph {
     }
     return {
       nodeId: node.id,
-      dependencyNodeIds: new Set(visibleRelationships(view, node.dependencyNodeIds).filter((nodeId) => nodeId !== node.id)),
-      consumerNodeIds: new Set(visibleRelationships(view, node.consumerNodeIds).filter((nodeId) => nodeId !== node.id)),
+      dependencyNodeIds: new Set(
+        visibleRelationships(view, node.id, "dependency").flatMap(({ nodeId }) => (nodeId === node.id ? [] : [nodeId])),
+      ),
+      consumerNodeIds: new Set(
+        visibleRelationships(view, node.id, "consumer").flatMap(({ nodeId }) => (nodeId === node.id ? [] : [nodeId])),
+      ),
     }
   }
 

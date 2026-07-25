@@ -184,7 +184,7 @@ Options:
       const analysis = parseAnalysis(html)
 
       expect(exitCode).toBe(0)
-      expect(analysis.dependencies).toHaveLength(13)
+      expect(analysis.dependencies).toHaveLength(16)
       expect(analysis.files).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
@@ -200,11 +200,20 @@ Options:
           expect.objectContaining({
             source: "src/main.ts",
             target: "src/runtime.ts",
+            kind: "runtime",
+          }),
+          expect.objectContaining({
+            source: "src/main.ts",
+            target: "src/types-only.ts",
+            kind: "type-only",
           }),
         ]),
       )
-      expect(analysis.externalPackages).toEqual([{ name: "external-package" }])
-      expect(analysis.externalPackageDependencies).toEqual([{ source: "src/main.ts", target: "external-package", kind: "runtime" }])
+      expect(analysis.externalPackages).toEqual([{ name: "external-package" }, { name: "type-only-package" }])
+      expect(analysis.externalPackageDependencies).toEqual([
+        { source: "src/main.ts", target: "external-package", kind: "runtime" },
+        { source: "src/main.ts", target: "type-only-package", kind: "type-only" },
+      ])
     })
   })
 

@@ -8,6 +8,7 @@ export type ReportHeadingElements = {
 export type ReportControlElements = {
   readonly resetCameraButton: HTMLButtonElement
   readonly externalPackageToggle: HTMLInputElement
+  readonly typeOnlyDependencyToggle: HTMLInputElement
   readonly structureEdgesToggle: HTMLInputElement
   readonly dependencyEdgesToggle: HTMLInputElement
   readonly workspacePackageFieldset: HTMLElement
@@ -71,6 +72,7 @@ export function getReportElements(reportDocument: Document): ReportElements {
     controls: {
       resetCameraButton: requiredButton(reportDocument, "reset-camera"),
       externalPackageToggle: requiredCheckbox(reportDocument, "external-packages-toggle"),
+      typeOnlyDependencyToggle: requiredCheckbox(reportDocument, "type-only-dependencies-toggle"),
       structureEdgesToggle: requiredCheckbox(reportDocument, "structure-edges-toggle"),
       dependencyEdgesToggle: requiredCheckbox(reportDocument, "dependency-edges-toggle"),
       workspacePackageFieldset: requiredElement(reportDocument, "workspace-package-fieldset"),

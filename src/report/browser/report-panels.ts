@@ -2,7 +2,7 @@ import { buildProjectFileTree, type ProjectFileTreeEntry, type ProjectFileTreeFi
 import type { ReportPanelElements } from "./report-elements.js"
 import type { ReportInteractionState } from "./report-interaction.js"
 import type { BrowserPresentation, ReportNode, ReportProjectFileNode } from "./report-presentation.js"
-import { visibleRelationships, type ReportView, type ReportViewDirectory } from "./report-view.js"
+import { visibleRelationships, type ReportView, type ReportViewDirectory, type VisibleRelationship } from "./report-view.js"
 
 export type ReportPanelActions = {
   readonly selectNode: (nodeId: string) => void
@@ -199,12 +199,12 @@ export class ReportPanels {
     if (projectFile) {
       this.#showProjectFileDetails(node)
     }
-    const dependencyNodeIds = visibleRelationships(view, node.dependencyNodeIds)
-    const consumerNodeIds = visibleRelationships(view, node.consumerNodeIds)
-    this.#elements.selectedDependencies.textContent = String(dependencyNodeIds.length)
-    this.#elements.selectedConsumers.textContent = String(consumerNodeIds.length)
-    this.#renderRelatedNodes(this.#elements.selectedDependencyNodes, dependencyNodeIds)
-    this.#renderRelatedNodes(this.#elements.selectedConsumerNodes, consumerNodeIds)
+    const dependencies = visibleRelationships(view, node.id, "dependency")
+    const consumers = visibleRelationships(view, node.id, "consumer")
+    this.#elements.selectedDependencies.textContent = String(dependencies.length)
+    this.#elements.selectedConsumers.textContent = String(consumers.length)
+    this.#renderRelatedNodes(this.#elements.selectedDependencyNodes, dependencies)
+    this.#renderRelatedNodes(this.#elements.selectedConsumerNodes, consumers)
   }
 
   #showProjectFileDetails(node: ReportProjectFileNode): void {
@@ -243,16 +243,18 @@ export class ReportPanels {
     }
   }
 
-  #renderRelatedNodes(container: HTMLElement, relatedNodeIds: readonly string[]): void {
+  #renderRelatedNodes(container: HTMLElement, relationships: readonly VisibleRelationship[]): void {
     container.replaceChildren()
-    if (relatedNodeIds.length === 0) {
+    if (relationships.length === 0) {
       container.append(this.#emptyListItem("None"))
       return
     }
-    for (const nodeId of relatedNodeIds) {
-      const node = this.#nodeById.get(nodeId)
+    for (const relationship of relationships) {
+      const node = this.#nodeById.get(relationship.nodeId)
       if (node !== undefined) {
-        container.append(this.#nodeListItem(node, node.displayName))
+        const kindLabel =
+          relationship.kind === "type-only" ? (node.kind === "external-package" ? "Type only · External package" : "Type only") : undefined
+        container.append(this.#nodeListItem(node, node.displayName, kindLabel))
       }
     }
   }

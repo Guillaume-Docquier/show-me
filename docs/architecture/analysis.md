@@ -4,7 +4,7 @@ Analysis converts files on disk into an internal, language-neutral description t
 
 ## Current implementation
 
-Filesystem and pnpm workspace discovery, normalized project-file paths, CLOC-style physical-line categories, static runtime ESM project and external-package dependency analysis, and Istanbul or LCOV line-coverage enrichment are implemented.
+Filesystem and pnpm workspace discovery, normalized project-file paths, CLOC-style physical-line categories, static runtime and explicitly type-only ESM project and external-package dependency analysis, and Istanbul or LCOV line-coverage enrichment are implemented.
 
 ## Project discovery
 
@@ -62,7 +62,9 @@ The initial JavaScript and TypeScript analyzer recognizes:
 - static runtime named re-exports;
 - static runtime wildcard re-exports.
 
-Explicitly type-only imports and re-exports are excluded. A mixed declaration remains a runtime dependency when at least one specifier is not marked as type-only. This rule is syntax-based: Show Me does not type-check ordinary imports to determine whether a compiler may later erase them.
+Explicitly type-only imports and re-exports create type-only dependencies. A mixed declaration remains a runtime dependency when at least one specifier is not marked as type-only. Repeated source-target relationships collapse to one edge, with runtime taking precedence if any declaration for that pair is runtime. This rule is syntax-based: Show Me does not type-check ordinary imports to determine whether a compiler may later erase them.
+
+Runtime and type-only requests use the same resolution precedence: discovered project files through Oxc resolution, configured aliases, workspace-package exports or source entry points, and finally canonical external packages. Unresolved executable-code requests produce diagnostics whose code and message preserve the classified dependency kind.
 
 CommonJS `require()`, dynamic `import()`, and non-literal dependency expressions are separate future work.
 
@@ -70,7 +72,7 @@ Imports that resolve to unsupported asset types are ignored. An import that shou
 
 ## External packages
 
-Unaliased bare npm requests create canonical external-package facts and distinct file-to-package runtime dependencies. Package classification is syntactic and does not require a package to be installed. External packages never enter project discovery, source reading, parsing, line metrics, or coverage matching, and files beneath `node_modules` remain permanently excluded.
+Unaliased bare npm requests create canonical external-package facts and distinct file-to-package dependencies, retaining whether each relationship is runtime or explicitly type-only. Package classification is syntactic and does not require a package to be installed. External packages never enter project discovery, source reading, parsing, line metrics, or coverage matching, and files beneath `node_modules` remain permanently excluded.
 
 Package subpaths collapse to their package name. For example, `drizzle-orm/pg-core` belongs to `drizzle-orm`, and `@scope/package/subpath` belongs to `@scope/package`.
 

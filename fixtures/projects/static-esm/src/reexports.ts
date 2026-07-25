@@ -1,4 +1,5 @@
 export { runtimeValue as reexportedRuntimeValue } from "./runtime.js"
+export type { RuntimeType } from "./runtime.js"
 export * from "./wildcard.js"
 export type { OnlyType } from "./types-only.js"
 export { type MixedType, mixedRuntimeValue } from "./mixed.js"

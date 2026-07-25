@@ -74,6 +74,7 @@ export class ReportControls {
       control.input.disabled = viewState.lineCategories.length === 1 && control.input.checked
     }
     this.#elements.externalPackageToggle.checked = viewState.externalPackages
+    this.#elements.typeOnlyDependencyToggle.checked = viewState.typeOnlyDependencies
     this.#elements.structureEdgesToggle.checked = edgeVisibility.structureEdges
     this.#elements.dependencyEdgesToggle.checked = edgeVisibility.dependencyEdges
     for (const input of this.#workspacePackageInputs) {
@@ -96,6 +97,12 @@ export class ReportControls {
       this.#events.onViewStateChange({
         ...this.#viewState,
         externalPackages: this.#elements.externalPackageToggle.checked,
+      })
+    })
+    this.#elements.typeOnlyDependencyToggle.addEventListener("change", () => {
+      this.#events.onViewStateChange({
+        ...this.#viewState,
+        typeOnlyDependencies: this.#elements.typeOnlyDependencyToggle.checked,
       })
     })
     this.#elements.structureEdgesToggle.addEventListener("change", () => {
