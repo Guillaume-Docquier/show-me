@@ -934,8 +934,12 @@ test("explains project-file coverage colors and shows exact coverage in hover to
           JSON.parse(serializedPositions) as Array<{ readonly id: string; readonly x: number; readonly y: number }>
         const position = positions.find(({ id }) => id === `project-file:${path}`)
         Assert.isDefined(position)
-        await page.mouse.move(graphBounds.x + position.x, graphBounds.y + position.y)
-        await expect(page.locator("html")).toHaveAttribute("data-hovered-node", `project-file:${path}`)
+        await expect
+          .poll(async () => {
+            await page.mouse.move(graphBounds.x + position.x, graphBounds.y + position.y)
+            return await page.locator("html").getAttribute("data-hovered-node")
+          })
+          .toBe(`project-file:${path}`)
         await expect(page.locator("#tooltip .tooltip-metrics")).toContainText("Coverage")
         await expect(page.locator("#tooltip .tooltip-metrics")).toContainText(coverage)
       }
