@@ -549,7 +549,7 @@ test("uses weighted folder nodes as the primary force graph under dependency arr
       await expect(graph).toHaveAttribute("data-rendered-structure-edge-count", "10")
       await expect(graph).toHaveAttribute("data-rendered-dependency-edge-count", "1")
       expect(await readJsonAttribute<readonly DependencyEdgeDiagnostic[]>(graph, "data-rendered-dependency-edges")).toEqual([
-        { id: "project-dependency-0", color: "rgba(98, 139, 181, 0.32)", size: 2.4 },
+        { id: "project-dependency-0", color: "rgba(98, 139, 181, 0.32)", size: 3 },
       ])
       const structureCanvas = graph.locator("canvas.sigma-structure")
       await expect(structureCanvas).toHaveCount(1)
@@ -666,7 +666,7 @@ test("uses weighted folder nodes as the primary force graph under dependency arr
       await expect(graph).toHaveAttribute("data-structure-focus", accounts.id)
       await expect(graph).toHaveAttribute("data-focused-structure-edge-count", "3")
       expect(await readJsonAttribute<readonly DependencyEdgeDiagnostic[]>(graph, "data-rendered-dependency-edges")).toEqual([
-        { id: "project-dependency-0", color: "rgba(98, 139, 181, 0.18)", size: 2.4 },
+        { id: "project-dependency-0", color: "rgba(98, 139, 181, 0.18)", size: 3 },
       ])
 
       const platformDirectory = page.locator('[data-directory-path="src/platform"]')
@@ -870,12 +870,12 @@ test("focuses only the hovered or selected file's direct dependency neighborhood
       expect(renderedEdgeById.get(report.edgeIds.transitive)).toEqual({
         id: report.edgeIds.transitive,
         color: "rgba(98, 139, 181, 0.18)",
-        size: 2.4,
+        size: 3,
       })
       expect(renderedEdgeById.get(report.edgeIds.unrelated)).toEqual({
         id: report.edgeIds.unrelated,
         color: "rgba(98, 139, 181, 0.18)",
-        size: 2.4,
+        size: 3,
       })
 
       await structureEdges.evaluate((element) => {
@@ -1009,7 +1009,7 @@ test("focuses only the hovered or selected file's direct dependency neighborhood
         expect(isolatedFocusEdgeById.get(edgeId)).toEqual({
           id: edgeId,
           color: "rgba(98, 139, 181, 0.18)",
-          size: 2.4,
+          size: 3,
         })
       }
       await structureEdges.evaluate((element) => {

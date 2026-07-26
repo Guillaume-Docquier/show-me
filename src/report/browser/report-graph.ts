@@ -166,7 +166,7 @@ export class ReportGraph {
         dependencyKind: edge.dependencyKind,
         type: "arrow",
         color: typeOnly ? TYPE_ONLY_DEPENDENCY_EDGE_COLOR : externalPackage ? EXTERNAL_DEPENDENCY_EDGE_COLOR : DEPENDENCY_EDGE_COLOR,
-        size: typeOnly || externalPackage ? 2 : 2.4,
+        size: 3,
         weight: typeOnly ? TYPE_ONLY_DEPENDENCY_EDGE_WEIGHT : externalPackage ? EXTERNAL_DEPENDENCY_EDGE_WEIGHT : DEPENDENCY_EDGE_WEIGHT,
       })
     }
