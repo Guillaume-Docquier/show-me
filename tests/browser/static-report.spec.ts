@@ -458,7 +458,7 @@ test("shows, distinguishes, filters, and deterministically restores type-only de
       await expect(page.locator(".type-only-dependency-edge-swatch")).toBeVisible()
 
       const renderedEdges = await readJsonAttribute<readonly DependencyEdgeDiagnostic[]>(graph, "data-rendered-dependency-edges")
-      expect(new Set(renderedEdges.map(({ color }) => color))).toEqual(new Set(["rgba(98, 139, 181, 0.32)", "rgba(163, 230, 53, 0.5)"]))
+      expect(new Set(renderedEdges.map(({ color }) => color))).toEqual(new Set(["#628bb5", "#a3e635"]))
 
       await page.locator("#file-list").getByRole("button", { name: "src/main.ts", exact: true }).click()
       await expect(page.locator("#selected-dependencies")).toHaveText("9")
@@ -498,9 +498,7 @@ test("shows, distinguishes, filters, and deterministically restores type-only de
         "type-only-packageExternal package",
       ])
       const renderedEdges = await readJsonAttribute<readonly DependencyEdgeDiagnostic[]>(graph, "data-rendered-dependency-edges")
-      expect(new Set(renderedEdges.map(({ color }) => color))).toEqual(
-        new Set(["rgba(98, 139, 181, 0.32)", "rgba(154, 104, 193, 0.38)", "rgba(163, 230, 53, 0.5)"]),
-      )
+      expect(new Set(renderedEdges.map(({ color }) => color))).toEqual(new Set(["#628bb5", "#9a68c1", "#a3e635"]))
       await page.getByRole("checkbox", { name: "Type-only dependencies" }).uncheck()
       await expect(graph).toHaveAttribute("data-visible-edge-count", "14")
       await expect(page.locator("#external-package-list button")).toHaveText(["external-packageExternal package"])
@@ -549,7 +547,7 @@ test("uses weighted folder nodes as the primary force graph under dependency arr
       await expect(graph).toHaveAttribute("data-rendered-structure-edge-count", "10")
       await expect(graph).toHaveAttribute("data-rendered-dependency-edge-count", "1")
       expect(await readJsonAttribute<readonly DependencyEdgeDiagnostic[]>(graph, "data-rendered-dependency-edges")).toEqual([
-        { id: "project-dependency-0", color: "rgba(98, 139, 181, 0.32)", size: 3 },
+        { id: "project-dependency-0", color: "#628bb5", size: 3 },
       ])
       const structureCanvas = graph.locator("canvas.sigma-structure")
       await expect(structureCanvas).toHaveCount(1)
@@ -666,7 +664,7 @@ test("uses weighted folder nodes as the primary force graph under dependency arr
       await expect(graph).toHaveAttribute("data-structure-focus", accounts.id)
       await expect(graph).toHaveAttribute("data-focused-structure-edge-count", "3")
       expect(await readJsonAttribute<readonly DependencyEdgeDiagnostic[]>(graph, "data-rendered-dependency-edges")).toEqual([
-        { id: "project-dependency-0", color: "rgba(98, 139, 181, 0.18)", size: 3 },
+        { id: "project-dependency-0", color: "#1c2733", size: 3 },
       ])
 
       const platformDirectory = page.locator('[data-directory-path="src/platform"]')
@@ -825,11 +823,13 @@ test("focuses only the hovered or selected file's direct dependency neighborhood
       const consumer = circleById.get("project-file:src/consumer.ts")
       const transitive = circleById.get("project-file:src/transitive.ts")
       const unrelated = circleById.get("project-file:src/unrelated-source.ts")
+      const unrelatedTarget = circleById.get("project-file:src/unrelated-target.ts")
       Assert.isDefined(hovered)
       Assert.isDefined(dependency)
       Assert.isDefined(consumer)
       Assert.isDefined(transitive)
       Assert.isDefined(unrelated)
+      Assert.isDefined(unrelatedTarget)
       const colors = await readJsonAttribute<readonly NodeColorDiagnostic[]>(graph, "data-visible-node-colors")
       expect(colors).toEqual(
         expect.arrayContaining([
@@ -869,12 +869,12 @@ test("focuses only the hovered or selected file's direct dependency neighborhood
       })
       expect(renderedEdgeById.get(report.edgeIds.transitive)).toEqual({
         id: report.edgeIds.transitive,
-        color: "rgba(98, 139, 181, 0.18)",
+        color: "#1c2733",
         size: 3,
       })
       expect(renderedEdgeById.get(report.edgeIds.unrelated)).toEqual({
         id: report.edgeIds.unrelated,
-        color: "rgba(98, 139, 181, 0.18)",
+        color: "#1c2733",
         size: 3,
       })
 
@@ -920,6 +920,8 @@ test("focuses only the hovered or selected file's direct dependency neighborhood
         [
           { id: report.edgeIds.consumer, source: consumer, target: hovered, expected: [255, 155, 113] },
           { id: report.edgeIds.dependency, source: hovered, target: dependency, expected: [70, 215, 198] },
+          { id: report.edgeIds.transitive, source: dependency, target: transitive, expected: [28, 39, 51] },
+          { id: report.edgeIds.unrelated, source: unrelated, target: unrelatedTarget, expected: [28, 39, 51] },
         ],
         baselineScreenshot,
         focusedScreenshot,
@@ -1008,7 +1010,7 @@ test("focuses only the hovered or selected file's direct dependency neighborhood
       for (const edgeId of Object.values(report.edgeIds)) {
         expect(isolatedFocusEdgeById.get(edgeId)).toEqual({
           id: edgeId,
-          color: "rgba(98, 139, 181, 0.18)",
+          color: "#1c2733",
           size: 3,
         })
       }

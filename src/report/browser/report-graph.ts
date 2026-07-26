@@ -20,12 +20,15 @@ const STRUCTURE_EDGE_WEIGHT = 6
 const DEPENDENCY_EDGE_WEIGHT = 0.25
 const EXTERNAL_DEPENDENCY_EDGE_WEIGHT = 1.2
 const TYPE_ONLY_DEPENDENCY_EDGE_WEIGHT = 0.18
-const DEPENDENCY_EDGE_COLOR = "rgba(98, 139, 181, 0.32)"
-const EXTERNAL_DEPENDENCY_EDGE_COLOR = "rgba(154, 104, 193, 0.38)"
-const TYPE_ONLY_DEPENDENCY_EDGE_COLOR = "rgba(163, 230, 53, 0.5)"
-const DIMMED_DEPENDENCY_EDGE_COLOR = "rgba(98, 139, 181, 0.18)"
-const DIMMED_EXTERNAL_DEPENDENCY_EDGE_COLOR = "rgba(154, 104, 193, 0.21)"
-const DIMMED_TYPE_ONLY_DEPENDENCY_EDGE_COLOR = "rgba(163, 230, 53, 0.24)"
+// Sigma's WebGL layer uses premultiplied-alpha blending. These opaque colors
+// are the intended rgba edge colors composited over the fixed #0d1117 graph
+// background, so changing focus visibly changes both arrow bodies and heads.
+const DEPENDENCY_EDGE_COLOR = "#628bb5"
+const EXTERNAL_DEPENDENCY_EDGE_COLOR = "#9a68c1"
+const TYPE_ONLY_DEPENDENCY_EDGE_COLOR = "#a3e635"
+const DIMMED_DEPENDENCY_EDGE_COLOR = "#1c2733"
+const DIMMED_EXTERNAL_DEPENDENCY_EDGE_COLOR = "#2b233b"
+const DIMMED_TYPE_ONLY_DEPENDENCY_EDGE_COLOR = "#31441e"
 const GRAPH_FIT_MARGIN = 1
 const DEPENDENCY_FOCUS_EDGE_SIZE = 4.4
 const CONSUMER_FOCUS_EDGE_SIZE = 5.2
