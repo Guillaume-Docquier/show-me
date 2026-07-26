@@ -56,7 +56,7 @@ jobs:
       - name: Run full performance benchmark
         id: full_performance_benchmark
         continue-on-error: true
-        run: pnpm benchmark:full
+        run: pnpm test:performance
 
       - name: Add performance benchmark to job summary
         if: ${{ always() }}

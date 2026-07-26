@@ -26,8 +26,6 @@ type BrowserDiagnostics = {
   readonly visibleEdgeCount: number
   readonly layoutStrategy: string
   readonly layoutIterations: number
-  readonly layoutCollisionScale: number
-  readonly layoutMinimumClearance: number
   readonly circles: readonly GraphCircle[]
 }
 
@@ -63,8 +61,6 @@ try {
       visibleEdgeCount: graphElement.dataset.visibleEdgeCount,
       layoutStrategy: graphElement.dataset.layoutStrategy,
       layoutIterations: graphElement.dataset.layoutIterations,
-      layoutCollisionScale: graphElement.dataset.layoutCollisionScale,
-      layoutMinimumClearance: graphElement.dataset.layoutMinimumClearance,
       circles: graphElement.dataset.visibleNodePositions,
     }
   })
@@ -109,8 +105,6 @@ try {
     layout: {
       strategy: diagnostics.layoutStrategy,
       iterations: diagnostics.layoutIterations,
-      collisionScale: diagnostics.layoutCollisionScale,
-      minimumGraphClearance: diagnostics.layoutMinimumClearance,
       minimumViewportClearance,
     },
     interactions,
@@ -182,8 +176,6 @@ function parseBrowserDiagnostics(value: unknown): BrowserDiagnostics {
     visibleEdgeCount: parseNumberField(value, "visibleEdgeCount"),
     layoutStrategy: parseStringField(value, "layoutStrategy"),
     layoutIterations: parseNumberField(value, "layoutIterations"),
-    layoutCollisionScale: parseNumberField(value, "layoutCollisionScale"),
-    layoutMinimumClearance: parseNumberField(value, "layoutMinimumClearance"),
     circles: parseGraphCircles(parseJson(parseStringField(value, "circles"))),
   }
 }

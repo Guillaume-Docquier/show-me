@@ -57,12 +57,6 @@ export class ReportGraphDiagnostics {
   public writeLayout(metrics: ReportLayoutMetrics): void {
     this.#container.dataset.layoutStrategy = metrics.strategy
     this.#container.dataset.layoutIterations = String(metrics.iterations)
-    this.#container.dataset.layoutCollisionScale = String(metrics.collisionScale)
-    if (metrics.minimumClearance === undefined) {
-      delete this.#container.dataset.layoutMinimumClearance
-    } else {
-      this.#container.dataset.layoutMinimumClearance = String(metrics.minimumClearance)
-    }
   }
 
   public writeDirectoryLabels({

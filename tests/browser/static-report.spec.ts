@@ -191,7 +191,7 @@ test("supports graph hover, selection, clearing, and side-panel navigation", asy
     const pointer = await test.step("Preview complete node details on hover without replacing selection", async () => {
       await page.goto(pathToFileURL(report.reportPath).href)
       await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
-      await expect(page).toHaveTitle("project · Show Me")
+      await expect(page).toHaveTitle("Show me project")
       await expect(page.locator("#project-name")).toHaveText("project")
       await expect(page.locator("#project-file-count")).toHaveText("2 / 2 project files")
       await expect(page.locator("#graph")).toHaveAttribute("data-visible-node-count", "2")
