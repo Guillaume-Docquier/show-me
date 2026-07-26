@@ -21,24 +21,24 @@ export class ReportPanels {
   #directoryById = new Map<string, ReportViewDirectory>()
   #directoryByPath = new Map<string, ReportViewDirectory>()
   #view: ReportView | undefined
-  #interaction: ReportInteractionState
+  #interaction: ReportInteractionState = {
+    selectedNodeId: undefined,
+    hoveredNodeId: undefined,
+  }
 
   public constructor({
     elements,
     presentation,
-    initialInteraction,
     actions,
   }: {
     readonly elements: ReportPanelElements
     readonly presentation: BrowserPresentation
-    readonly initialInteraction: ReportInteractionState
     readonly actions: ReportPanelActions
   }) {
     this.#elements = elements
     this.#presentation = presentation
     this.#nodeById = new Map(presentation.nodes.map((node) => [node.id, node]))
     this.#actions = actions
-    this.#interaction = initialInteraction
     elements.fileSearch.addEventListener("input", () => {
       this.#collapsedDirectoryPaths.clear()
       this.#renderProjectFileList()

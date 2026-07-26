@@ -8,10 +8,10 @@
 import type { ProjectAnalysis } from "../../analysis/project-analysis.js"
 import { PerformanceProfiler } from "../../performance/performance-profiler.js"
 import { renderCoverageLegend } from "./coverage-legend.js"
-import { INITIAL_EDGE_VISIBILITY, ReportControls, type EdgeVisibilityState } from "./report-controls.js"
+import { ReportControls, type EdgeVisibilityState } from "./report-controls.js"
 import { getReportElements } from "./report-elements.js"
 import { ReportGraph } from "./report-graph.js"
-import { INITIAL_REPORT_INTERACTION, type ReportInteractionState } from "./report-interaction.js"
+import { type ReportInteractionState } from "./report-interaction.js"
 import { ReportPanels } from "./report-panels.js"
 import { browserPresentationSignature, buildBrowserPresentation } from "./report-presentation.js"
 import { buildReportView, initialReportViewState, type ReportViewState } from "./report-view.js"
@@ -29,9 +29,12 @@ const analysis = window.showMeAnalysis
 const presentation = performanceProfiler.measure("browser-presentation", () => buildBrowserPresentation(analysis))
 const elements = getReportElements(document)
 let viewState = initialReportViewState(presentation)
-let edgeVisibility: EdgeVisibilityState = INITIAL_EDGE_VISIBILITY
+let edgeVisibility: EdgeVisibilityState = {
+  structureEdges: true,
+  dependencyEdges: true,
+}
 
-document.title = `${presentation.projectName} · Show Me`
+document.title = `Show me ${presentation.projectName}`
 elements.heading.projectName.textContent = presentation.projectName
 renderCoverageLegend(elements.coverageLegend)
 
@@ -39,16 +42,16 @@ const graph = new ReportGraph({
   root: elements.root,
   container: elements.graphContainer,
   presentation,
-  initialInteraction: INITIAL_REPORT_INTERACTION,
   initialEdgeVisibility: edgeVisibility,
   performanceProfiler,
-  events: { onInteractionChange: renderInteraction },
+  events: {
+    onInteractionChange: renderInteraction,
+  },
 })
 
 const panels = new ReportPanels({
   elements: elements.panels,
   presentation,
-  initialInteraction: INITIAL_REPORT_INTERACTION,
   actions: {
     selectNode: (nodeId): void => {
       graph.selectNode(nodeId)

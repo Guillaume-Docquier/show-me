@@ -54,7 +54,10 @@ export class ReportGraph {
   readonly #diagnostics: ReportGraphDiagnostics
   readonly #labelVisibility: ReportGraphLabelVisibility
   #view: ReportView | undefined
-  #interaction: ReportInteractionState
+  #interaction: ReportInteractionState = {
+    selectedNodeId: undefined,
+    hoveredNodeId: undefined,
+  }
   #edgeVisibility: EdgeVisibilityState
   #dependencyFocus: DependencyFocus | undefined
   #structureFocusNodeId: string | undefined
@@ -65,7 +68,6 @@ export class ReportGraph {
     root,
     container,
     presentation,
-    initialInteraction,
     initialEdgeVisibility,
     performanceProfiler,
     events,
@@ -73,7 +75,6 @@ export class ReportGraph {
     readonly root: HTMLElement
     readonly container: HTMLElement
     readonly presentation: BrowserPresentation
-    readonly initialInteraction: ReportInteractionState
     readonly initialEdgeVisibility: EdgeVisibilityState
     readonly performanceProfiler: PerformanceProfiler
     readonly events: ReportGraphEvents
@@ -81,7 +82,6 @@ export class ReportGraph {
     this.#root = root
     this.#container = container
     this.#nodeById = new Map(presentation.nodes.map((node) => [node.id, node]))
-    this.#interaction = initialInteraction
     this.#edgeVisibility = initialEdgeVisibility
     this.#events = events
     this.#performanceProfiler = performanceProfiler

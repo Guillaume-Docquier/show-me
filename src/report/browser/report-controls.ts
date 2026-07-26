@@ -8,12 +8,6 @@ export type EdgeVisibilityState = {
   readonly dependencyEdges: boolean
 }
 
-/** Default edge visibility selected by the generated HTML shell. */
-export const INITIAL_EDGE_VISIBILITY: EdgeVisibilityState = {
-  structureEdges: true,
-  dependencyEdges: true,
-}
-
 export type ReportControlEvents = {
   readonly onViewStateChange: (state: ReportViewState) => void
   readonly onEdgeVisibilityChange: (state: EdgeVisibilityState) => void
