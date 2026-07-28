@@ -109,6 +109,7 @@ The report lets you:
 
 - search and select files from the project tree;
 - inspect dependencies, consumers, line counts, and coverage;
+- hover project files and directories to reveal their labels and details at any zoom level;
 - show or hide structure, runtime, type-only, and external-package relationships;
 - filter pnpm workspace packages;
 - size nodes by code, comment, and blank lines;

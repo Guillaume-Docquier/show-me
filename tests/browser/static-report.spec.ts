@@ -685,7 +685,7 @@ test("uses weighted folder nodes as the primary force graph under dependency arr
   })
 })
 
-test("reveals project-file labels after zooming into a stable desktop viewport", async ({ page }) => {
+test("shows hovered project-file labels regardless of zoom visibility", async ({ page }) => {
   await withTemporaryDirectory(async (temporaryDirectory) => {
     const reportPath = await test.step("Generate a report with one unambiguous project-file label", async () => {
       const projectDirectory = join(temporaryDirectory, "labels")
@@ -699,7 +699,7 @@ test("reveals project-file labels after zooming into a stable desktop viewport",
       return path
     })
 
-    await test.step("Hide the file label at overview zoom, then render it above its node after zooming in", async () => {
+    await test.step("Override overview hiding while hovered, then preserve zoom visibility after hover", async () => {
       await page.setViewportSize({ width: 1920, height: 1080 })
       await page.goto(pathToFileURL(reportPath).href)
       await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
@@ -711,7 +711,17 @@ test("reveals project-file labels after zooming into a stable desktop viewport",
       const nodes = await readJsonAttribute<readonly NodeCircleDiagnostic[]>(graph, "data-visible-node-positions")
       const mainNode = nodes.find(({ id }) => id === "project-file:main.ts")
       Assert.isDefined(mainNode)
+      const emptyGraphPoint = graphPointFarthestFromNodes(nodes, bounds.width, bounds.height)
       await page.mouse.move(bounds.x + mainNode.x, bounds.y + mainNode.y)
+      await expect(page.locator("html")).toHaveAttribute("data-hovered-node", mainNode.id)
+      await expect(graph).toHaveAttribute("data-file-label-visibility", "hidden")
+      await expect(graph).toHaveAttribute("data-rendered-file-labels", '["main.ts"]')
+
+      await page.mouse.move(bounds.x + emptyGraphPoint.x, bounds.y + emptyGraphPoint.y)
+      await expect(page.locator("html")).not.toHaveAttribute("data-hovered-node")
+      await expect(graph).toHaveAttribute("data-rendered-file-labels", "[]")
+      await page.mouse.move(bounds.x + mainNode.x, bounds.y + mainNode.y)
+      await expect(page.locator("html")).toHaveAttribute("data-hovered-node", mainNode.id)
 
       for (const maximumRatio of [0.7, 0.4, 0.25, 0.15]) {
         await page.mouse.wheel(0, -120)
@@ -719,10 +729,11 @@ test("reveals project-file labels after zooming into a stable desktop viewport",
           .poll(async () => (await readJsonAttribute<{ readonly ratio: number }>(graph, "data-camera-state")).ratio)
           .toBeLessThan(maximumRatio)
       }
-      await page.mouse.move(0, 0)
+      await expect(graph).toHaveAttribute("data-file-label-visibility", "visible")
+      await expect(graph).toHaveAttribute("data-rendered-file-labels", '["main.ts"]')
+      await page.mouse.move(bounds.x + emptyGraphPoint.x, bounds.y + emptyGraphPoint.y)
       await expect(page.locator("html")).not.toHaveAttribute("data-hovered-node")
 
-      await expect(graph).toHaveAttribute("data-file-label-visibility", "visible")
       await expect(graph).toHaveAttribute("data-rendered-file-labels", '["main.ts"]')
       const nodeLabels = await readJsonAttribute<readonly NodeLabelDiagnostic[]>(graph, "data-rendered-node-label-rectangles")
       const fileLabel = nodeLabels.find(({ id }) => id === "project-file:main.ts")
@@ -1528,6 +1539,25 @@ function expectDirectoryLabelsNotToOverlap(labels: readonly DirectoryLabelDiagno
 function expectCenteredAboveNode(label: NodeLabelDiagnostic): void {
   expect((label.bounds.left + label.bounds.right) / 2).toBeCloseTo(label.nodeX, 5)
   expect(label.bounds.bottom).toBeLessThan(label.nodeY - label.nodeSize)
+}
+
+function graphPointFarthestFromNodes(
+  nodes: readonly NodeCircleDiagnostic[],
+  width: number,
+  height: number,
+): { readonly x: number; readonly y: number } {
+  const [point] = [
+    { x: 1, y: 1 },
+    { x: width - 1, y: 1 },
+    { x: 1, y: height - 1 },
+    { x: width - 1, y: height - 1 },
+  ].toSorted((left, right) => {
+    const minimumClearance = (candidate: { readonly x: number; readonly y: number }): number =>
+      Math.min(...nodes.map((node) => Math.hypot(candidate.x - node.x, candidate.y - node.y) - node.radius))
+    return minimumClearance(right) - minimumClearance(left)
+  })
+  Assert.isDefined(point)
+  return point
 }
 
 async function sampleDirectoryHoverPixels(

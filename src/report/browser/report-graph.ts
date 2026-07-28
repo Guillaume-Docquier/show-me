@@ -216,13 +216,14 @@ export class ReportGraph {
     if (!this.#graph.hasNode(nodeId)) {
       return
     }
+    const previousHoveredNodeId = this.#interaction.hoveredNodeId
     if (this.#graph.getNodeAttribute(nodeId, "nodeKind") === "directory") {
       this.#labelVisibility.hoverDirectory(nodeId)
     }
     this.#interaction = { ...this.#interaction, hoveredNodeId: nodeId }
     this.#synchronizeEdgeFocus()
     this.#emitInteraction()
-    this.#refreshDependencyEdges()
+    this.#refreshHoverTransition(previousHoveredNodeId)
   }
 
   /** Clear node and directory hover effects. */
@@ -230,11 +231,12 @@ export class ReportGraph {
     if (nodeId !== undefined && this.#interaction.hoveredNodeId !== nodeId) {
       return
     }
+    const previousHoveredNodeId = this.#interaction.hoveredNodeId
     this.#interaction = { ...this.#interaction, hoveredNodeId: undefined }
     this.#synchronizeEdgeFocus()
     this.#labelVisibility.clearDirectoryHover()
     this.#emitInteraction()
-    this.#refreshDependencyEdges()
+    this.#refreshHoverTransition(previousHoveredNodeId)
   }
 
   /** Animate the camera center to one visible node. */
@@ -349,10 +351,12 @@ export class ReportGraph {
 
   #reduceNode(node: string, attributes: BrowserNodeAttributes): Partial<NodeDisplayData> {
     const label =
-      (attributes.nodeKind === "directory" && !this.#labelVisibility.directoryLabelIsVisible(node)) ||
-      (attributes.nodeKind === "project-file" && !this.#labelVisibility.fileLabelsAreVisible)
-        ? { label: null, forceLabel: false }
-        : {}
+      node === this.#interaction.hoveredNodeId && attributes.label !== undefined
+        ? { forceLabel: true }
+        : (attributes.nodeKind === "directory" && !this.#labelVisibility.directoryLabelIsVisible(node)) ||
+            (attributes.nodeKind === "project-file" && !this.#labelVisibility.fileLabelsAreVisible)
+          ? { label: null, forceLabel: false }
+          : {}
     return node === this.#interaction.selectedNodeId
       ? { ...attributes, ...label, color: "#f4c66a", highlighted: true, zIndex: 1 }
       : { ...attributes, ...label }
@@ -489,6 +493,17 @@ export class ReportGraph {
   #refreshDependencyEdges(): void {
     this.#renderer.refresh({
       partialGraph: { edges: this.#dependencyEdgeIds() },
+      schedule: true,
+      skipIndexation: true,
+    })
+  }
+
+  #refreshHoverTransition(previousHoveredNodeId: string | undefined): void {
+    const nodes = [...new Set([previousHoveredNodeId, this.#interaction.hoveredNodeId])].flatMap((nodeId) =>
+      nodeId !== undefined && this.#graph.hasNode(nodeId) ? [nodeId] : [],
+    )
+    this.#renderer.refresh({
+      partialGraph: { nodes, edges: this.#dependencyEdgeIds() },
       schedule: true,
       skipIndexation: true,
     })
