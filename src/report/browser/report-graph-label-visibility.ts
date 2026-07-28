@@ -10,8 +10,8 @@ import type { ReportGraphDiagnostics } from "./report-graph-diagnostics.js"
 import {
   centeredNodeLabelGeometry,
   DIRECTORY_LABEL_COLLISION_PADDING,
-  DIRECTORY_LABEL_HOVER_BACKGROUND,
-  DIRECTORY_LABEL_HOVER_FOREGROUND,
+  HOVER_LABEL_BACKGROUND,
+  HOVER_LABEL_FOREGROUND,
   LABEL_FONT,
   LABEL_SIZE,
   LABEL_WEIGHT,
@@ -78,8 +78,8 @@ export class ReportGraphLabelVisibility {
   public hoverDirectory(nodeId: string): void {
     this.#hoveredDirectoryNodeId = nodeId
     this.#container.dataset.hoveredDirectoryLabel = nodeId
-    this.#container.dataset.directoryLabelHoverForeground = DIRECTORY_LABEL_HOVER_FOREGROUND
-    this.#container.dataset.directoryLabelHoverBackground = DIRECTORY_LABEL_HOVER_BACKGROUND
+    this.#container.dataset.directoryLabelHoverForeground = HOVER_LABEL_FOREGROUND
+    this.#container.dataset.directoryLabelHoverBackground = HOVER_LABEL_BACKGROUND
     this.markDirty()
     this.#renderer.scheduleRender()
   }

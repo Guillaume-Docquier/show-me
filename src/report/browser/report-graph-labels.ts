@@ -6,8 +6,8 @@ export const LABEL_COLOR = "#aebdca"
 export const LABEL_SIZE = 11
 export const LABEL_WEIGHT = "500"
 export const DIRECTORY_LABEL_COLLISION_PADDING = 4
-export const DIRECTORY_LABEL_HOVER_FOREGROUND = "#f5f9ff"
-export const DIRECTORY_LABEL_HOVER_BACKGROUND = "#111821"
+export const HOVER_LABEL_FOREGROUND = "#f5f9ff"
+export const HOVER_LABEL_BACKGROUND = "#111821"
 
 const LABEL_OFFSET = 3
 
@@ -23,7 +23,7 @@ export function drawNodeHover(
   context.save()
   const isDirectory = typeof data.key === "string" && data.key.startsWith("directory:")
   if (isDirectory) {
-    context.strokeStyle = DIRECTORY_LABEL_HOVER_FOREGROUND
+    context.strokeStyle = HOVER_LABEL_FOREGROUND
     context.lineWidth = 2
     context.beginPath()
     context.arc(data.x, data.y, data.size + 3, 0, Math.PI * 2)
@@ -38,7 +38,6 @@ export function drawNodeHover(
 export function drawHoveredNodeLabel(
   context: CanvasRenderingContext2D,
   data: {
-    readonly nodeId: string
     readonly label: string
     readonly x: number
     readonly y: number
@@ -46,18 +45,17 @@ export function drawHoveredNodeLabel(
   },
 ): void {
   context.save()
-  const isDirectory = data.nodeId.startsWith("directory:")
   context.font = `${LABEL_WEIGHT} ${LABEL_SIZE}px ${LABEL_FONT}`
   context.textAlign = "center"
   const geometry = centeredNodeLabelGeometry(context, data.label, data.x, data.y, data.size, LABEL_SIZE, DIRECTORY_LABEL_COLLISION_PADDING)
-  context.fillStyle = isDirectory ? DIRECTORY_LABEL_HOVER_BACKGROUND : "#fff"
+  context.fillStyle = HOVER_LABEL_BACKGROUND
   context.fillRect(
     geometry.bounds.left,
     geometry.bounds.top,
     geometry.bounds.right - geometry.bounds.left,
     geometry.bounds.bottom - geometry.bounds.top,
   )
-  context.fillStyle = isDirectory ? DIRECTORY_LABEL_HOVER_FOREGROUND : LABEL_COLOR
+  context.fillStyle = HOVER_LABEL_FOREGROUND
   context.fillText(data.label, geometry.textX, geometry.baseline)
   context.restore()
 }

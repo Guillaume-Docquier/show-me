@@ -716,6 +716,10 @@ test("shows hovered project-file labels regardless of zoom visibility", async ({
       await expect(page.locator("html")).toHaveAttribute("data-hovered-node", mainNode.id)
       await expect(graph).toHaveAttribute("data-file-label-visibility", "hidden")
       await expect(graph).toHaveAttribute("data-rendered-file-labels", '["main.ts"]')
+      const hoveredLabels = await readJsonAttribute<readonly NodeLabelDiagnostic[]>(graph, "data-rendered-node-label-rectangles")
+      const hoveredFileLabel = hoveredLabels.find(({ id }) => id === mainNode.id)
+      Assert.isDefined(hoveredFileLabel)
+      await expectReadableHoverLabel(graph, hoveredFileLabel)
 
       await page.mouse.move(bounds.x + emptyGraphPoint.x, bounds.y + emptyGraphPoint.y)
       await expect(page.locator("html")).not.toHaveAttribute("data-hovered-node")
@@ -1096,18 +1100,10 @@ test("keeps dense orientation labels collision-free and readable on directory ho
           return dependencyFocusLayer instanceof HTMLCanvasElement && dependencyFocusLayer.nextElementSibling === hoverLabelLayer
         }),
       ).toBe(true)
-      await expect.poll(async () => (await sampleDirectoryHoverPixels(graph, hoveredRoot)).foregroundPixelCount).toBeGreaterThan(0)
-
-      const pixels = await sampleDirectoryHoverPixels(graph, hoveredRoot)
-      expect(pixels.backgroundPixelCount).toBeGreaterThan(0)
-      expectRgbNear(pixels.background, "#111821")
-      expectRgbNear(pixels.foreground, "#f5f9ff")
-      expect(pixels.compositedBackgroundPixelCount).toBeGreaterThan(0)
-      expect(pixels.compositedForegroundPixelCount).toBeGreaterThan(0)
-      expect(contrastRatio(rgbHex(pixels.foreground), rgbHex(pixels.background))).toBeGreaterThanOrEqual(7)
-      expectRgbNear(pixels.directoryNode, "#79b8ff")
-      expect(pixels.directoryNode.alpha).toBeGreaterThan(0)
-      expect(pixels.hoverAtNodeCenter.alpha).toBe(0)
+      const pixels = await expectReadableHoverLabel(graph, hoveredRoot)
+      expectRgbNear(pixels.node, "#79b8ff")
+      expect(pixels.node.alpha).toBeGreaterThan(0)
+      expect(pixels.labelLayerAtNodeCenter.alpha).toBe(0)
     })
   })
 })
@@ -1498,15 +1494,15 @@ type RgbDiagnostic = {
   readonly alpha: number
 }
 
-type DirectoryHoverPixelDiagnostic = {
+type HoverLabelPixelDiagnostic = {
   readonly background: RgbDiagnostic
   readonly backgroundPixelCount: number
   readonly foreground: RgbDiagnostic
   readonly foregroundPixelCount: number
   readonly compositedBackgroundPixelCount: number
   readonly compositedForegroundPixelCount: number
-  readonly directoryNode: RgbDiagnostic
-  readonly hoverAtNodeCenter: RgbDiagnostic
+  readonly node: RgbDiagnostic
+  readonly labelLayerAtNodeCenter: RgbDiagnostic
 }
 
 async function readJsonAttribute<T>(locator: Locator, attribute: string): Promise<T> {
@@ -1571,13 +1567,22 @@ function graphPointFarthestFromNodes(
   return point
 }
 
-async function sampleDirectoryHoverPixels(
-  graph: Locator,
-  directoryLabel: DirectoryLabelDiagnostic,
-): Promise<DirectoryHoverPixelDiagnostic> {
+async function expectReadableHoverLabel(graph: Locator, label: DirectoryLabelDiagnostic): Promise<HoverLabelPixelDiagnostic> {
+  await expect.poll(async () => (await sampleHoverLabelPixels(graph, label)).foregroundPixelCount).toBeGreaterThan(0)
+  const pixels = await sampleHoverLabelPixels(graph, label)
+  expect(pixels.backgroundPixelCount).toBeGreaterThan(0)
+  expectRgbNear(pixels.background, "#111821")
+  expectRgbNear(pixels.foreground, "#f5f9ff")
+  expect(pixels.compositedBackgroundPixelCount).toBeGreaterThan(0)
+  expect(pixels.compositedForegroundPixelCount).toBeGreaterThan(0)
+  expect(contrastRatio(rgbHex(pixels.foreground), rgbHex(pixels.background))).toBeGreaterThanOrEqual(7)
+  return pixels
+}
+
+async function sampleHoverLabelPixels(graph: Locator, labelDiagnostic: DirectoryLabelDiagnostic): Promise<HoverLabelPixelDiagnostic> {
   const screenshot = await graph.screenshot()
   return await graph.evaluate(
-    async (container, diagnostic): Promise<DirectoryHoverPixelDiagnostic> => {
+    async (container, diagnostic): Promise<HoverLabelPixelDiagnostic> => {
       const { label, screenshotBase64 } = diagnostic
       const hoverLabelCanvas = container.querySelector("canvas.sigma-hover-label")
       if (!(hoverLabelCanvas instanceof HTMLCanvasElement)) {
@@ -1668,11 +1673,11 @@ async function sampleDirectoryHoverPixels(
         foregroundPixelCount: foreground.matchingPixelCount,
         compositedBackgroundPixelCount: screenshotBackground.matchingPixelCount,
         compositedForegroundPixelCount: screenshotForeground.matchingPixelCount,
-        directoryNode: colorAt(renderedReportContext, label.nodeX, label.nodeY, screenshotScaleX, screenshotScaleY),
-        hoverAtNodeCenter: colorAt(hoverLabelContext, label.nodeX, label.nodeY, hoverScaleX, hoverScaleY),
+        node: colorAt(renderedReportContext, label.nodeX, label.nodeY, screenshotScaleX, screenshotScaleY),
+        labelLayerAtNodeCenter: colorAt(hoverLabelContext, label.nodeX, label.nodeY, hoverScaleX, hoverScaleY),
       }
     },
-    { label: directoryLabel, screenshotBase64: screenshot.toString("base64") },
+    { label: labelDiagnostic, screenshotBase64: screenshot.toString("base64") },
   )
 }
 

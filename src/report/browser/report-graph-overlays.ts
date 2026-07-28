@@ -155,7 +155,6 @@ export class ReportGraphOverlays {
     const attributes = this.#graph.getNodeAttributes(nodeId)
     const node = this.#renderer.graphToViewport(attributes)
     drawHoveredNodeLabel(this.#hoverLabelContext, {
-      nodeId,
       label: displayData.label,
       x: node.x,
       y: node.y,
