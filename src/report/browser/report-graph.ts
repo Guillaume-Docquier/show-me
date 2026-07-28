@@ -289,6 +289,7 @@ export class ReportGraph {
         this.#structureFocusNodeId,
       )
       this.#overlays.renderDependencyFocus(this.#dependencyFocus)
+      this.#overlays.renderHoveredNodeLabel(this.#interaction.hoveredNodeId)
       this.#diagnostics.writeDependencyEdges(this.#dependencyEdgeIds(), this.#edgeVisibility.dependencyEdges)
       const labelRefreshScheduled = this.#labelVisibility.synchronizeAfterRender()
       this.#diagnostics.writeCamera(this.#labelVisibility.fileLabelsAreVisible, this.#camera.getState())

@@ -14,7 +14,7 @@ const LABEL_OFFSET = 3
 type BrowserNodeHoverDrawingFunction = NodeHoverDrawingFunction<BrowserNodeAttributes, BrowserEdgeAttributes>
 type BrowserNodeLabelDrawingFunction = NodeLabelDrawingFunction<BrowserNodeAttributes, BrowserEdgeAttributes>
 
-/** Draw a hover disc and a centered label without obscuring the node fill. */
+/** Draw a hover disc without obscuring the node fill. */
 export function drawNodeHover(
   context: Parameters<BrowserNodeHoverDrawingFunction>[0],
   data: Parameters<BrowserNodeHoverDrawingFunction>[1],
@@ -31,29 +31,34 @@ export function drawNodeHover(
   } else {
     drawDiscNodeHover(context, { ...data, label: null }, settings)
   }
+  context.restore()
+}
 
-  if (typeof data.label === "string") {
-    context.font = `${settings.labelWeight} ${settings.labelSize}px ${settings.labelFont}`
-    context.textAlign = "center"
-    const geometry = centeredNodeLabelGeometry(
-      context,
-      data.label,
-      data.x,
-      data.y,
-      data.size,
-      settings.labelSize,
-      DIRECTORY_LABEL_COLLISION_PADDING,
-    )
-    context.fillStyle = isDirectory ? DIRECTORY_LABEL_HOVER_BACKGROUND : "#fff"
-    context.fillRect(
-      geometry.bounds.left,
-      geometry.bounds.top,
-      geometry.bounds.right - geometry.bounds.left,
-      geometry.bounds.bottom - geometry.bounds.top,
-    )
-    context.fillStyle = isDirectory ? DIRECTORY_LABEL_HOVER_FOREGROUND : LABEL_COLOR
-    context.fillText(data.label, geometry.textX, geometry.baseline)
-  }
+/** Draw one hovered node label plate above every graph rendering layer. */
+export function drawHoveredNodeLabel(
+  context: CanvasRenderingContext2D,
+  data: {
+    readonly nodeId: string
+    readonly label: string
+    readonly x: number
+    readonly y: number
+    readonly size: number
+  },
+): void {
+  context.save()
+  const isDirectory = data.nodeId.startsWith("directory:")
+  context.font = `${LABEL_WEIGHT} ${LABEL_SIZE}px ${LABEL_FONT}`
+  context.textAlign = "center"
+  const geometry = centeredNodeLabelGeometry(context, data.label, data.x, data.y, data.size, LABEL_SIZE, DIRECTORY_LABEL_COLLISION_PADDING)
+  context.fillStyle = isDirectory ? DIRECTORY_LABEL_HOVER_BACKGROUND : "#fff"
+  context.fillRect(
+    geometry.bounds.left,
+    geometry.bounds.top,
+    geometry.bounds.right - geometry.bounds.left,
+    geometry.bounds.bottom - geometry.bounds.top,
+  )
+  context.fillStyle = isDirectory ? DIRECTORY_LABEL_HOVER_FOREGROUND : LABEL_COLOR
+  context.fillText(data.label, geometry.textX, geometry.baseline)
   context.restore()
 }
 

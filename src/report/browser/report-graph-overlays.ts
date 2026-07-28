@@ -1,6 +1,7 @@
 import type { DirectedGraph } from "graphology"
 import type { Sigma } from "sigma"
 import type { ProjectStructureEdge } from "./project-structure.js"
+import { drawHoveredNodeLabel } from "./report-graph-labels.js"
 import type { BrowserEdgeAttributes, BrowserNodeAttributes } from "./report-graph-types.js"
 
 export const DEPENDENCY_FOCUS_COLOR = "#46d7c6"
@@ -29,6 +30,8 @@ export class ReportGraphOverlays {
   readonly #structureContext: CanvasRenderingContext2D
   readonly #dependencyFocusLayer: HTMLCanvasElement
   readonly #dependencyFocusContext: CanvasRenderingContext2D
+  readonly #hoverLabelLayer: HTMLCanvasElement
+  readonly #hoverLabelContext: CanvasRenderingContext2D
 
   public constructor({
     graph,
@@ -52,6 +55,11 @@ export class ReportGraphOverlays {
       style: { pointerEvents: "none" },
     })
     this.#dependencyFocusContext = requiredCanvasContext(this.#dependencyFocusLayer)
+    this.#hoverLabelLayer = renderer.createCanvas("hover-label", {
+      afterLayer: "dependency-focus",
+      style: { pointerEvents: "none" },
+    })
+    this.#hoverLabelContext = requiredCanvasContext(this.#hoverLabelLayer)
   }
 
   /** A correctly configured 2D context for label measurement. */
@@ -128,6 +136,31 @@ export class ReportGraphOverlays {
     }
     this.#dependencyFocusContext.setLineDash([])
     this.#container.dataset.renderedDependencyFocusRingCount = String(renderedRingCount)
+  }
+
+  /** Draw the hovered node label after every node and focus decoration. */
+  public renderHoveredNodeLabel(nodeId: string | undefined): void {
+    this.#resizeCanvas(this.#hoverLabelLayer)
+    const pixelRatio = this.#devicePixelRatio()
+    this.#hoverLabelContext.setTransform(1, 0, 0, 1, 0, 0)
+    this.#hoverLabelContext.clearRect(0, 0, this.#hoverLabelLayer.width, this.#hoverLabelLayer.height)
+    this.#hoverLabelContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0)
+    if (nodeId === undefined || !this.#graph.hasNode(nodeId)) {
+      return
+    }
+    const displayData = this.#renderer.getNodeDisplayData(nodeId)
+    if (typeof displayData?.label !== "string") {
+      return
+    }
+    const attributes = this.#graph.getNodeAttributes(nodeId)
+    const node = this.#renderer.graphToViewport(attributes)
+    drawHoveredNodeLabel(this.#hoverLabelContext, {
+      nodeId,
+      label: displayData.label,
+      x: node.x,
+      y: node.y,
+      size: this.#renderer.scaleSize(attributes.size),
+    })
   }
 
   #drawFocusRing(nodeId: string, color: string, offset: number, lineDash: readonly number[]): number {

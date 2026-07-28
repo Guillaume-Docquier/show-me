@@ -1089,12 +1089,21 @@ test("keeps dense orientation labels collision-free and readable on directory ho
       const hoveredLabels = await readJsonAttribute<readonly DirectoryLabelDiagnostic[]>(graph, "data-visible-directory-label-rectangles")
       const hoveredRoot = hoveredLabels.find(({ id }) => id === rootLabel.id)
       Assert.isDefined(hoveredRoot)
+      expect(
+        await graph.evaluate((container) => {
+          const dependencyFocusLayer = container.querySelector("canvas.sigma-dependency-focus")
+          const hoverLabelLayer = container.querySelector("canvas.sigma-hover-label")
+          return dependencyFocusLayer instanceof HTMLCanvasElement && dependencyFocusLayer.nextElementSibling === hoverLabelLayer
+        }),
+      ).toBe(true)
       await expect.poll(async () => (await sampleDirectoryHoverPixels(graph, hoveredRoot)).foregroundPixelCount).toBeGreaterThan(0)
 
       const pixels = await sampleDirectoryHoverPixels(graph, hoveredRoot)
       expect(pixels.backgroundPixelCount).toBeGreaterThan(0)
       expectRgbNear(pixels.background, "#111821")
       expectRgbNear(pixels.foreground, "#f5f9ff")
+      expect(pixels.compositedBackgroundPixelCount).toBeGreaterThan(0)
+      expect(pixels.compositedForegroundPixelCount).toBeGreaterThan(0)
       expect(contrastRatio(rgbHex(pixels.foreground), rgbHex(pixels.background))).toBeGreaterThanOrEqual(7)
       expectRgbNear(pixels.directoryNode, "#79b8ff")
       expect(pixels.directoryNode.alpha).toBeGreaterThan(0)
@@ -1494,6 +1503,8 @@ type DirectoryHoverPixelDiagnostic = {
   readonly backgroundPixelCount: number
   readonly foreground: RgbDiagnostic
   readonly foregroundPixelCount: number
+  readonly compositedBackgroundPixelCount: number
+  readonly compositedForegroundPixelCount: number
   readonly directoryNode: RgbDiagnostic
   readonly hoverAtNodeCenter: RgbDiagnostic
 }
@@ -1568,13 +1579,13 @@ async function sampleDirectoryHoverPixels(
   return await graph.evaluate(
     async (container, diagnostic): Promise<DirectoryHoverPixelDiagnostic> => {
       const { label, screenshotBase64 } = diagnostic
-      const hoverCanvas = container.querySelector("canvas.sigma-hovers")
-      if (!(hoverCanvas instanceof HTMLCanvasElement)) {
-        throw new Error("Sigma hover canvas is required for pixel diagnostics.")
+      const hoverLabelCanvas = container.querySelector("canvas.sigma-hover-label")
+      if (!(hoverLabelCanvas instanceof HTMLCanvasElement)) {
+        throw new Error("Show Me's hover-label canvas is required for pixel diagnostics.")
       }
-      const hoverContext = hoverCanvas.getContext("2d", { willReadFrequently: true })
-      if (hoverContext === null || hoverCanvas.clientWidth === 0 || hoverCanvas.clientHeight === 0) {
-        throw new Error("Sigma hover canvas is not readable.")
+      const hoverLabelContext = hoverLabelCanvas.getContext("2d", { willReadFrequently: true })
+      if (hoverLabelContext === null || hoverLabelCanvas.clientWidth === 0 || hoverLabelCanvas.clientHeight === 0) {
+        throw new Error("Show Me's hover-label canvas is not readable.")
       }
       const renderedReport = new Image()
       renderedReport.src = `data:image/png;base64,${screenshotBase64}`
@@ -1624,27 +1635,41 @@ async function sampleDirectoryHoverPixels(
         return { color: closest, matchingPixelCount }
       }
 
-      const hoverScaleX = hoverCanvas.width / hoverCanvas.clientWidth
-      const hoverScaleY = hoverCanvas.height / hoverCanvas.clientHeight
+      const hoverScaleX = hoverLabelCanvas.width / hoverLabelCanvas.clientWidth
+      const hoverScaleY = hoverLabelCanvas.height / hoverLabelCanvas.clientHeight
       const left = Math.max(0, Math.floor(label.bounds.left * hoverScaleX))
       const top = Math.max(0, Math.floor(label.bounds.top * hoverScaleY))
-      const right = Math.min(hoverCanvas.width, Math.ceil(label.bounds.right * hoverScaleX))
-      const bottom = Math.min(hoverCanvas.height, Math.ceil(label.bounds.bottom * hoverScaleY))
-      const plate = hoverContext.getImageData(left, top, Math.max(1, right - left), Math.max(1, bottom - top))
+      const right = Math.min(hoverLabelCanvas.width, Math.ceil(label.bounds.right * hoverScaleX))
+      const bottom = Math.min(hoverLabelCanvas.height, Math.ceil(label.bounds.bottom * hoverScaleY))
+      const plate = hoverLabelContext.getImageData(left, top, Math.max(1, right - left), Math.max(1, bottom - top))
       // Exclude the plate's left padding so foreground matches inside this region can only be label glyphs.
       const textLeft = Math.min(right - 1, Math.max(left, Math.floor((label.bounds.left + 5) * hoverScaleX)))
-      const text = hoverContext.getImageData(textLeft, top, Math.max(1, right - textLeft), Math.max(1, bottom - top))
+      const text = hoverLabelContext.getImageData(textLeft, top, Math.max(1, right - textLeft), Math.max(1, bottom - top))
       const background = closestColor(plate, [17, 24, 33])
       const foreground = closestColor(text, [245, 249, 255])
       const screenshotScaleX = renderedReportCanvas.width / container.clientWidth
       const screenshotScaleY = renderedReportCanvas.height / container.clientHeight
+      const screenshotLeft = Math.max(0, Math.floor(label.bounds.left * screenshotScaleX))
+      const screenshotTop = Math.max(0, Math.floor(label.bounds.top * screenshotScaleY))
+      const screenshotRight = Math.min(renderedReportCanvas.width, Math.ceil(label.bounds.right * screenshotScaleX))
+      const screenshotBottom = Math.min(renderedReportCanvas.height, Math.ceil(label.bounds.bottom * screenshotScaleY))
+      const screenshotPlate = renderedReportContext.getImageData(
+        screenshotLeft,
+        screenshotTop,
+        Math.max(1, screenshotRight - screenshotLeft),
+        Math.max(1, screenshotBottom - screenshotTop),
+      )
+      const screenshotBackground = closestColor(screenshotPlate, [17, 24, 33])
+      const screenshotForeground = closestColor(screenshotPlate, [245, 249, 255])
       return {
         background: background.color,
         backgroundPixelCount: background.matchingPixelCount,
         foreground: foreground.color,
         foregroundPixelCount: foreground.matchingPixelCount,
+        compositedBackgroundPixelCount: screenshotBackground.matchingPixelCount,
+        compositedForegroundPixelCount: screenshotForeground.matchingPixelCount,
         directoryNode: colorAt(renderedReportContext, label.nodeX, label.nodeY, screenshotScaleX, screenshotScaleY),
-        hoverAtNodeCenter: colorAt(hoverContext, label.nodeX, label.nodeY, hoverScaleX, hoverScaleY),
+        hoverAtNodeCenter: colorAt(hoverLabelContext, label.nodeX, label.nodeY, hoverScaleX, hoverScaleY),
       }
     },
     { label: directoryLabel, screenshotBase64: screenshot.toString("base64") },
