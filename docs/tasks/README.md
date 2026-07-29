@@ -4,9 +4,20 @@ This directory tracks milestones, implementation progress, verification evidence
 
 ## Roadmap
 
-| Milestone                                                                       | Status      | Outcome                                                        |
-| ------------------------------------------------------------------------------- | ----------- | -------------------------------------------------------------- |
-| [020 Configurable coverage locations](./020-configurable-coverage-locations.md) | Not started | Configure per-package locations and multiple explicit reports. |
+Milestones 022 through 030 form one ordered report-UX sequence. Implement them in numeric order because each milestone establishes interaction or presentation contracts used by the next. Milestone 020 is independent and may be scheduled separately.
+
+| Milestone                                                                       | Status      | Outcome                                                                                     |
+| ------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------- |
+| [020 Configurable coverage locations](./020-configurable-coverage-locations.md) | Not started | Configure per-package locations and multiple explicit reports.                              |
+| [022 Coherent report navigation](./022-coherent-report-navigation.md)           | Not started | Unify search, selection, centering, directory disclosure, breadcrumbs, and history.         |
+| [023 Diagnostic lens framework](./023-diagnostic-lens-framework.md)             | Not started | Replace checkbox-first setup with deterministic task-oriented presentation presets.         |
+| [024 Findings-first overview](./024-findings-first-overview.md)                 | Not started | Surface explainable coverage, coupling, cycle, and cross-workspace candidates on open.      |
+| [025 Coverage lens](./025-coverage-lens.md)                                     | Not started | Explore file size and coverage through explicit thresholds, counts, and graph emphasis.     |
+| [026 Coupling lens](./026-coupling-lens.md)                                     | Not started | Reveal dependency hubs, consumers, fan-out, cycles, and focused relationship direction.     |
+| [027 Boundary lens](./027-boundary-lens.md)                                     | Not started | Aggregate directed dependencies between workspace and directory boundaries with drill-down. |
+| [028 Configurable architecture rules](./028-configurable-architecture-rules.md) | Not started | Declare modules and allowed directions, then report exact rule-backed violations.           |
+| [029 External dependency lens](./029-external-dependency-lens.md)               | Not started | Rank external packages and explore their consumers without adding every package to layout.  |
+| [030 Report workspace polish](./030-report-workspace-polish.md)                 | Not started | Reclaim graph space, improve long-path readability, and preserve spatial context.           |
 
 ## Done
 
