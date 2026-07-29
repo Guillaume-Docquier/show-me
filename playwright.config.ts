@@ -7,8 +7,8 @@ export default defineConfig({
   use: {
     headless: true,
     viewport: {
-      width: 1280,
-      height: 800,
+      width: 1920,
+      height: 1080,
     },
   },
 })

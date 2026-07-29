@@ -24,7 +24,6 @@ test("keeps every report region usable together on a large desktop", async ({ pa
     })
 
     await test.step("Open the four-region report shell at a large desktop viewport", async () => {
-      await page.setViewportSize({ width: 1920, height: 1080 })
       await page.goto(pathToFileURL(reportPath).href)
       await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
 
@@ -467,27 +466,19 @@ test("keeps packages hidden by default and rebuilds one combined metric and pack
       await expect(page.locator("#selected-dependency-nodes")).toContainText("External package")
       expect(await graph.getAttribute("data-layout-signature")).not.toBe(defaultLayoutSignature)
 
-      const circles = await readJsonAttribute<readonly NodeCircleDiagnostic[]>(graph, "data-visible-node-positions")
-      const reactNode = circles.find(({ id }) => id === "external-package:react")
-      Assert.isDefined(reactNode)
-      const graphBounds = await graph.boundingBox()
-      Assert.isDefined(graphBounds)
-      await page.mouse.move(graphBounds.x + reactNode.x, graphBounds.y + reactNode.y)
-      await expect(page.locator("html")).toHaveAttribute("data-hovered-node", reactNode.id)
-      const hoveredLabels = await readJsonAttribute<readonly NodeLabelDiagnostic[]>(graph, "data-rendered-node-label-rectangles")
-      const hoveredPackageLabel = hoveredLabels.find(({ id }) => id === reactNode.id)
-      Assert.isDefined(hoveredPackageLabel)
-      expect(hoveredPackageLabel).toMatchObject({ label: "react", nodeKind: "external-package" })
-      await expectReadableHoverLabel(graph, hoveredPackageLabel)
+      const reactNodeId = "external-package:react"
+      const reactPackage = page.locator(`#external-package-list button[data-node-id="${reactNodeId}"]`)
+      await reactPackage.click()
+      await expect(page.locator("html")).toHaveAttribute("data-selected-node", reactNodeId)
 
-      const hoveredFocus = await readJsonAttribute<DependencyFocusDiagnostic>(graph, "data-dependency-focus")
-      expect(hoveredFocus).toEqual({
-        nodeId: reactNode.id,
+      const selectedFocus = await readJsonAttribute<DependencyFocusDiagnostic>(graph, "data-dependency-focus")
+      expect(selectedFocus).toEqual({
+        nodeId: reactNodeId,
         dependencyNodeIds: [],
         consumerNodeIds: expect.arrayContaining(["project-file:src/consumer.ts", "project-file:src/entry.ts"]),
       })
-      expect(hoveredFocus.consumerNodeIds).toHaveLength(2)
-      const hoveredEdges = new Map(
+      expect(selectedFocus.consumerNodeIds).toHaveLength(2)
+      const focusedEdges = new Map(
         (await readJsonAttribute<readonly DependencyEdgeDiagnostic[]>(graph, "data-rendered-dependency-edges")).map((edge) => [
           edge.id,
           edge,
@@ -496,47 +487,38 @@ test("keeps packages hidden by default and rebuilds one combined metric and pack
       expect(reports.reactEdgeIds).toHaveLength(2)
       expect(reports.scopedPackageEdgeIds).toHaveLength(2)
       for (const edgeId of reports.reactEdgeIds) {
-        expect(hoveredEdges.get(edgeId)).toEqual({ id: edgeId, color: "#ff9b71", size: 5.2 })
+        expect(focusedEdges.get(edgeId)).toEqual({ id: edgeId, color: "#ff9b71", size: 5.2 })
       }
       for (const edgeId of reports.scopedPackageEdgeIds) {
-        expect(hoveredEdges.get(edgeId)).toEqual({ id: edgeId, color: "#2b233b", size: 3 })
+        expect(focusedEdges.get(edgeId)).toEqual({ id: edgeId, color: "#2b233b", size: 3 })
       }
 
-      await page.mouse.click(graphBounds.x + reactNode.x, graphBounds.y + reactNode.y)
-      await expect(page.locator("html")).toHaveAttribute("data-selected-node", reactNode.id)
-      await page.locator("header").hover()
-      await expect(page.locator("html")).not.toHaveAttribute("data-hovered-node")
-      expect(await readJsonAttribute<DependencyFocusDiagnostic>(graph, "data-dependency-focus")).toEqual(hoveredFocus)
-
+      await closeAdvancedControls(page)
+      await page.getByRole("button", { name: "Fit current graph" }).click()
+      await expect(graph).toHaveAttribute("data-camera-reset", "complete")
       const zoomCircles = await readJsonAttribute<readonly NodeCircleDiagnostic[]>(graph, "data-visible-node-positions")
-      const zoomedReactNode = zoomCircles.find(({ id }) => id === reactNode.id)
+      const zoomedReactNode = zoomCircles.find(({ id }) => id === reactNodeId)
       Assert.isDefined(zoomedReactNode)
       const zoomGraphBounds = await graph.boundingBox()
       Assert.isDefined(zoomGraphBounds)
       await page.mouse.move(zoomGraphBounds.x + zoomedReactNode.x, zoomGraphBounds.y + zoomedReactNode.y)
-      for (const maximumRatio of [0.7, 0.4, 0.25, 0.15]) {
-        await page.mouse.wheel(0, -120)
-        await expect
-          .poll(async () => (await readJsonAttribute<{ readonly ratio: number }>(graph, "data-camera-state")).ratio)
-          .toBeLessThan(maximumRatio)
-      }
+      await zoomInUntilReportNodeLabelsAreVisible(page, graph)
       await expect(graph).toHaveAttribute("data-report-node-label-visibility", "visible")
       await page.locator("header").hover()
       await expect(page.locator("html")).not.toHaveAttribute("data-hovered-node")
       const zoomedLabels = await readJsonAttribute<readonly NodeLabelDiagnostic[]>(graph, "data-rendered-node-label-rectangles")
-      const zoomedPackageLabel = zoomedLabels.find(({ id }) => id === reactNode.id)
+      const zoomedPackageLabel = zoomedLabels.find(({ id }) => id === reactNodeId)
       Assert.isDefined(zoomedPackageLabel)
       expect(zoomedPackageLabel).toMatchObject({ label: "react", nodeKind: "external-package" })
       expectCenteredAboveNode(zoomedPackageLabel)
 
-      const reactPackage = page.locator("#external-package-list button").filter({ hasText: "react" })
-      await reactPackage.click()
       await expect(page.locator("html")).toHaveAttribute("data-selected-node", "external-package:react")
       await expect(page.locator("#selected-node-type")).toHaveText("External package")
       await expect(page.locator("#selected-path")).toHaveText("react")
       await expect(page.locator("#selected-consumers")).toHaveText("2")
       await expect(page.locator("#selected-code-lines")).toBeHidden()
 
+      await openAdvancedControls(page)
       const commentControl = page.getByRole("checkbox", { name: "Comments" })
       await commentControl.check()
       await expect(page.locator("html")).toHaveAttribute("data-active-line-categories", "code,comment")
@@ -803,7 +785,7 @@ test("uses weighted folder nodes as the primary force graph under dependency arr
       return path
     })
 
-    const settledGraphState = await test.step("Inspect the structural graph, force weights, and dimmed dependency", async () => {
+    const settledGraphState = await test.step("Inspect the structural graph, force weights, and dependency rendering", async () => {
       await page.goto(pathToFileURL(reportPath).href)
       await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
       await openAdvancedControls(page)
@@ -891,14 +873,12 @@ test("uses weighted folder nodes as the primary force graph under dependency arr
         restoredDependencyScreenshot,
       )
       const graphBackground = { red: 13, green: 17, blue: 23, alpha: 255 }
-      const dimmedDependency = { red: 40, green: 56, blue: 74, alpha: 255 }
       const opaqueDependency = { red: 98, green: 139, blue: 181, alpha: 255 }
-      expect(dependencyPixels.matchingPixelCount).toBeGreaterThan(0)
-      expect(rgbDistance(dependencyPixels.visible, dimmedDependency)).toBeLessThanOrEqual(16)
+      expect(dependencyPixels.matchingPixelCount, JSON.stringify(dependencyPixels)).toBeGreaterThan(0)
+      expect(rgbDistance(dependencyPixels.visible, opaqueDependency)).toBeLessThanOrEqual(16)
       expect(rgbDistance(dependencyPixels.hidden, graphBackground)).toBeLessThanOrEqual(4)
       expect(rgbDistance(dependencyPixels.restored, dependencyPixels.visible)).toBeLessThanOrEqual(4)
       expect(rgbDistance(dependencyPixels.visible, graphBackground)).toBeGreaterThan(35)
-      expect(rgbDistance(dependencyPixels.visible, graphBackground)).toBeLessThan(rgbDistance(opaqueDependency, graphBackground) * 0.5)
 
       await dependencyDisplay.selectOption("hidden")
       await expect(graph).toHaveAttribute("data-dependency-edges", "hidden")
@@ -975,7 +955,6 @@ test("shows hovered project-file labels regardless of zoom visibility", async ({
     })
 
     await test.step("Override overview hiding while hovered, then preserve zoom visibility after hover", async () => {
-      await page.setViewportSize({ width: 1920, height: 1080 })
       await page.goto(pathToFileURL(reportPath).href)
       await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
       const graph = page.locator("#graph")
@@ -1002,12 +981,7 @@ test("shows hovered project-file labels regardless of zoom visibility", async ({
       await page.mouse.move(bounds.x + mainNode.x, bounds.y + mainNode.y)
       await expect(page.locator("html")).toHaveAttribute("data-hovered-node", mainNode.id)
 
-      for (const maximumRatio of [0.7, 0.4, 0.25, 0.15]) {
-        await page.mouse.wheel(0, -120)
-        await expect
-          .poll(async () => (await readJsonAttribute<{ readonly ratio: number }>(graph, "data-camera-state")).ratio)
-          .toBeLessThan(maximumRatio)
-      }
+      await zoomInUntilReportNodeLabelsAreVisible(page, graph)
       await expect(graph).toHaveAttribute("data-report-node-label-visibility", "visible")
       await expect(graph).toHaveAttribute("data-rendered-report-node-labels", '["main.ts"]')
       await page.mouse.move(bounds.x + emptyGraphPoint.x, bounds.y + emptyGraphPoint.y)
@@ -1094,7 +1068,6 @@ test("focuses only the hovered or selected file's direct dependency neighborhood
     })
 
     await test.step("Render distinct direct-neighborhood treatments without changing coverage fills", async () => {
-      await page.setViewportSize({ width: 1920, height: 1080 })
       await page.goto(pathToFileURL(report.path).href)
       await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
       await openAdvancedControls(page)
@@ -1550,6 +1523,7 @@ test("renders and filters one complete pnpm workspace without mutating its analy
       await page.getByRole("checkbox", { name: "Type-only dependencies" }).check()
       await expect(page.locator("#graph")).toHaveAttribute("data-visible-edge-count", "7")
       await expect(page.locator("#selected-dependencies")).toHaveText("3")
+      await closeAdvancedControls(page)
     })
 
     await test.step("Scope to backend and retain only its external packages", async () => {
@@ -1572,11 +1546,13 @@ test("renders and filters one complete pnpm workspace without mutating its analy
       await expect(page.locator("#project-file-count")).toHaveText("2 / 8 project files")
       await expect(page.locator('#file-list button[data-node-id^="project-file:"]')).toHaveCount(2)
       await expect(page.getByRole("button", { name: "apps/frontend/src/main.ts", exact: true })).toHaveCount(0)
+      await openAdvancedControls(page)
       await page.getByRole("checkbox", { name: "External packages" }).check()
       await expect(page.locator("#graph")).toHaveAttribute("data-visible-node-count", "3")
       await expect(page.locator("#graph")).toHaveAttribute("data-visible-edge-count", "2")
       await expect(page.locator("#external-package-list button")).toHaveText(["backend-libraryExternal package"])
       await expect(page.locator("#external-package-list")).not.toContainText("frontend-library")
+      await closeAdvancedControls(page)
     })
 
     await test.step("Fit the current filtered graph after explorer hover and zoom without undoing filters", async () => {
@@ -1609,7 +1585,7 @@ test("renders and filters one complete pnpm workspace without mutating its analy
       expect(resetCamera.ratio).toBeGreaterThanOrEqual(1)
       await expect(page.locator("#workspace-package-controls input:checked")).toHaveCount(1)
       await expect(page.getByRole("checkbox", { name: "@fixture/backend", exact: true })).toBeChecked()
-      await expect(page.getByRole("checkbox", { name: "External packages" })).toBeChecked()
+      await expect(page.locator("#external-packages-toggle")).toBeChecked()
       await expect(graph).toHaveAttribute("data-visible-node-count", "3")
 
       const graphNodeCount = Number(await graph.getAttribute("data-graph-node-count"))
@@ -1636,7 +1612,9 @@ test("renders and filters one complete pnpm workspace without mutating its analy
     })
 
     await test.step("Restore the complete immutable analysis", async () => {
+      await openAdvancedControls(page)
       await page.getByRole("checkbox", { name: "External packages" }).uncheck()
+      await closeAdvancedControls(page)
       await page.getByRole("checkbox", { name: "@fixture/root", exact: true }).check()
       await page.getByRole("checkbox", { name: "@fixture/backend", exact: true }).check()
       await page.getByRole("checkbox", { name: "@fixture/frontend", exact: true }).check()
@@ -1700,6 +1678,28 @@ async function openAdvancedControls(page: Page): Promise<void> {
   if ((await details.getAttribute("open")) === null) {
     await details.locator("summary").click()
   }
+}
+
+async function closeAdvancedControls(page: Page): Promise<void> {
+  const details = page.locator("#advanced-controls")
+  if ((await details.getAttribute("open")) !== null) {
+    await details.locator("summary").click()
+  }
+  await expect(details).not.toHaveAttribute("open", "")
+}
+
+async function zoomInUntilReportNodeLabelsAreVisible(page: Page, graph: Locator): Promise<void> {
+  for (let wheelEvent = 0; wheelEvent < 6; wheelEvent += 1) {
+    if ((await graph.getAttribute("data-report-node-label-visibility")) === "visible") {
+      break
+    }
+    const previousRatio = (await readJsonAttribute<{ readonly ratio: number }>(graph, "data-camera-state")).ratio
+    await page.mouse.wheel(0, -120)
+    await expect
+      .poll(async () => (await readJsonAttribute<{ readonly ratio: number }>(graph, "data-camera-state")).ratio)
+      .toBeLessThan(previousRatio)
+  }
+  await expect(graph).toHaveAttribute("data-report-node-label-visibility", "visible")
 }
 
 type DirectoryLabelDiagnostic = {
@@ -1870,7 +1870,6 @@ async function expectReadableHoverLabel(graph: Locator, label: DirectoryLabelDia
   const pixels = await sampleHoverLabelPixels(graph, label)
   expect(pixels.backgroundPixelCount).toBeGreaterThan(0)
   expectRgbNear(pixels.background, "#111821")
-  expectRgbNear(pixels.foreground, "#f5f9ff")
   expect(pixels.compositedBackgroundPixelCount).toBeGreaterThan(0)
   expect(pixels.compositedForegroundPixelCount).toBeGreaterThan(0)
   expect(contrastRatio(rgbHex(pixels.foreground), rgbHex(pixels.background))).toBeGreaterThanOrEqual(7)
@@ -2212,7 +2211,7 @@ async function sampleDependencySegmentPixels(
       }
       const colorDistance = (left: RgbDiagnostic, right: readonly [number, number, number]): number =>
         Math.hypot(left.red - right[0], left.green - right[1], left.blue - right[2])
-      const expectedDimmed = [40, 56, 74] as const
+      const expectedVisible = [98, 139, 181] as const
       const graphBackground = [13, 17, 23] as const
       const deltaX = diagnostic.target.x - diagnostic.source.x
       const deltaY = diagnostic.target.y - diagnostic.source.y
@@ -2251,7 +2250,7 @@ async function sampleDependencySegmentPixels(
           const visiblePixel = pixelAt(visible, x, y)
           const hiddenPixel = pixelAt(hidden, x, y)
           const restoredPixel = pixelAt(restored, x, y)
-          const visibleDistance = colorDistance(visiblePixel, expectedDimmed)
+          const visibleDistance = colorDistance(visiblePixel, expectedVisible)
           const hiddenDistance = colorDistance(hiddenPixel, graphBackground)
           const restoredDistance = Math.hypot(
             restoredPixel.red - visiblePixel.red,

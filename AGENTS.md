@@ -126,6 +126,8 @@ Use Arrange/Act/Assert for focused unit tests with one straightforward setup, op
 
 For Playwright browser tests, use awaited `test.step(...)` calls to describe meaningful phases of the user workflow. Keep an action and the expectations for its resulting state in the same step. Do not force an interaction-heavy browser test into one global Arrange/Act/Assert sequence, and do not create a separate step for every assertion.
 
+Browser tests use the single 1920 by 1080 viewport configured in `playwright.config.ts`. Never override the viewport in an individual test. If the baseline changes, update the shared Playwright configuration instead.
+
 We test the production code. We do not use `vitest.mock()`.
 
 We prefer end-to-end and integration tests. We use unit tests sparingly for complex scenarios (algorithm verification, validating race conditions, regression tests, etc.)
