@@ -1,5 +1,5 @@
-import { writeFile } from "node:fs/promises"
-import { resolve } from "node:path"
+import { mkdir, writeFile } from "node:fs/promises"
+import { dirname, resolve } from "node:path"
 import { Result, Time, Timer, UnitOfTime } from "@guillaume-docquier/tools-ts"
 import packageMetadata from "../../package.json" with { type: "json" }
 import { analyzeProject, type AnalyzeProjectError } from "../analysis/analyze-project.js"
@@ -141,6 +141,7 @@ export async function runCli(arguments_: readonly string[], output: CliOutput, o
       ? (projectConfiguration.value.outputPath ?? resolve(currentDirectory, "show-me.html"))
       : resolve(currentDirectory, command.value.outputPath)
   const writeReport = async (): ReturnType<typeof writeFile> => {
+    await mkdir(dirname(outputPath), { recursive: true })
     await writeFile(outputPath, html, "utf8")
   }
   const writeResult = await Result.tryCatch(

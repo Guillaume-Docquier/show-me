@@ -86,18 +86,17 @@ Options:
     })
   })
 
-  it("supports explicit project and output paths", async () => {
+  it("creates missing parent directories for an explicit output path", async () => {
     await withTemporaryDirectory(async (currentDirectory) => {
       // Arrange
       const projectDirectory = join(currentDirectory, "project")
-      const reportDirectory = join(currentDirectory, "reports")
+      const reportDirectory = join(currentDirectory, "reports", "generated")
       await mkdir(projectDirectory)
-      await mkdir(reportDirectory)
       await writeFile(join(projectDirectory, "app.js"), "export const app = true")
       const captured = captureOutput()
 
       // Act
-      const exitCode = await runCli(["project", "--output", "reports/graph.html"], captured.output, {
+      const exitCode = await runCli(["project", "--output", "reports/generated/graph.html"], captured.output, {
         currentDirectory,
         browserBundle: TEST_BROWSER_BUNDLE,
       })
@@ -106,6 +105,7 @@ Options:
       const html = await readFile(join(reportDirectory, "graph.html"), "utf8")
       expect(exitCode).toBe(0)
       expect(html).toContain("app.js")
+      expect(captured.standardError).toEqual([])
     })
   })
 
