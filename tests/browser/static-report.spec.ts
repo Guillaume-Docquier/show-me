@@ -327,7 +327,16 @@ test("keeps packages hidden by default and rebuilds one combined metric and pack
         buildHtmlReport({ ...analysis.value, externalPackages: [], externalPackageDependencies: [] }, browserBundle),
         "utf8",
       )
-      return { reportPath, fileOnlyReportPath }
+      const externalDependencyEdgeIds = (packageName: string): readonly string[] =>
+        analysis.value.externalPackageDependencies.flatMap((dependency, index) =>
+          dependency.target === packageName ? [`external-package-dependency-${index}`] : [],
+        )
+      return {
+        reportPath,
+        fileOnlyReportPath,
+        reactEdgeIds: externalDependencyEdgeIds("react"),
+        scopedPackageEdgeIds: externalDependencyEdgeIds("@scope/package"),
+      }
     })
 
     const defaultLayoutSignature = await test.step("Open the default file-only projection", async () => {
@@ -365,6 +374,68 @@ test("keeps packages hidden by default and rebuilds one combined metric and pack
       await expect(page.locator("#selected-dependency-nodes button")).toHaveCount(4)
       await expect(page.locator("#selected-dependency-nodes")).toContainText("External package")
       expect(await graph.getAttribute("data-layout-signature")).not.toBe(defaultLayoutSignature)
+
+      const circles = await readJsonAttribute<readonly NodeCircleDiagnostic[]>(graph, "data-visible-node-positions")
+      const reactNode = circles.find(({ id }) => id === "external-package:react")
+      Assert.isDefined(reactNode)
+      const graphBounds = await graph.boundingBox()
+      Assert.isDefined(graphBounds)
+      await page.mouse.move(graphBounds.x + reactNode.x, graphBounds.y + reactNode.y)
+      await expect(page.locator("html")).toHaveAttribute("data-hovered-node", reactNode.id)
+      const hoveredLabels = await readJsonAttribute<readonly NodeLabelDiagnostic[]>(graph, "data-rendered-node-label-rectangles")
+      const hoveredPackageLabel = hoveredLabels.find(({ id }) => id === reactNode.id)
+      Assert.isDefined(hoveredPackageLabel)
+      expect(hoveredPackageLabel).toMatchObject({ label: "react", nodeKind: "external-package" })
+      await expectReadableHoverLabel(graph, hoveredPackageLabel)
+
+      const hoveredFocus = await readJsonAttribute<DependencyFocusDiagnostic>(graph, "data-dependency-focus")
+      expect(hoveredFocus).toEqual({
+        nodeId: reactNode.id,
+        dependencyNodeIds: [],
+        consumerNodeIds: expect.arrayContaining(["project-file:src/consumer.ts", "project-file:src/entry.ts"]),
+      })
+      expect(hoveredFocus.consumerNodeIds).toHaveLength(2)
+      const hoveredEdges = new Map(
+        (await readJsonAttribute<readonly DependencyEdgeDiagnostic[]>(graph, "data-rendered-dependency-edges")).map((edge) => [
+          edge.id,
+          edge,
+        ]),
+      )
+      expect(reports.reactEdgeIds).toHaveLength(2)
+      expect(reports.scopedPackageEdgeIds).toHaveLength(2)
+      for (const edgeId of reports.reactEdgeIds) {
+        expect(hoveredEdges.get(edgeId)).toEqual({ id: edgeId, color: "#ff9b71", size: 5.2 })
+      }
+      for (const edgeId of reports.scopedPackageEdgeIds) {
+        expect(hoveredEdges.get(edgeId)).toEqual({ id: edgeId, color: "#2b233b", size: 3 })
+      }
+
+      await page.mouse.click(graphBounds.x + reactNode.x, graphBounds.y + reactNode.y)
+      await expect(page.locator("html")).toHaveAttribute("data-selected-node", reactNode.id)
+      await page.locator("header").hover()
+      await expect(page.locator("html")).not.toHaveAttribute("data-hovered-node")
+      expect(await readJsonAttribute<DependencyFocusDiagnostic>(graph, "data-dependency-focus")).toEqual(hoveredFocus)
+
+      const zoomCircles = await readJsonAttribute<readonly NodeCircleDiagnostic[]>(graph, "data-visible-node-positions")
+      const zoomedReactNode = zoomCircles.find(({ id }) => id === reactNode.id)
+      Assert.isDefined(zoomedReactNode)
+      const zoomGraphBounds = await graph.boundingBox()
+      Assert.isDefined(zoomGraphBounds)
+      await page.mouse.move(zoomGraphBounds.x + zoomedReactNode.x, zoomGraphBounds.y + zoomedReactNode.y)
+      for (const maximumRatio of [0.7, 0.4, 0.25, 0.15]) {
+        await page.mouse.wheel(0, -120)
+        await expect
+          .poll(async () => (await readJsonAttribute<{ readonly ratio: number }>(graph, "data-camera-state")).ratio)
+          .toBeLessThan(maximumRatio)
+      }
+      await expect(graph).toHaveAttribute("data-report-node-label-visibility", "visible")
+      await page.locator("header").hover()
+      await expect(page.locator("html")).not.toHaveAttribute("data-hovered-node")
+      const zoomedLabels = await readJsonAttribute<readonly NodeLabelDiagnostic[]>(graph, "data-rendered-node-label-rectangles")
+      const zoomedPackageLabel = zoomedLabels.find(({ id }) => id === reactNode.id)
+      Assert.isDefined(zoomedPackageLabel)
+      expect(zoomedPackageLabel).toMatchObject({ label: "react", nodeKind: "external-package" })
+      expectCenteredAboveNode(zoomedPackageLabel)
 
       const reactPackage = page.locator("#external-package-list button").filter({ hasText: "react" })
       await reactPackage.click()
@@ -704,8 +775,8 @@ test("shows hovered project-file labels regardless of zoom visibility", async ({
       await page.goto(pathToFileURL(reportPath).href)
       await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
       const graph = page.locator("#graph")
-      await expect(graph).toHaveAttribute("data-file-label-visibility", "hidden")
-      await expect(graph).toHaveAttribute("data-rendered-file-labels", "[]")
+      await expect(graph).toHaveAttribute("data-report-node-label-visibility", "hidden")
+      await expect(graph).toHaveAttribute("data-rendered-report-node-labels", "[]")
       const bounds = await graph.boundingBox()
       Assert.isDefined(bounds)
       const nodes = await readJsonAttribute<readonly NodeCircleDiagnostic[]>(graph, "data-visible-node-positions")
@@ -714,8 +785,8 @@ test("shows hovered project-file labels regardless of zoom visibility", async ({
       const emptyGraphPoint = graphPointFarthestFromNodes(nodes, bounds.width, bounds.height)
       await page.mouse.move(bounds.x + mainNode.x, bounds.y + mainNode.y)
       await expect(page.locator("html")).toHaveAttribute("data-hovered-node", mainNode.id)
-      await expect(graph).toHaveAttribute("data-file-label-visibility", "hidden")
-      await expect(graph).toHaveAttribute("data-rendered-file-labels", '["main.ts"]')
+      await expect(graph).toHaveAttribute("data-report-node-label-visibility", "hidden")
+      await expect(graph).toHaveAttribute("data-rendered-report-node-labels", '["main.ts"]')
       const hoveredLabels = await readJsonAttribute<readonly NodeLabelDiagnostic[]>(graph, "data-rendered-node-label-rectangles")
       const hoveredFileLabel = hoveredLabels.find(({ id }) => id === mainNode.id)
       Assert.isDefined(hoveredFileLabel)
@@ -723,7 +794,7 @@ test("shows hovered project-file labels regardless of zoom visibility", async ({
 
       await page.mouse.move(bounds.x + emptyGraphPoint.x, bounds.y + emptyGraphPoint.y)
       await expect(page.locator("html")).not.toHaveAttribute("data-hovered-node")
-      await expect(graph).toHaveAttribute("data-rendered-file-labels", "[]")
+      await expect(graph).toHaveAttribute("data-rendered-report-node-labels", "[]")
       await page.mouse.move(bounds.x + mainNode.x, bounds.y + mainNode.y)
       await expect(page.locator("html")).toHaveAttribute("data-hovered-node", mainNode.id)
 
@@ -733,12 +804,12 @@ test("shows hovered project-file labels regardless of zoom visibility", async ({
           .poll(async () => (await readJsonAttribute<{ readonly ratio: number }>(graph, "data-camera-state")).ratio)
           .toBeLessThan(maximumRatio)
       }
-      await expect(graph).toHaveAttribute("data-file-label-visibility", "visible")
-      await expect(graph).toHaveAttribute("data-rendered-file-labels", '["main.ts"]')
+      await expect(graph).toHaveAttribute("data-report-node-label-visibility", "visible")
+      await expect(graph).toHaveAttribute("data-rendered-report-node-labels", '["main.ts"]')
       await page.mouse.move(bounds.x + emptyGraphPoint.x, bounds.y + emptyGraphPoint.y)
       await expect(page.locator("html")).not.toHaveAttribute("data-hovered-node")
 
-      await expect(graph).toHaveAttribute("data-rendered-file-labels", '["main.ts"]')
+      await expect(graph).toHaveAttribute("data-rendered-report-node-labels", '["main.ts"]')
       const nodeLabels = await readJsonAttribute<readonly NodeLabelDiagnostic[]>(graph, "data-rendered-node-label-rectangles")
       const fileLabel = nodeLabels.find(({ id }) => id === "project-file:main.ts")
       Assert.isDefined(fileLabel)
@@ -1418,7 +1489,7 @@ type DirectoryLabelDiagnostic = {
 }
 
 type NodeLabelDiagnostic = DirectoryLabelDiagnostic & {
-  readonly nodeKind: "project-file" | "directory"
+  readonly nodeKind: "project-file" | "external-package" | "directory"
   readonly nodeSize: number
 }
 

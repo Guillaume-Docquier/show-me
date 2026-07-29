@@ -1,17 +1,31 @@
 import type { DependencyKind } from "../../analysis/project-analysis.js"
+import type { ReportNode } from "./report-presentation.js"
 
 /** Graphology/Sigma-only node attributes for the visible report projection. */
-export type BrowserNodeAttributes = {
+type BrowserNodeAttributesBase = {
   readonly size: number
   readonly color: string
   readonly x: number
   readonly y: number
-  readonly nodeKind: "project-file" | "external-package" | "directory"
-  readonly label?: string
+  readonly label: string
   readonly forceLabel?: boolean
-  readonly directoryDepth?: number
-  readonly descendantProjectFileCount?: number
 }
+
+/** Graphology/Sigma attributes shared by project files and external packages. */
+export type BrowserReportNodeAttributes = BrowserNodeAttributesBase & {
+  readonly nodeKind: "report-node"
+  readonly reportNodeKind: ReportNode["kind"]
+}
+
+/** Graphology/Sigma attributes for one browser-derived directory. */
+export type BrowserDirectoryNodeAttributes = BrowserNodeAttributesBase & {
+  readonly nodeKind: "directory"
+  readonly directoryDepth: number
+  readonly descendantProjectFileCount: number
+}
+
+/** Graphology/Sigma-only node attributes for the visible report projection. */
+export type BrowserNodeAttributes = BrowserReportNodeAttributes | BrowserDirectoryNodeAttributes
 
 /** Graphology/Sigma-only edge attributes for layout and rendering. */
 export type BrowserEdgeAttributes = {

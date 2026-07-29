@@ -61,15 +61,15 @@ export function visibleDirectoryDepth(cameraRatio: number): number {
 }
 
 /**
- * Decide whether project-file labels may participate in Sigma label rendering.
+ * Decide whether report-node labels may participate in Sigma label rendering.
  *
- * The threshold is below Sigma's default ratio so file names stay out of the
- * overview and appear after one deliberate zoom-in gesture.
+ * The threshold is below Sigma's default ratio so report-node names stay out
+ * of the overview and appear after one deliberate zoom-in gesture.
  *
  * @param cameraRatio - The positive Sigma camera ratio.
- * @returns Whether file labels may be rendered at this zoom.
+ * @returns Whether project-file and external-package labels may be rendered at this zoom.
  */
-export function fileLabelsAreVisible(cameraRatio: number): boolean {
+export function reportNodeLabelsAreVisible(cameraRatio: number): boolean {
   if (cameraRatio >= 0.3) {
     // Zooming in twice goes to 0.34
     return false

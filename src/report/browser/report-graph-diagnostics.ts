@@ -4,6 +4,7 @@ import { centeredNodeLabelGeometry, LABEL_FONT, LABEL_SIZE, LABEL_WEIGHT } from 
 import type { DependencyFocus } from "./report-graph-overlays.js"
 import type { BrowserEdgeAttributes, BrowserNodeAttributes, GraphNodeCircle } from "./report-graph-types.js"
 import type { ReportLayoutMetrics } from "./report-layout.js"
+import type { ReportNode } from "./report-presentation.js"
 import { reportViewLayoutSignature, type ReportView } from "./report-view.js"
 
 /** Isolates browser-test observability from production graph decisions. */
@@ -78,12 +79,12 @@ export class ReportGraphDiagnostics {
   }
 
   public writeRenderedLabels(): void {
-    const renderedFileLabels: string[] = []
+    const renderedReportNodeLabels: string[] = []
     const renderedDirectoryLabels: string[] = []
     const renderedNodeLabelRectangles: Array<{
       readonly id: string
       readonly label: string
-      readonly nodeKind: "project-file" | "directory"
+      readonly nodeKind: ReportNode["kind"] | "directory"
       readonly nodeX: number
       readonly nodeY: number
       readonly nodeSize: number
@@ -99,19 +100,17 @@ export class ReportGraphDiagnostics {
       if (attributes.label === undefined) {
         continue
       }
-      if (attributes.nodeKind === "project-file") {
-        renderedFileLabels.push(attributes.label)
-      } else if (attributes.nodeKind === "directory") {
-        renderedDirectoryLabels.push(attributes.label)
+      if (attributes.nodeKind === "report-node") {
+        renderedReportNodeLabels.push(attributes.label)
       } else {
-        continue
+        renderedDirectoryLabels.push(attributes.label)
       }
       const node = this.#renderer.graphToViewport(attributes)
       const nodeSize = this.#renderer.scaleSize(attributes.size)
       renderedNodeLabelRectangles.push({
         id,
         label: attributes.label,
-        nodeKind: attributes.nodeKind,
+        nodeKind: attributes.nodeKind === "report-node" ? attributes.reportNodeKind : "directory",
         nodeX: node.x,
         nodeY: node.y,
         nodeSize,
@@ -119,16 +118,16 @@ export class ReportGraphDiagnostics {
       })
     }
     this.#measurementContext.restore()
-    this.#container.dataset.renderedFileLabels = JSON.stringify(renderedFileLabels.toSorted())
+    this.#container.dataset.renderedReportNodeLabels = JSON.stringify(renderedReportNodeLabels.toSorted())
     this.#container.dataset.renderedDirectoryLabels = JSON.stringify(renderedDirectoryLabels.toSorted())
     this.#container.dataset.renderedNodeLabelRectangles = JSON.stringify(
       renderedNodeLabelRectangles.toSorted((left, right) => left.id.localeCompare(right.id)),
     )
   }
 
-  public writeCamera(showFileLabels: boolean, cameraState: unknown): void {
+  public writeCamera(showReportNodeLabels: boolean, cameraState: unknown): void {
     this.#container.dataset.cameraState = JSON.stringify(cameraState)
-    this.#container.dataset.fileLabelVisibility = showFileLabels ? "visible" : "hidden"
+    this.#container.dataset.reportNodeLabelVisibility = showReportNodeLabels ? "visible" : "hidden"
   }
 
   public writeDependencyEdges(edgeIds: readonly string[], visible: boolean): void {

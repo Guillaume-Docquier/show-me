@@ -11,7 +11,7 @@ import { CONSUMER_FOCUS_COLOR, DEPENDENCY_FOCUS_COLOR, ReportGraphOverlays, type
 import type { BrowserEdgeAttributes, BrowserNodeAttributes } from "./report-graph-types.js"
 import type { ReportInteractionState } from "./report-interaction.js"
 import { layoutReportGraph } from "./report-layout.js"
-import type { BrowserPresentation, ReportNode, ReportProjectFileNode } from "./report-presentation.js"
+import type { ReportNode } from "./report-presentation.js"
 import { visibleRelationships, type ReportView } from "./report-view.js"
 
 const DIRECTORY_NODE_SIZE = 9
@@ -47,7 +47,6 @@ export type ReportGraphEvents = {
 export class ReportGraph {
   readonly #root: HTMLElement
   readonly #container: HTMLElement
-  readonly #nodeById: ReadonlyMap<string, ReportNode>
   readonly #events: ReportGraphEvents
   readonly #performanceProfiler: PerformanceProfiler
   readonly #graph = new DirectedGraph<BrowserNodeAttributes, BrowserEdgeAttributes>()
@@ -70,21 +69,18 @@ export class ReportGraph {
   public constructor({
     root,
     container,
-    presentation,
     initialEdgeVisibility,
     performanceProfiler,
     events,
   }: {
     readonly root: HTMLElement
     readonly container: HTMLElement
-    readonly presentation: BrowserPresentation
     readonly initialEdgeVisibility: EdgeVisibilityState
     readonly performanceProfiler: PerformanceProfiler
     readonly events: ReportGraphEvents
   }) {
     this.#root = root
     this.#container = container
-    this.#nodeById = new Map(presentation.nodes.map((node) => [node.id, node]))
     this.#edgeVisibility = initialEdgeVisibility
     this.#events = events
     this.#performanceProfiler = performanceProfiler
@@ -134,8 +130,9 @@ export class ReportGraph {
       this.#graph.addNode(node.id, {
         size: node.size,
         color: node.color,
-        nodeKind: node.reportNode.kind,
-        ...(node.reportNode.kind === "project-file" ? { label: projectFileLabel(node.reportNode.path) } : {}),
+        nodeKind: "report-node",
+        reportNodeKind: node.reportNode.kind,
+        label: reportNodeLabel(node.reportNode),
         x: 0,
         y: 0,
       })
@@ -292,7 +289,7 @@ export class ReportGraph {
       this.#overlays.renderHoveredNodeLabel(this.#interaction.hoveredNodeId)
       this.#diagnostics.writeDependencyEdges(this.#dependencyEdgeIds(), this.#edgeVisibility.dependencyEdges)
       const labelRefreshScheduled = this.#labelVisibility.synchronizeAfterRender()
-      this.#diagnostics.writeCamera(this.#labelVisibility.fileLabelsAreVisible, this.#camera.getState())
+      this.#diagnostics.writeCamera(this.#labelVisibility.reportNodeLabelsAreVisible, this.#camera.getState())
       if (!labelRefreshScheduled) {
         this.#diagnostics.writeRenderedLabels()
         this.#diagnostics.writeNodeCircles()
@@ -355,7 +352,7 @@ export class ReportGraph {
       node === this.#interaction.hoveredNodeId && attributes.label !== undefined
         ? { forceLabel: true }
         : (attributes.nodeKind === "directory" && !this.#labelVisibility.directoryLabelIsVisible(node)) ||
-            (attributes.nodeKind === "project-file" && !this.#labelVisibility.fileLabelsAreVisible)
+            (attributes.nodeKind === "report-node" && !this.#labelVisibility.reportNodeLabelsAreVisible)
           ? { label: null, forceLabel: false }
           : {}
     return node === this.#interaction.selectedNodeId
@@ -455,18 +452,22 @@ export class ReportGraph {
     return undefined
   }
 
-  #dependencyFocusFor(node: ReportProjectFileNode): DependencyFocus {
+  #dependencyFocusFor(nodeId: string): DependencyFocus {
     const view = this.#view
     if (view === undefined) {
-      return { nodeId: node.id, dependencyNodeIds: new Set(), consumerNodeIds: new Set() }
+      return { nodeId, dependencyNodeIds: new Set(), consumerNodeIds: new Set() }
     }
     return {
-      nodeId: node.id,
+      nodeId,
       dependencyNodeIds: new Set(
-        visibleRelationships(view, node.id, "dependency").flatMap(({ nodeId }) => (nodeId === node.id ? [] : [nodeId])),
+        visibleRelationships(view, nodeId, "dependency").flatMap((relationship) =>
+          relationship.nodeId === nodeId ? [] : [relationship.nodeId],
+        ),
       ),
       consumerNodeIds: new Set(
-        visibleRelationships(view, node.id, "consumer").flatMap(({ nodeId }) => (nodeId === node.id ? [] : [nodeId])),
+        visibleRelationships(view, nodeId, "consumer").flatMap((relationship) =>
+          relationship.nodeId === nodeId ? [] : [relationship.nodeId],
+        ),
       ),
     }
   }
@@ -477,7 +478,6 @@ export class ReportGraph {
 
   #synchronizeEdgeFocus(): void {
     const focusedNodeId = this.#interaction.hoveredNodeId ?? this.#interaction.selectedNodeId
-    const focusedNode = focusedNodeId === undefined ? undefined : this.#nodeById.get(focusedNodeId)
     this.#structureFocusNodeId =
       focusedNodeId !== undefined &&
       this.#graph.hasNode(focusedNodeId) &&
@@ -485,9 +485,7 @@ export class ReportGraph {
         ? focusedNodeId
         : undefined
     this.#dependencyFocus =
-      focusedNode?.kind === "project-file" && this.#view?.nodeIds.has(focusedNode.id) === true
-        ? this.#dependencyFocusFor(focusedNode)
-        : undefined
+      focusedNodeId !== undefined && this.#view?.nodeIds.has(focusedNodeId) === true ? this.#dependencyFocusFor(focusedNodeId) : undefined
     this.#diagnostics.writeDependencyFocus(this.#dependencyFocus)
   }
 
@@ -511,8 +509,8 @@ export class ReportGraph {
   }
 }
 
-function projectFileLabel(path: string): string {
-  return path.split("/").at(-1) ?? path
+function reportNodeLabel(node: ReportNode): string {
+  return node.kind === "project-file" ? (node.path.split("/").at(-1) ?? node.path) : node.packageName
 }
 
 function graphFitRatioMultiplier(centerDisplacement: number, radius: number, viewportHalfExtent: number): number {

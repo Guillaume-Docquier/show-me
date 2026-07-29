@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
-  fileLabelsAreVisible,
+  reportNodeLabelsAreVisible,
   selectVisibleDirectoryLabels,
   type DirectoryLabelCandidate,
   visibleDirectoryDepth,
@@ -21,13 +21,13 @@ describe("visibleDirectoryDepth", () => {
   })
 })
 
-describe("fileLabelsAreVisible", () => {
+describe("reportNodeLabelsAreVisible", () => {
   it.each([
     { cameraRatio: 0.34, expected: false }, // 2x zoom in
     { cameraRatio: 0.2, expected: true }, // 3x zoom in
     { cameraRatio: 0.11, expected: true }, // 4x zoom in
   ])("returns $expected at camera ratio $cameraRatio", ({ cameraRatio, expected }) => {
-    expect(fileLabelsAreVisible(cameraRatio)).toBe(expected)
+    expect(reportNodeLabelsAreVisible(cameraRatio)).toBe(expected)
   })
 })
 

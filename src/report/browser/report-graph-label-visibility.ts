@@ -1,7 +1,7 @@
 import type { DirectedGraph } from "graphology"
 import type { Sigma } from "sigma"
 import {
-  fileLabelsAreVisible,
+  reportNodeLabelsAreVisible,
   selectVisibleDirectoryLabels,
   type DirectoryLabelCandidate,
   visibleDirectoryDepth,
@@ -18,7 +18,7 @@ import {
 } from "./report-graph-labels.js"
 import type { BrowserEdgeAttributes, BrowserNodeAttributes } from "./report-graph-types.js"
 
-/** Owns zoom-aware file and directory label eligibility for one Sigma renderer. */
+/** Owns zoom-aware report-node and directory label eligibility for one Sigma renderer. */
 export class ReportGraphLabelVisibility {
   readonly #graph: DirectedGraph<BrowserNodeAttributes, BrowserEdgeAttributes>
   readonly #renderer: Sigma<BrowserNodeAttributes, BrowserEdgeAttributes>
@@ -27,7 +27,7 @@ export class ReportGraphLabelVisibility {
   readonly #diagnostics: ReportGraphDiagnostics
   #hoveredDirectoryNodeId: string | undefined
   #maximumVisibleDirectoryDepth: number
-  #showFileLabels: boolean
+  #showReportNodeLabels: boolean
   #visibleDirectoryLabels: readonly DirectoryLabelCandidate[] = []
   #visibleDirectoryLabelIds = new Set<string>()
   #dirty = true
@@ -52,11 +52,11 @@ export class ReportGraphLabelVisibility {
     this.#diagnostics = diagnostics
     const cameraRatio = renderer.getCamera().getState().ratio
     this.#maximumVisibleDirectoryDepth = visibleDirectoryDepth(cameraRatio)
-    this.#showFileLabels = fileLabelsAreVisible(cameraRatio)
+    this.#showReportNodeLabels = reportNodeLabelsAreVisible(cameraRatio)
   }
 
-  public get fileLabelsAreVisible(): boolean {
-    return this.#showFileLabels
+  public get reportNodeLabelsAreVisible(): boolean {
+    return this.#showReportNodeLabels
   }
 
   public directoryLabelIsVisible(nodeId: string): boolean {
@@ -113,15 +113,15 @@ export class ReportGraphLabelVisibility {
     this.#dirty = false
     const ratio = this.#renderer.getCamera().getState().ratio
     const nextMaximumDirectoryDepth = visibleDirectoryDepth(ratio)
-    const nextShowFileLabels = fileLabelsAreVisible(ratio)
+    const nextShowReportNodeLabels = reportNodeLabelsAreVisible(ratio)
     const candidates = this.#directoryLabelCandidates(nextMaximumDirectoryDepth)
     const nextDirectoryLabels = selectVisibleDirectoryLabels(candidates, this.#renderer.getDimensions())
     const nextDirectoryLabelIds = new Set(nextDirectoryLabels.map(({ id }) => id))
     const directoryLabelsChanged = !setsEqual(this.#visibleDirectoryLabelIds, nextDirectoryLabelIds)
-    const fileLabelsChanged = this.#showFileLabels !== nextShowFileLabels
+    const reportNodeLabelsChanged = this.#showReportNodeLabels !== nextShowReportNodeLabels
 
     this.#maximumVisibleDirectoryDepth = nextMaximumDirectoryDepth
-    this.#showFileLabels = nextShowFileLabels
+    this.#showReportNodeLabels = nextShowReportNodeLabels
     this.#visibleDirectoryLabels = nextDirectoryLabels
     this.#visibleDirectoryLabelIds = nextDirectoryLabelIds
     this.#diagnostics.writeDirectoryLabels({
@@ -130,7 +130,7 @@ export class ReportGraphLabelVisibility {
       candidateCount: candidates.length,
     })
 
-    if (fileLabelsChanged) {
+    if (reportNodeLabelsChanged) {
       this.#renderer.scheduleRefresh()
       return true
     }

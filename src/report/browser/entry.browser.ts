@@ -41,7 +41,6 @@ renderCoverageLegend(elements.coverageLegend)
 const graph = new ReportGraph({
   root: elements.root,
   container: elements.graphContainer,
-  presentation,
   initialEdgeVisibility: edgeVisibility,
   performanceProfiler,
   events: {
