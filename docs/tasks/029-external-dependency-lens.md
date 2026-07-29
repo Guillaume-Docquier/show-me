@@ -10,7 +10,7 @@ Users can quickly identify which external packages have the broadest footprint, 
 
 ## Dependencies
 
-- [Milestone 023](./023-diagnostic-lens-framework.md) establishes lens presets.
+- [Milestone 023](./done/023-diagnostic-lens-framework.md) establishes lens presets.
 - [Milestone 024](./024-findings-first-overview.md) establishes findings.
 - [Milestone 027](./027-boundary-lens.md) establishes workspace and boundary aggregation.
 - [Milestone 007](./done/007-external-packages.md) and [Milestone 021](./done/021-type-only-dependencies.md) establish canonical external-package identities and relationship kinds.

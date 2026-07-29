@@ -79,6 +79,16 @@ export class ReportPanels {
     this.#renderSelectedTreeItem()
   }
 
+  /** Announce that the prior selection is unavailable in the new presentation. */
+  public announceUnavailableSelection(): void {
+    this.#elements.selectedEmpty.textContent = "Selection cleared because it is not available in the current lens or workspace scope."
+  }
+
+  /** Restore the ordinary empty-inspector instruction after an explicit clear. */
+  public showDefaultSelectionPrompt(): void {
+    this.#elements.selectedEmpty.textContent = "Hover over or select a node to inspect it."
+  }
+
   #renderProjectFileList(): void {
     const view = this.#view
     if (view === undefined) {
@@ -378,8 +388,8 @@ export class ReportPanels {
       return
     }
     this.#elements.externalPackageList.replaceChildren()
-    this.#elements.externalPackageSection.hidden = !view.state.externalPackages
-    if (!view.state.externalPackages) {
+    this.#elements.externalPackageSection.hidden = !view.settings.externalPackages
+    if (!view.settings.externalPackages) {
       return
     }
     for (const { reportNode } of view.nodes) {

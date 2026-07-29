@@ -58,29 +58,54 @@ export function buildHtmlReport(analysis: ProjectAnalysis, browserBundle: string
   <section id="controls" class="report-controls" aria-labelledby="controls-heading">
     <h2 id="controls-heading">Graph controls</h2>
     <div class="report-control-groups">
+      <label class="lens-control" for="lens-selector">
+        <span>Lens</span>
+        <select id="lens-selector">
+          <option value="overview" selected>Overview</option>
+          <option value="structure">Structure</option>
+          <option value="custom" hidden disabled>Custom</option>
+        </select>
+      </label>
       <button id="reset-camera" class="graph-control-button" type="button">Fit current graph</button>
-      <fieldset id="line-category-controls">
-        <legend>Size nodes by</legend>
-        <label><input id="line-category-code" type="checkbox" value="code" checked>Code</label>
-        <label><input id="line-category-comment" type="checkbox" value="comment">Comments</label>
-        <label><input id="line-category-blank" type="checkbox" value="blank">Blank</label>
-      </fieldset>
-      <fieldset id="graph-content-controls">
-        <legend>Show</legend>
-        <label><input id="structure-edges-toggle" type="checkbox" checked>Structure edges</label>
-        <label><input id="dependency-edges-toggle" type="checkbox" checked>Dependency edges</label>
-        <label><input id="type-only-dependencies-toggle" type="checkbox" checked>Type-only dependencies</label>
-        <label><input id="external-packages-toggle" type="checkbox">External packages</label>
-      </fieldset>
       <fieldset id="workspace-package-fieldset" hidden>
         <legend>Workspace packages</legend>
         <span id="workspace-package-controls"></span>
       </fieldset>
+      <details id="advanced-controls" class="advanced-controls">
+        <summary>Advanced</summary>
+        <div class="advanced-control-groups">
+          <fieldset id="line-category-controls">
+            <legend>Size nodes by</legend>
+            <label><input id="line-category-code" type="checkbox" value="code" checked>Code</label>
+            <label><input id="line-category-comment" type="checkbox" value="comment">Comments</label>
+            <label><input id="line-category-blank" type="checkbox" value="blank">Blank</label>
+          </fieldset>
+          <fieldset id="graph-content-controls">
+            <legend>Presentation</legend>
+            <label for="project-file-color">File color
+              <select id="project-file-color">
+                <option value="coverage" selected>Coverage</option>
+                <option value="neutral">Neutral</option>
+              </select>
+            </label>
+            <label for="dependency-display">Dependencies
+              <select id="dependency-display">
+                <option value="all">All</option>
+                <option value="focused" selected>Direct focus only</option>
+                <option value="hidden">Hidden</option>
+              </select>
+            </label>
+            <label><input id="structure-edges-toggle" type="checkbox" checked>Structure edges</label>
+            <label><input id="type-only-dependencies-toggle" type="checkbox" checked>Type-only dependencies</label>
+            <label><input id="external-packages-toggle" type="checkbox">External packages</label>
+          </fieldset>
+        </div>
+      </details>
       <div class="graph-key" aria-label="Graph edge types">
-        <span><i class="graph-edge-swatch structure-edge-swatch" aria-hidden="true"></i>Structure</span>
-        <span><i class="graph-edge-swatch dependency-edge-swatch" aria-hidden="true"></i>Runtime</span>
-        <span><i class="graph-edge-swatch type-only-dependency-edge-swatch" aria-hidden="true"></i>Type only</span>
-        <span><i class="graph-edge-swatch external-dependency-edge-swatch" aria-hidden="true"></i>External</span>
+        <span id="structure-edge-key"><i class="graph-edge-swatch structure-edge-swatch" aria-hidden="true"></i>Structure</span>
+        <span id="runtime-dependency-edge-key"><i class="graph-edge-swatch dependency-edge-swatch" aria-hidden="true"></i>Runtime</span>
+        <span id="type-only-dependency-edge-key"><i class="graph-edge-swatch type-only-dependency-edge-swatch" aria-hidden="true"></i>Type only</span>
+        <span id="external-dependency-edge-key"><i class="graph-edge-swatch external-dependency-edge-swatch" aria-hidden="true"></i>External</span>
       </div>
       <div id="coverage-legend" class="coverage-legend" aria-label="Project-file coverage colors"></div>
     </div>
@@ -93,7 +118,7 @@ export function buildHtmlReport(analysis: ProjectAnalysis, browserBundle: string
       </div>
       <div id="selection-breadcrumb" class="selection-breadcrumb" aria-label="Selected path"></div>
     </nav>
-    <p id="selected-empty">Hover over or select a node to inspect it.</p>
+    <p id="selected-empty" role="status" aria-live="polite">Hover over or select a node to inspect it.</p>
     <section id="selected-details" hidden>
       <div class="node-type" id="selected-node-type"></div>
       <div class="detail-path" id="selected-path"></div>

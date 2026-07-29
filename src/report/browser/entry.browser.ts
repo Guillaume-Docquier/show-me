@@ -8,13 +8,14 @@
 import type { ProjectAnalysis } from "../../analysis/project-analysis.js"
 import { PerformanceProfiler } from "../../performance/performance-profiler.js"
 import { renderCoverageLegend } from "./coverage-legend.js"
-import { ReportControls, type EdgeVisibilityState } from "./report-controls.js"
+import { ReportControls } from "./report-controls.js"
 import { getReportElements } from "./report-elements.js"
 import { ReportGraph } from "./report-graph.js"
+import { activeReportLens, initialReportPresentationState, reportLensSettings, type ReportPresentationState } from "./report-lens.js"
 import { ReportNavigation, type ReportNavigationState } from "./report-navigation.js"
 import { ReportPanels } from "./report-panels.js"
 import { browserPresentationSignature, buildBrowserPresentation } from "./report-presentation.js"
-import { buildReportView, initialReportViewState, type ReportViewState } from "./report-view.js"
+import { buildReportView, reportViewGraphSignature } from "./report-view.js"
 
 declare global {
   interface Window {
@@ -28,15 +29,12 @@ const performanceProfiler = new PerformanceProfiler()
 const analysis = window.showMeAnalysis
 const presentation = performanceProfiler.measure("browser-presentation", () => buildBrowserPresentation(analysis))
 const elements = getReportElements(document)
-let viewState = initialReportViewState(presentation)
-let edgeVisibility: EdgeVisibilityState = {
-  structureEdges: true,
-  dependencyEdges: true,
-}
+let presentationState = initialReportPresentationState(presentation.workspacePackages.map(({ path }) => path))
+let renderedViewSignature: string | undefined
 
 document.title = `Show me ${presentation.projectName}`
 elements.heading.projectName.textContent = presentation.projectName
-renderCoverageLegend(elements.coverageLegend)
+renderCoverageLegend(elements.controls.coverageLegend)
 
 const navigation = new ReportNavigation({
   onChange: renderNavigation,
@@ -44,7 +42,7 @@ const navigation = new ReportNavigation({
 const graph = new ReportGraph({
   root: elements.root,
   container: elements.graphContainer,
-  initialEdgeVisibility: edgeVisibility,
+  initialLensSettings: reportLensSettings(presentationState),
   performanceProfiler,
   events: {
     onActivateNode: (nodeId): void => {
@@ -52,6 +50,7 @@ const graph = new ReportGraph({
     },
     onClearSelection: (): void => {
       navigation.clearSelection()
+      panels.showDefaultSelectionPrompt()
     },
     onPreviewNode: (nodeId): void => {
       navigation.preview(nodeId)
@@ -87,22 +86,16 @@ const panels = new ReportPanels({
 const controls = new ReportControls({
   elements: elements.controls,
   presentation,
-  initialViewState: viewState,
-  initialEdgeVisibility: edgeVisibility,
+  initialPresentationState: presentationState,
   events: {
-    onViewStateChange: applyViewState,
-    onEdgeVisibilityChange(nextEdgeVisibility): void {
-      edgeVisibility = nextEdgeVisibility
-      graph.setEdgeVisibility(edgeVisibility)
-      controls.render(viewState, edgeVisibility)
-    },
+    onPresentationStateChange: applyPresentationState,
     onResetCamera: (): void => {
       graph.resetCamera()
     },
   },
 })
 
-applyViewState(viewState)
+applyPresentationState(presentationState)
 // The graph and interaction state initialize synchronously. Sigma may still
 // paint the resulting WebGL frame on the next animation frame.
 elements.root.dataset.showMeReady = "true"
@@ -119,14 +112,26 @@ function renderNavigation(state: ReportNavigationState, centeredNodeId: string |
   }
 }
 
-function applyViewState(nextViewState: ReportViewState): void {
-  viewState = nextViewState
-  const view = buildReportView(presentation, viewState)
-  controls.render(viewState, edgeVisibility)
+function applyPresentationState(nextPresentationState: ReportPresentationState): void {
+  presentationState = nextPresentationState
+  const settings = reportLensSettings(presentationState)
+  const view = buildReportView(presentation, presentationState.scope, settings)
+  const nextViewSignature = reportViewGraphSignature(view)
+  controls.render(presentationState)
   elements.heading.projectFileCount.textContent = projectFileCountLabel(view.visibleProjectFileCount, analysis.files.length)
-  graph.applyView(view)
-  navigation.setVisibleNodeIds(view.graphNodeIds)
-  panels.renderView(view)
+  graph.setLensSettings(settings)
+  if (nextViewSignature !== renderedViewSignature) {
+    graph.applyView(view)
+    renderedViewSignature = nextViewSignature
+    const clearedSelectionNodeId = navigation.setVisibleNodeIds(view.graphNodeIds)
+    panels.renderView(view)
+    if (clearedSelectionNodeId !== undefined) {
+      panels.announceUnavailableSelection()
+    }
+  }
+  elements.root.dataset.activeLens = activeReportLens(presentationState)
+  elements.root.dataset.selectedLens = presentationState.lens
+  elements.root.dataset.lensSettings = JSON.stringify(settings)
 }
 
 function projectFileCountLabel(visibleCount: number, totalCount: number): string {

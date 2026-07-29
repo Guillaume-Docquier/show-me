@@ -1,24 +1,13 @@
 import { buildProjectStructure, type ProjectDirectoryNode, type ProjectStructureEdge } from "./project-structure.js"
+import type { ReportLensSettings, ReportScopeState } from "./report-lens.js"
 import {
   activeLineCount,
+  coverageColor,
   nodeSizeForLines,
   type BrowserPresentation,
   type ReportEdge,
-  type ReportLineCategory,
   type ReportNode,
 } from "./report-presentation.js"
-
-/** User-controlled dimensions that change graph membership or node sizing. */
-export type ReportViewState = {
-  /** Always non-empty; these categories affect project-file size, not the metrics displayed in details. */
-  readonly lineCategories: readonly ReportLineCategory[]
-  /** Controls graph membership and therefore which relationships are visible. */
-  readonly externalPackages: boolean
-  /** Whether explicitly type-only relationships participate in the visible graph. */
-  readonly typeOnlyDependencies: boolean
-  /** Workspace packages whose owned project files participate in the visible graph. */
-  readonly workspacePackages: ReadonlySet<string>
-}
 
 /** One presentation node prepared for the current graph projection. */
 export type ReportViewNode = {
@@ -35,7 +24,8 @@ export type ReportViewDirectory = ProjectDirectoryNode & {
 
 /** Complete visible projection derived from immutable browser presentation. */
 export type ReportView = {
-  readonly state: ReportViewState
+  readonly scope: ReportScopeState
+  readonly settings: ReportLensSettings
   readonly nodes: readonly ReportViewNode[]
   readonly nodeIds: ReadonlySet<string>
   readonly graphNodeIds: ReadonlySet<string>
@@ -45,36 +35,26 @@ export type ReportView = {
   readonly visibleProjectFileCount: number
 }
 
-/** Create the default report view selected by the generated HTML controls. */
-export function initialReportViewState(presentation: BrowserPresentation): ReportViewState {
-  return {
-    lineCategories: ["code"],
-    externalPackages: false,
-    typeOnlyDependencies: true,
-    workspacePackages: new Set(presentation.workspacePackages.map(({ path }) => path)),
-  }
-}
-
 /**
  * Derive the visible, sized report graph from immutable presentation facts.
  *
- * This is the single transition for every control that changes layout inputs.
- * Render-only edge visibility intentionally does not participate.
+ * This is the single transition for scope and lens settings that change graph
+ * membership, node appearance, or layout inputs.
  */
-export function buildReportView(presentation: BrowserPresentation, state: ReportViewState): ReportView {
+export function buildReportView(presentation: BrowserPresentation, scope: ReportScopeState, settings: ReportLensSettings): ReportView {
   const visibleProjectNodeIds = new Set(
     presentation.nodes
       .filter(
         (node) =>
-          node.kind === "project-file" && (node.workspacePackage === undefined || state.workspacePackages.has(node.workspacePackage)),
+          node.kind === "project-file" && (node.workspacePackage === undefined || scope.workspacePackages.has(node.workspacePackage)),
       )
       .map(({ id }) => id),
   )
   const visiblePresentationEdges = presentation.edges.filter(
-    ({ dependencyKind }) => dependencyKind === "runtime" || state.typeOnlyDependencies,
+    ({ dependencyKind }) => dependencyKind === "runtime" || settings.typeOnlyDependencies,
   )
   const visibleExternalPackageNodeIds = new Set(
-    state.externalPackages
+    settings.externalPackages
       ? visiblePresentationEdges
           .filter((edge) => edge.targetKind === "external-package" && visibleProjectNodeIds.has(edge.source))
           .map(({ target }) => target)
@@ -89,10 +69,10 @@ export function buildReportView(presentation: BrowserPresentation, state: Report
     .map(
       (reportNode): ReportViewNode => ({
         id: reportNode.id,
-        color: reportNode.color,
+        color: reportNode.kind === "project-file" && settings.projectFileColor === "neutral" ? coverageColor(undefined) : reportNode.color,
         size:
           reportNode.kind === "project-file"
-            ? nodeSizeForLines(activeLineCount(reportNode.lineMetrics, state.lineCategories))
+            ? nodeSizeForLines(activeLineCount(reportNode.lineMetrics, settings.lineCategories))
             : reportNode.size,
         reportNode,
       }),
@@ -112,7 +92,8 @@ export function buildReportView(presentation: BrowserPresentation, state: Report
   const graphNodeIds = new Set([...nodeIds, ...directories.map(({ id }) => id)])
 
   return {
-    state,
+    scope,
+    settings,
     nodes,
     nodeIds,
     graphNodeIds,
@@ -153,12 +134,23 @@ export function visibleRelationships(
  * node identities or sizes changed and can later be restored.
  */
 export function reportViewLayoutSignature(view: ReportView): string {
-  let hash = 2_166_136_261
-  const layoutInputs = {
+  return fingerprintViewInputs({
     nodes: view.nodes.map(({ id, size }) => ({ id, size })),
     edges: view.dependencyEdges.map(({ id }) => id),
-  }
-  for (const character of JSON.stringify(layoutInputs)) {
+  })
+}
+
+/** Fingerprint graph membership, sizes, and colors that require a graph rebuild. */
+export function reportViewGraphSignature(view: ReportView): string {
+  return fingerprintViewInputs({
+    nodes: view.nodes.map(({ id, size, color }) => ({ id, size, color })),
+    edges: view.dependencyEdges.map(({ id }) => id),
+  })
+}
+
+function fingerprintViewInputs(inputs: object): string {
+  let hash = 2_166_136_261
+  for (const character of JSON.stringify(inputs)) {
     hash ^= character.charCodeAt(0)
     hash = Math.imul(hash, 16_777_619)
   }

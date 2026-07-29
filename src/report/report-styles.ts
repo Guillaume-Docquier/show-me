@@ -19,7 +19,8 @@ header {
 h1 { margin: 0; font-size: 17px; font-weight: 650; letter-spacing: 0.01em; }
 header p { margin: 0; color: #8fa3b8; font-size: 12px; }
 .report-heading { display: flex; align-items: baseline; gap: 14px; min-width: 0; }
-.report-control-groups, #line-category-controls, #graph-content-controls, #workspace-package-fieldset, #workspace-package-controls {
+.report-control-groups, #line-category-controls, #graph-content-controls, #workspace-package-fieldset, #workspace-package-controls,
+.advanced-control-groups {
   display: flex; align-items: center; gap: 12px; margin: 0; padding: 0; border: 0;
   color: #aebdca; font-size: 11px;
 }
@@ -34,6 +35,25 @@ header p { margin: 0; color: #8fa3b8; font-size: 12px; }
 .report-controls label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
 .report-controls label:has(input:disabled) { color: #6f8295; cursor: default; }
 .report-controls input { accent-color: #79b8ff; }
+.report-controls select {
+  border: 1px solid #42556a; border-radius: 5px; padding: 4px 22px 4px 7px;
+  background: #17202a; color: #d3dee9; font: 600 11px Inter, ui-sans-serif, system-ui, sans-serif;
+}
+.report-controls select:focus-visible { border-color: #79b8ff; outline: 1px solid #79b8ff; outline-offset: 1px; }
+.lens-control { color: #8fa3b8; }
+.advanced-controls { position: relative; }
+.advanced-controls summary {
+  border: 1px solid #42556a; border-radius: 5px; padding: 6px 9px;
+  background: #17202a; color: #d3dee9; font-weight: 600; cursor: pointer; list-style-position: inside;
+}
+.advanced-controls[open] summary { border-color: #79b8ff; }
+.advanced-control-groups {
+  position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 10; align-items: flex-start;
+  width: max-content; max-width: min(760px, 70vw); padding: 12px 14px; border: 1px solid #42556a; border-radius: 7px;
+  background: #111821; box-shadow: 0 10px 28px rgba(0, 0, 0, .35);
+}
+#line-category-controls, #graph-content-controls { flex-wrap: wrap; }
+#graph-content-controls { max-width: 540px; }
 .graph-control-button {
   border: 1px solid #42556a; border-radius: 5px; padding: 6px 9px;
   background: #17202a; color: #d3dee9; font: 600 11px Inter, ui-sans-serif, system-ui, sans-serif; cursor: pointer;
@@ -43,6 +63,7 @@ header p { margin: 0; color: #8fa3b8; font-size: 12px; }
 }
 .graph-key, .graph-key span { display: flex; align-items: center; gap: 6px; }
 .graph-key { gap: 12px; color: #8fa3b8; }
+.graph-key[hidden], .graph-key span[hidden], .coverage-legend[hidden] { display: flex; visibility: hidden; }
 .graph-edge-swatch { display: inline-block; width: 18px; }
 .structure-edge-swatch { height: 0; border-top: 1px dashed #6f8295; }
 .dependency-edge-swatch { height: 2px; background: rgba(98, 139, 181, 0.32); }

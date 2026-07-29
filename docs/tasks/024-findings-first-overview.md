@@ -11,7 +11,7 @@ Opening a report immediately presents a short, explainable set of codebase candi
 ## Dependencies
 
 - [Milestone 022](./022-coherent-report-navigation.md) establishes explicit navigation from any report surface.
-- [Milestone 023](./023-diagnostic-lens-framework.md) establishes the `Overview` lens and lens-specific presentation state.
+- [Milestone 023](./done/023-diagnostic-lens-framework.md) establishes the `Overview` lens and lens-specific presentation state.
 - [ADR 001](../adr/001-separate-analysis-from-rendering.md) requires findings to be derived in the browser from language-neutral analysis facts.
 
 ## Current behavior and problem

@@ -1,16 +1,19 @@
 import type { ReportControlElements } from "./report-elements.js"
+import {
+  activeReportLens,
+  customizeReportLens,
+  reportLensSettings,
+  selectReportLens,
+  updateReportScope,
+  type DependencyDisplay,
+  type ProjectFileColor,
+  type ReportLensSettings,
+  type ReportPresentationState,
+} from "./report-lens.js"
 import { REPORT_LINE_CATEGORIES, type BrowserPresentation, type ReportLineCategory } from "./report-presentation.js"
-import type { ReportViewState } from "./report-view.js"
-
-/** User-controlled edge visibility that does not change graph layout inputs. */
-export type EdgeVisibilityState = {
-  readonly structureEdges: boolean
-  readonly dependencyEdges: boolean
-}
 
 export type ReportControlEvents = {
-  readonly onViewStateChange: (state: ReportViewState) => void
-  readonly onEdgeVisibilityChange: (state: EdgeVisibilityState) => void
+  readonly onPresentationStateChange: (state: ReportPresentationState) => void
   readonly onResetCamera: () => void
 }
 
@@ -25,58 +28,78 @@ export class ReportControls {
   readonly #events: ReportControlEvents
   readonly #lineCategoryControls: readonly LineCategoryControl[]
   readonly #workspacePackageInputs: readonly HTMLInputElement[]
-  #viewState: ReportViewState
-  #edgeVisibility: EdgeVisibilityState
+  readonly #customLensOption: HTMLOptionElement
+  #presentationState: ReportPresentationState
 
   public constructor({
     elements,
     presentation,
-    initialViewState,
-    initialEdgeVisibility,
+    initialPresentationState,
     events,
   }: {
     readonly elements: ReportControlElements
     readonly presentation: BrowserPresentation
-    readonly initialViewState: ReportViewState
-    readonly initialEdgeVisibility: EdgeVisibilityState
+    readonly initialPresentationState: ReportPresentationState
     readonly events: ReportControlEvents
   }) {
     this.#elements = elements
     this.#events = events
-    this.#viewState = initialViewState
-    this.#edgeVisibility = initialEdgeVisibility
+    this.#presentationState = initialPresentationState
     this.#lineCategoryControls = [
       { category: "code", input: elements.lineCategoryCode },
       { category: "comment", input: elements.lineCategoryComment },
       { category: "blank", input: elements.lineCategoryBlank },
     ]
+    const customLensOption = elements.lensSelector.querySelector<HTMLOptionElement>('option[value="custom"]')
+    if (customLensOption === null) {
+      throw new Error("Static report lens selector is missing its Custom state.")
+    }
+    this.#customLensOption = customLensOption
     this.#workspacePackageInputs = presentation.workspacePackages.map((workspacePackage, index) =>
       this.#createWorkspacePackageControl(workspacePackage, index),
     )
     elements.workspacePackageFieldset.hidden = this.#workspacePackageInputs.length === 0
     this.#bindEvents()
-    this.render(initialViewState, initialEdgeVisibility)
+    this.render(initialPresentationState)
   }
 
-  /** Reflect accepted application state into every control. */
-  public render(viewState: ReportViewState, edgeVisibility: EdgeVisibilityState): void {
-    this.#viewState = viewState
-    this.#edgeVisibility = edgeVisibility
+  /** Reflect accepted application state into every control and relevant legend. */
+  public render(presentationState: ReportPresentationState): void {
+    this.#presentationState = presentationState
+    const settings = reportLensSettings(presentationState)
+    const activeLens = activeReportLens(presentationState)
 
+    this.#customLensOption.hidden = activeLens !== "custom"
+    this.#elements.lensSelector.value = activeLens
     for (const control of this.#lineCategoryControls) {
-      control.input.checked = viewState.lineCategories.includes(control.category)
-      control.input.disabled = viewState.lineCategories.length === 1 && control.input.checked
+      control.input.checked = settings.lineCategories.includes(control.category)
+      control.input.disabled = settings.lineCategories.length === 1 && control.input.checked
     }
-    this.#elements.externalPackageToggle.checked = viewState.externalPackages
-    this.#elements.typeOnlyDependencyToggle.checked = viewState.typeOnlyDependencies
-    this.#elements.structureEdgesToggle.checked = edgeVisibility.structureEdges
-    this.#elements.dependencyEdgesToggle.checked = edgeVisibility.dependencyEdges
+    this.#elements.externalPackageToggle.checked = settings.externalPackages
+    this.#elements.typeOnlyDependencyToggle.checked = settings.typeOnlyDependencies
+    this.#elements.structureEdgesToggle.checked = settings.structureEdges
+    this.#elements.dependencyDisplay.value = settings.dependencyDisplay
+    this.#elements.projectFileColor.value = settings.projectFileColor
     for (const input of this.#workspacePackageInputs) {
-      input.checked = viewState.workspacePackages.has(input.dataset.workspacePackage ?? "")
+      input.checked = presentationState.scope.workspacePackages.has(input.dataset.workspacePackage ?? "")
     }
+
+    const dependencyLegendVisible = settings.dependencyDisplay !== "hidden"
+    this.#elements.structureEdgeKey.hidden = !settings.structureEdges
+    this.#elements.runtimeDependencyEdgeKey.hidden = !dependencyLegendVisible
+    this.#elements.typeOnlyDependencyEdgeKey.hidden = !dependencyLegendVisible || !settings.typeOnlyDependencies
+    this.#elements.externalDependencyEdgeKey.hidden = !dependencyLegendVisible || !settings.externalPackages
+    this.#elements.graphKey.hidden = !settings.structureEdges && !dependencyLegendVisible
+    this.#elements.coverageLegend.hidden = settings.projectFileColor !== "coverage"
   }
 
   #bindEvents(): void {
+    this.#elements.lensSelector.addEventListener("change", () => {
+      const lens = this.#elements.lensSelector.value
+      if (lens === "overview" || lens === "structure") {
+        this.#events.onPresentationStateChange(selectReportLens(this.#presentationState, lens))
+      }
+    })
     for (const control of this.#lineCategoryControls) {
       control.input.addEventListener("change", () => {
         const lineCategories = this.#selectedLineCategories()
@@ -84,34 +107,40 @@ export class ReportControls {
           control.input.checked = true
           return
         }
-        this.#events.onViewStateChange({ ...this.#viewState, lineCategories })
+        this.#applyAdvancedSettings({ ...reportLensSettings(this.#presentationState), lineCategories })
       })
     }
     this.#elements.externalPackageToggle.addEventListener("change", () => {
-      this.#events.onViewStateChange({
-        ...this.#viewState,
+      this.#applyAdvancedSettings({
+        ...reportLensSettings(this.#presentationState),
         externalPackages: this.#elements.externalPackageToggle.checked,
       })
     })
     this.#elements.typeOnlyDependencyToggle.addEventListener("change", () => {
-      this.#events.onViewStateChange({
-        ...this.#viewState,
+      this.#applyAdvancedSettings({
+        ...reportLensSettings(this.#presentationState),
         typeOnlyDependencies: this.#elements.typeOnlyDependencyToggle.checked,
       })
     })
     this.#elements.structureEdgesToggle.addEventListener("change", () => {
-      this.#events.onEdgeVisibilityChange({
-        ...this.#edgeVisibility,
+      this.#applyAdvancedSettings({
+        ...reportLensSettings(this.#presentationState),
         structureEdges: this.#elements.structureEdgesToggle.checked,
       })
     })
-    this.#elements.dependencyEdgesToggle.addEventListener("change", () => {
-      this.#events.onEdgeVisibilityChange({
-        ...this.#edgeVisibility,
-        dependencyEdges: this.#elements.dependencyEdgesToggle.checked,
-      })
+    this.#elements.dependencyDisplay.addEventListener("change", () => {
+      const dependencyDisplay = this.#selectedDependencyDisplay()
+      this.#applyAdvancedSettings({ ...reportLensSettings(this.#presentationState), dependencyDisplay })
+    })
+    this.#elements.projectFileColor.addEventListener("change", () => {
+      const projectFileColor = this.#selectedProjectFileColor()
+      this.#applyAdvancedSettings({ ...reportLensSettings(this.#presentationState), projectFileColor })
     })
     this.#elements.resetCameraButton.addEventListener("click", this.#events.onResetCamera)
+  }
+
+  #applyAdvancedSettings(settings: ReportLensSettings): void {
+    this.#events.onPresentationStateChange(customizeReportLens(this.#presentationState, settings))
   }
 
   #createWorkspacePackageControl(workspacePackage: BrowserPresentation["workspacePackages"][number], index: number): HTMLInputElement {
@@ -122,16 +151,13 @@ export class ReportControls {
     input.type = "checkbox"
     input.dataset.workspacePackage = workspacePackage.path
     input.addEventListener("change", () => {
-      const visibleWorkspacePackages = new Set(this.#viewState.workspacePackages)
+      const visibleWorkspacePackages = new Set(this.#presentationState.scope.workspacePackages)
       if (input.checked) {
         visibleWorkspacePackages.add(workspacePackage.path)
       } else {
         visibleWorkspacePackages.delete(workspacePackage.path)
       }
-      this.#events.onViewStateChange({
-        ...this.#viewState,
-        workspacePackages: visibleWorkspacePackages,
-      })
+      this.#events.onPresentationStateChange(updateReportScope(this.#presentationState, { workspacePackages: visibleWorkspacePackages }))
     })
     label.append(input, reportDocument.createTextNode(workspacePackage.name))
     this.#elements.workspacePackageControls.append(label)
@@ -142,5 +168,21 @@ export class ReportControls {
     return REPORT_LINE_CATEGORIES.filter(
       (category) => this.#lineCategoryControls.find((control) => control.category === category)?.input.checked === true,
     )
+  }
+
+  #selectedDependencyDisplay(): DependencyDisplay {
+    const value = this.#elements.dependencyDisplay.value
+    if (value === "all" || value === "focused" || value === "hidden") {
+      return value
+    }
+    throw new Error(`Unknown dependency display ${value}.`)
+  }
+
+  #selectedProjectFileColor(): ProjectFileColor {
+    const value = this.#elements.projectFileColor.value
+    if (value === "coverage" || value === "neutral") {
+      return value
+    }
+    throw new Error(`Unknown project-file color ${value}.`)
   }
 }

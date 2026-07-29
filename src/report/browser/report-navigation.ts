@@ -41,8 +41,10 @@ export class ReportNavigation {
    *
    * @param visibleNodeIds - Entity identities available in the current graph projection.
    */
-  public setVisibleNodeIds(visibleNodeIds: ReadonlySet<string>): void {
+  public setVisibleNodeIds(visibleNodeIds: ReadonlySet<string>): string | undefined {
     this.#visibleNodeIds = visibleNodeIds
+    const clearedSelectedNodeId =
+      this.#selectedNodeId !== undefined && !visibleNodeIds.has(this.#selectedNodeId) ? this.#selectedNodeId : undefined
     const retainedHistory = this.#history.flatMap((nodeId, originalIndex) =>
       visibleNodeIds.has(nodeId) ? [{ nodeId, originalIndex }] : [],
     )
@@ -53,6 +55,7 @@ export class ReportNavigation {
     this.#hoveredNodeId = this.#hoveredNodeId !== undefined && visibleNodeIds.has(this.#hoveredNodeId) ? this.#hoveredNodeId : undefined
     this.#historyIndex = selectedNodeId === undefined ? this.#history.length : retainedHistoryIndex
     this.#emit(undefined)
+    return clearedSelectedNodeId
   }
 
   /**

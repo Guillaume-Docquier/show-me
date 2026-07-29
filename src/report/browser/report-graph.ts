@@ -3,7 +3,6 @@ import { Sigma } from "sigma"
 import { createEdgeArrowProgram } from "sigma/rendering"
 import type { EdgeDisplayData, NodeDisplayData } from "sigma/types"
 import type { PerformanceProfiler } from "../../performance/performance-profiler.js"
-import type { EdgeVisibilityState } from "./report-controls.js"
 import { ReportGraphDiagnostics } from "./report-graph-diagnostics.js"
 import { ReportGraphLabelVisibility } from "./report-graph-label-visibility.js"
 import { drawNodeHover, drawNodeLabel, LABEL_COLOR, LABEL_FONT, LABEL_SIZE, LABEL_WEIGHT } from "./report-graph-labels.js"
@@ -11,6 +10,7 @@ import { CONSUMER_FOCUS_COLOR, DEPENDENCY_FOCUS_COLOR, ReportGraphOverlays, type
 import type { BrowserEdgeAttributes, BrowserNodeAttributes } from "./report-graph-types.js"
 import type { ReportInteractionState } from "./report-interaction.js"
 import { layoutReportGraph } from "./report-layout.js"
+import type { ReportLensSettings } from "./report-lens.js"
 import type { ReportNode } from "./report-presentation.js"
 import { visibleRelationships, type ReportView } from "./report-view.js"
 
@@ -63,7 +63,7 @@ export class ReportGraph {
     selectedNodeId: undefined,
     hoveredNodeId: undefined,
   }
-  #edgeVisibility: EdgeVisibilityState
+  #lensSettings: ReportLensSettings
   #dependencyFocus: DependencyFocus | undefined
   #structureFocusNodeId: string | undefined
   #cameraResetAwaitingSettledRender = false
@@ -72,19 +72,19 @@ export class ReportGraph {
   public constructor({
     root,
     container,
-    initialEdgeVisibility,
+    initialLensSettings,
     performanceProfiler,
     events,
   }: {
     readonly root: HTMLElement
     readonly container: HTMLElement
-    readonly initialEdgeVisibility: EdgeVisibilityState
+    readonly initialLensSettings: ReportLensSettings
     readonly performanceProfiler: PerformanceProfiler
     readonly events: ReportGraphEvents
   }) {
     this.#root = root
     this.#container = container
-    this.#edgeVisibility = initialEdgeVisibility
+    this.#lensSettings = initialLensSettings
     this.#events = events
     this.#performanceProfiler = performanceProfiler
     this.#renderer = new Sigma<BrowserNodeAttributes, BrowserEdgeAttributes>(this.#graph, container, {
@@ -183,11 +183,12 @@ export class ReportGraph {
     this.#renderer.refresh()
   }
 
-  /** Change only edge rendering; graph membership, positions, and layout remain untouched. */
-  public setEdgeVisibility(edgeVisibility: EdgeVisibilityState): void {
-    const structureEdgesChanged = edgeVisibility.structureEdges !== this.#edgeVisibility.structureEdges
-    const dependencyEdgesChanged = edgeVisibility.dependencyEdges !== this.#edgeVisibility.dependencyEdges
-    this.#edgeVisibility = edgeVisibility
+  /** Change render-only lens settings without rebuilding layout inputs. */
+  public setLensSettings(lensSettings: ReportLensSettings): void {
+    const structureEdgesChanged = lensSettings.structureEdges !== this.#lensSettings.structureEdges
+    const dependencyEdgesChanged = lensSettings.dependencyDisplay !== this.#lensSettings.dependencyDisplay
+    this.#lensSettings = lensSettings
+    this.#synchronizeEdgeFocus()
     if (structureEdgesChanged) {
       this.#renderer.scheduleRender()
     }
@@ -260,13 +261,13 @@ export class ReportGraph {
     this.#renderer.on("afterRender", () => {
       this.#overlays.renderStructureLinks(
         this.#view?.structureEdges ?? [],
-        this.#edgeVisibility.structureEdges,
+        this.#lensSettings.structureEdges,
         this.#hasEdgeFocus(),
         this.#structureFocusNodeId,
       )
       this.#overlays.renderDependencyFocus(this.#dependencyFocus)
       this.#overlays.renderHoveredNodeLabel(this.#interaction.hoveredNodeId)
-      this.#diagnostics.writeDependencyEdges(this.#dependencyEdgeIds(), this.#edgeVisibility.dependencyEdges)
+      this.#diagnostics.writeDependencyEdges(this.#dependencyEdgeIds(), this.#lensSettings.dependencyDisplay)
       const labelRefreshScheduled = this.#labelVisibility.synchronizeAfterRender()
       this.#diagnostics.writeCamera(this.#labelVisibility.reportNodeLabelsAreVisible, this.#camera.getState())
       if (!labelRefreshScheduled) {
@@ -301,11 +302,14 @@ export class ReportGraph {
     if (attributes.edgeKind !== "dependency") {
       return attributes
     }
-    if (attributes.hidden === true || !this.#edgeVisibility.dependencyEdges) {
+    if (attributes.hidden === true || this.#lensSettings.dependencyDisplay === "hidden") {
       return { ...attributes, hidden: true }
     }
 
     const relationship = this.#focusedDependencyEdgeRelationship(edge)
+    if (this.#lensSettings.dependencyDisplay === "focused" && relationship === undefined) {
+      return { ...attributes, hidden: true }
+    }
     if (relationship === "dependency") {
       return { ...attributes, color: DEPENDENCY_FOCUS_COLOR, size: DEPENDENCY_FOCUS_EDGE_SIZE, zIndex: 1 }
     }
@@ -358,10 +362,12 @@ export class ReportGraph {
     if (view === undefined) {
       return
     }
-    this.#root.dataset.activeLineCategories = view.state.lineCategories.join(",")
-    this.#root.dataset.externalPackages = view.state.externalPackages ? "visible" : "hidden"
-    this.#root.dataset.typeOnlyDependencies = view.state.typeOnlyDependencies ? "visible" : "hidden"
-    this.#root.dataset.workspacePackages = JSON.stringify([...view.state.workspacePackages])
+    this.#root.dataset.activeLineCategories = view.settings.lineCategories.join(",")
+    this.#root.dataset.externalPackages = view.settings.externalPackages ? "visible" : "hidden"
+    this.#root.dataset.typeOnlyDependencies = view.settings.typeOnlyDependencies ? "visible" : "hidden"
+    this.#root.dataset.workspacePackages = JSON.stringify([...view.scope.workspacePackages])
+    this.#root.dataset.dependencyDisplay = view.settings.dependencyDisplay
+    this.#root.dataset.projectFileColor = view.settings.projectFileColor
     this.#diagnostics.writeView(view)
     this.#diagnostics.writeGraphWeights({
       structure: STRUCTURE_EDGE_WEIGHT,
@@ -463,7 +469,9 @@ export class ReportGraph {
         ? focusedNodeId
         : undefined
     this.#dependencyFocus =
-      focusedNodeId !== undefined && this.#view?.nodeIds.has(focusedNodeId) === true ? this.#dependencyFocusFor(focusedNodeId) : undefined
+      this.#lensSettings.dependencyDisplay !== "hidden" && focusedNodeId !== undefined && this.#view?.nodeIds.has(focusedNodeId) === true
+        ? this.#dependencyFocusFor(focusedNodeId)
+        : undefined
     this.#diagnostics.writeDependencyFocus(this.#dependencyFocus)
   }
 

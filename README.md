@@ -6,7 +6,7 @@ The output is one self-contained HTML file. Open it locally, share it, or publis
 
 [Explore this codebase in the live GitHub Pages report](https://guillaume-docquier.github.io/show-me/)
 
-![Show Me report with a project file tree, dependency graph, graph controls, and node details](./docs/assets/report.png)
+![Show Me Overview lens with a project file tree, structure graph, lens controls, and node details](./docs/assets/report-lenses.png)
 
 ## Install
 
@@ -107,16 +107,17 @@ Show Me also respects `.gitignore` files and always skips `.git`, `.nyc_output`,
 
 The report lets you:
 
+- start in the `Overview` lens, which sizes files by code lines, colors them by coverage, keeps directory structure visible, and reveals only the hovered or selected file's direct dependencies;
+- switch to the `Structure` lens for neutral file colors, containment edges, and relationship details without dependency arrows or focus decoration;
+- open `Advanced` to customize file sizing and color, dependency display, type-only relationships, structure edges, and external packages. A changed preset is labeled `Custom`, and selecting a named lens restores its defaults without changing workspace scope;
 - search project-file and directory paths with exact result counts while keeping the selected item reachable;
 - expand directories independently from selecting them, with top-level directories expanded initially;
 - select and center files or directories from the graph, project tree, breadcrumbs, or relationship lists;
 - move backward and forward through selection history, and clear selection by clicking empty graph space;
 - inspect dependencies, consumers, line counts, and coverage;
 - hover project files, external packages, and directories to preview their labels and details without moving the camera or changing selection history;
-- select a project file or external package to highlight its direct dependency neighborhood;
-- show or hide structure, runtime, type-only, and external-package relationships;
+- select a project file or external package to highlight its direct dependency neighborhood when the active presentation enables dependency focus;
 - filter pnpm workspace packages;
-- size nodes by code, comment, and blank lines;
 - pan, zoom, and fit the graph.
 
 ## Feedback and contributions

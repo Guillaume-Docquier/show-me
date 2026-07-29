@@ -10,7 +10,7 @@ Users can see how workspace packages and coarse codebase regions depend on one a
 
 ## Dependencies
 
-- [Milestone 023](./023-diagnostic-lens-framework.md) establishes lens state and lens-specific surfaces.
+- [Milestone 023](./done/023-diagnostic-lens-framework.md) establishes lens state and lens-specific surfaces.
 - [Milestone 026](./026-coupling-lens.md) establishes coupling metrics, relationship filters, and focused dependency exploration.
 - [Milestone 008](./done/008-pnpm-workspaces.md) establishes workspace-package ownership.
 - [ADR 001](../adr/001-separate-analysis-from-rendering.md) keeps boundary aggregation in browser presentation unless authoritative analysis must change.

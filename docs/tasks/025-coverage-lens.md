@@ -10,7 +10,7 @@ Users can deliberately explore coverage risk by combining file size, exact cover
 
 ## Dependencies
 
-- [Milestone 023](./023-diagnostic-lens-framework.md) establishes deterministic lens presets and lens-specific controls.
+- [Milestone 023](./done/023-diagnostic-lens-framework.md) establishes deterministic lens presets and lens-specific controls.
 - [Milestone 024](./024-findings-first-overview.md) establishes explainable coverage findings and shared finding navigation.
 - [Milestone 005](./done/005-coverage.md) and [Milestone 018](./done/018-lcov-coverage.md) establish normalized project-file coverage.
 

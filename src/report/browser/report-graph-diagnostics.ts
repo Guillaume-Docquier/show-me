@@ -4,6 +4,7 @@ import { centeredNodeLabelGeometry, LABEL_FONT, LABEL_SIZE, LABEL_WEIGHT } from 
 import type { DependencyFocus } from "./report-graph-overlays.js"
 import type { BrowserEdgeAttributes, BrowserNodeAttributes, GraphNodeCircle } from "./report-graph-types.js"
 import type { ReportLayoutMetrics } from "./report-layout.js"
+import type { DependencyDisplay } from "./report-lens.js"
 import type { ReportNode } from "./report-presentation.js"
 import { reportViewLayoutSignature, type ReportView } from "./report-view.js"
 
@@ -130,12 +131,12 @@ export class ReportGraphDiagnostics {
     this.#container.dataset.reportNodeLabelVisibility = showReportNodeLabels ? "visible" : "hidden"
   }
 
-  public writeDependencyEdges(edgeIds: readonly string[], visible: boolean): void {
+  public writeDependencyEdges(edgeIds: readonly string[], display: DependencyDisplay): void {
     const renderedEdges = edgeIds.flatMap((edge) => {
       const displayData = this.#renderer.getEdgeDisplayData(edge)
       return displayData === undefined || displayData.hidden ? [] : [{ id: edge, color: displayData.color, size: displayData.size }]
     })
-    this.#container.dataset.dependencyEdges = visible ? "visible" : "hidden"
+    this.#container.dataset.dependencyEdges = display
     this.#container.dataset.renderedDependencyEdgeCount = String(renderedEdges.length)
     this.#container.dataset.renderedDependencyEdges = JSON.stringify(renderedEdges)
   }

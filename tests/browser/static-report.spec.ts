@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 import { promisify } from "node:util"
 import { Assert } from "@guillaume-docquier/tools-ts"
-import { expect, test, type Locator } from "@playwright/test"
+import { expect, test, type Locator, type Page } from "@playwright/test"
 import { analyzeProject } from "../../src/analysis/analyze-project.js"
 import { buildHtmlReport } from "../../src/report/build-html-report.js"
 import { fixtureProjectPath } from "../../src/testing/fixture-project.js"
@@ -59,6 +59,7 @@ test("keeps every report region usable together on a large desktop", async ({ pa
       await page.locator("#files").getByRole("button", { name: "src/entry.ts", exact: true }).click()
       await expect(page.locator("#selected-path")).toHaveText("src/entry.ts")
 
+      await openAdvancedControls(page)
       await page.locator("#controls").getByRole("checkbox", { name: "External packages" }).check()
       await expect(page.locator("html")).toHaveAttribute("data-external-packages", "visible")
       await expect(page.locator("#files #external-package-section")).toBeVisible()
@@ -333,6 +334,7 @@ test("supports graph hover, selection, clearing, and side-panel navigation", asy
     })
 
     await test.step("Select the file and rebuild every non-empty line-category view", async () => {
+      await openAdvancedControls(page)
       await page.mouse.move(pointer.pointerX, pointer.pointerY)
       await expect(page.locator("html")).toHaveAttribute("data-hovered-node", report.longPathNodeId)
       await page.mouse.click(pointer.pointerX, pointer.pointerY)
@@ -430,6 +432,8 @@ test("keeps packages hidden by default and rebuilds one combined metric and pack
     const defaultLayoutSignature = await test.step("Open the default file-only projection", async () => {
       await page.goto(pathToFileURL(reports.reportPath).href)
       await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
+      await openAdvancedControls(page)
+      await page.locator("#dependency-display").selectOption("all")
       const graph = page.locator("#graph")
       const externalPackages = page.getByRole("checkbox", { name: "External packages" })
       await expect(externalPackages).not.toBeChecked()
@@ -553,6 +557,115 @@ test("keeps packages hidden by default and rebuilds one combined metric and pack
   })
 })
 
+test("applies deterministic diagnostic lenses without losing compatible scope or selection", async ({ page }) => {
+  await withTemporaryDirectory(async (temporaryDirectory) => {
+    const reportPath = await test.step("Generate a workspace report with internal and external dependencies", async () => {
+      const analysis = await analyzeProject({ projectRoot: fixtureProjectPath("pnpm-workspace") })
+      Assert.isSuccess(analysis)
+      const browserBundle = await readFile(join(process.cwd(), "dist", "report", "browser.js"), "utf8")
+      const path = join(temporaryDirectory, "diagnostic-lenses.html")
+      await writeFile(path, buildHtmlReport(analysis.value, browserBundle), "utf8")
+      return path
+    })
+
+    await test.step("Open in Overview without the background dependency graph", async () => {
+      await page.goto(pathToFileURL(reportPath).href)
+      await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
+      await expect(page.locator("#lens-selector")).toHaveValue("overview")
+      await expect(page.locator("html")).toHaveAttribute("data-active-lens", "overview")
+      await expect(page.locator("#advanced-controls")).not.toHaveAttribute("open", "")
+      await expect(page.getByRole("checkbox", { name: "Comments" })).toBeHidden()
+      await expect(page.locator("#graph")).toHaveAttribute("data-dependency-edges", "focused")
+      await expect(page.locator("#graph")).toHaveAttribute("data-rendered-dependency-edge-count", "0")
+      await expect(page.locator("#coverage-legend")).toBeVisible()
+      await expect(page.locator("#runtime-dependency-edge-key")).toBeVisible()
+      await expect(page.locator("#external-dependency-edge-key")).toBeHidden()
+    })
+
+    await test.step("Reveal only the direct neighborhood on hover and selection", async () => {
+      const graph = page.locator("#graph")
+      const fileSearch = page.getByRole("searchbox", { name: "Search project paths" })
+      await fileSearch.fill("apps/backend/src/api.ts")
+      const backendApi = page.getByRole("button", { name: "apps/backend/src/api.ts", exact: true })
+      await backendApi.hover()
+      await expect(page.locator("html")).toHaveAttribute("data-hovered-node", "project-file:apps/backend/src/api.ts")
+      await expect(graph).toHaveAttribute("data-rendered-dependency-edge-count", "2")
+      await page.locator("header").hover()
+      await expect(graph).toHaveAttribute("data-rendered-dependency-edge-count", "0")
+
+      await backendApi.click()
+      await fileSearch.fill("")
+      await page.locator("header").hover()
+      await expect(page.locator("html")).toHaveAttribute("data-selected-node", "project-file:apps/backend/src/api.ts")
+      await expect(graph).toHaveAttribute("data-rendered-dependency-edge-count", "2")
+      await expect(page.locator("#selected-dependencies")).toHaveText("2")
+    })
+
+    await test.step("Preserve workspace scope and selection in Structure", async () => {
+      await page.getByRole("checkbox", { name: "@fixture/root", exact: true }).uncheck()
+      await page.getByRole("checkbox", { name: "@fixture/frontend", exact: true }).uncheck()
+      await page.getByRole("checkbox", { name: "@fixture/shared", exact: true }).uncheck()
+      await expect(page.locator("html")).toHaveAttribute("data-workspace-packages", '["apps/backend"]')
+      await expect(page.locator("html")).toHaveAttribute("data-selected-node", "project-file:apps/backend/src/api.ts")
+
+      await page.locator("#lens-selector").selectOption("structure")
+      await expect(page.locator("html")).toHaveAttribute("data-active-lens", "structure")
+      await expect(page.getByRole("checkbox", { name: "@fixture/backend", exact: true })).toBeChecked()
+      await expect(page.locator("#workspace-package-controls input:checked")).toHaveCount(1)
+      await expect(page.locator("html")).toHaveAttribute("data-selected-node", "project-file:apps/backend/src/api.ts")
+      await expect(page.locator("#selected-dependencies")).toHaveText("1")
+      await expect(page.locator("#graph")).toHaveAttribute("data-dependency-edges", "hidden")
+      await expect(page.locator("#graph")).toHaveAttribute("data-rendered-dependency-edge-count", "0")
+      await expect(page.locator("#graph")).toHaveAttribute("data-rendered-dependency-focus-ring-count", "0")
+      await expect(page.locator("#coverage-legend")).toBeHidden()
+      await expect(page.locator("#structure-edge-key")).toBeVisible()
+      await expect(page.locator("#runtime-dependency-edge-key")).toBeHidden()
+      const colors = await readJsonAttribute<readonly NodeColorDiagnostic[]>(page.locator("#graph"), "data-visible-node-colors")
+      expect(colors).toContainEqual({ id: "project-file:apps/backend/src/api.ts", color: "#8fa3b8" })
+    })
+
+    await test.step("Derive Custom from advanced settings and restore exact presets", async () => {
+      await openAdvancedControls(page)
+      await page.locator("#dependency-display").selectOption("all")
+      await expect(page.locator("html")).toHaveAttribute("data-active-lens", "custom")
+      await expect(page.locator("html")).toHaveAttribute("data-selected-lens", "structure")
+      await expect(page.locator("#lens-selector")).toHaveValue("custom")
+      await expect(page.locator("#graph")).toHaveAttribute("data-rendered-dependency-edge-count", "1")
+
+      await page.locator("#dependency-display").selectOption("hidden")
+      await expect(page.locator("html")).toHaveAttribute("data-active-lens", "structure")
+      await expect(page.locator("#lens-selector")).toHaveValue("structure")
+
+      await page.locator("#lens-selector").selectOption("overview")
+      await expect(page.locator("html")).toHaveAttribute("data-active-lens", "overview")
+      expect(await readJsonAttribute(page.locator("html"), "data-lens-settings")).toEqual({
+        lineCategories: ["code"],
+        externalPackages: false,
+        typeOnlyDependencies: true,
+        structureEdges: true,
+        dependencyDisplay: "focused",
+        projectFileColor: "coverage",
+      })
+      await expect(page.locator("#workspace-package-controls input:checked")).toHaveCount(1)
+      await expect(page.locator("html")).toHaveAttribute("data-selected-node", "project-file:apps/backend/src/api.ts")
+    })
+
+    await test.step("Clear and announce a selection that a named lens cannot show", async () => {
+      await page.getByRole("checkbox", { name: "External packages" }).check()
+      await expect(page.locator("html")).toHaveAttribute("data-active-lens", "custom")
+      await page.locator("#external-package-list button").filter({ hasText: "backend-library" }).click()
+      await expect(page.locator("html")).toHaveAttribute("data-selected-node", "external-package:backend-library")
+
+      await page.locator("#lens-selector").selectOption("structure")
+      await expect(page.locator("html")).not.toHaveAttribute("data-selected-node", /.+/u)
+      await expect(page.locator("#selected-empty")).toHaveText(
+        "Selection cleared because it is not available in the current lens or workspace scope.",
+      )
+      await expect(page.locator("#selected-empty")).toBeVisible()
+    })
+  })
+})
+
 test("derives project-file edges and relationships in the browser", async ({ page }) => {
   await withTemporaryDirectory(async (temporaryDirectory) => {
     const reportPath = await test.step("Generate the static-ESM report", async () => {
@@ -604,6 +717,8 @@ test("shows, distinguishes, filters, and deterministically restores type-only de
     const initialLayoutSignature = await test.step("Open with distinct type-only arrows and relationship details visible", async () => {
       await page.goto(pathToFileURL(reportPath).href)
       await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
+      await openAdvancedControls(page)
+      await page.locator("#dependency-display").selectOption("all")
       const graph = page.locator("#graph")
       const typeOnlyDependencies = page.getByRole("checkbox", { name: "Type-only dependencies" })
       await expect(typeOnlyDependencies).toBeChecked()
@@ -613,7 +728,7 @@ test("shows, distinguishes, filters, and deterministically restores type-only de
       await expect(page.locator(".graph-key")).toContainText("Structure")
       await expect(page.locator(".graph-key")).toContainText("Runtime")
       await expect(page.locator(".graph-key")).toContainText("Type only")
-      await expect(page.locator(".graph-key")).toContainText("External")
+      await expect(page.locator("#external-dependency-edge-key")).toBeHidden()
       await expect(page.locator(".type-only-dependency-edge-swatch")).toBeVisible()
 
       const renderedEdges = await readJsonAttribute<readonly DependencyEdgeDiagnostic[]>(graph, "data-rendered-dependency-edges")
@@ -691,9 +806,11 @@ test("uses weighted folder nodes as the primary force graph under dependency arr
     const settledGraphState = await test.step("Inspect the structural graph, force weights, and dimmed dependency", async () => {
       await page.goto(pathToFileURL(reportPath).href)
       await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
+      await openAdvancedControls(page)
+      await page.locator("#dependency-display").selectOption("all")
       const graph = page.locator("#graph")
       await expect(page.getByRole("checkbox", { name: "Structure edges" })).toBeChecked()
-      await expect(page.getByRole("checkbox", { name: "Dependency edges" })).toBeChecked()
+      await expect(page.locator("#dependency-display")).toHaveValue("all")
       await expect(graph).toHaveAttribute("data-visible-node-count", "3")
       await expect(graph).toHaveAttribute("data-visible-edge-count", "1")
       await expect(graph).toHaveAttribute("data-graph-node-count", "11")
@@ -702,7 +819,7 @@ test("uses weighted folder nodes as the primary force graph under dependency arr
       await expect(graph).toHaveAttribute("data-structure-edge-weight", "6")
       await expect(graph).toHaveAttribute("data-dependency-edge-weight", "0.25")
       await expect(graph).toHaveAttribute("data-structure-edges", "visible")
-      await expect(graph).toHaveAttribute("data-dependency-edges", "visible")
+      await expect(graph).toHaveAttribute("data-dependency-edges", "all")
       await expect(graph).toHaveAttribute("data-rendered-structure-edge-count", "10")
       await expect(graph).toHaveAttribute("data-rendered-dependency-edge-count", "1")
       expect(await readJsonAttribute<readonly DependencyEdgeDiagnostic[]>(graph, "data-rendered-dependency-edges")).toEqual([
@@ -732,7 +849,7 @@ test("uses weighted folder nodes as the primary force graph under dependency arr
     await test.step("Toggle each edge layer independently without moving nodes", async () => {
       const graph = page.locator("#graph")
       const structureEdges = page.getByRole("checkbox", { name: "Structure edges" })
-      const dependencyEdges = page.getByRole("checkbox", { name: "Dependency edges" })
+      const dependencyDisplay = page.locator("#dependency-display")
       const expectStableGraph = async (): Promise<void> => {
         await expect(graph).toHaveAttribute("data-visible-node-positions", settledGraphState.nodePositions)
         await expect(graph).toHaveAttribute("data-camera-state", settledGraphState.cameraState)
@@ -752,7 +869,7 @@ test("uses weighted folder nodes as the primary force graph under dependency arr
       Assert.isDefined(target)
       const visibleDependencyScreenshot = await graph.screenshot()
 
-      await dependencyEdges.uncheck()
+      await dependencyDisplay.selectOption("hidden")
       await expect(graph).toHaveAttribute("data-dependency-edges", "hidden")
       await expect(graph).toHaveAttribute("data-rendered-structure-edge-count", "0")
       await expect(graph).toHaveAttribute("data-rendered-dependency-edge-count", "0")
@@ -760,8 +877,8 @@ test("uses weighted folder nodes as the primary force graph under dependency arr
       await expectStableGraph()
       const hiddenDependencyScreenshot = await graph.screenshot()
 
-      await dependencyEdges.check()
-      await expect(graph).toHaveAttribute("data-dependency-edges", "visible")
+      await dependencyDisplay.selectOption("all")
+      await expect(graph).toHaveAttribute("data-dependency-edges", "all")
       await expect(graph).toHaveAttribute("data-rendered-dependency-edge-count", "1")
       await expectStableGraph()
       const restoredDependencyScreenshot = await graph.screenshot()
@@ -783,7 +900,7 @@ test("uses weighted folder nodes as the primary force graph under dependency arr
       expect(rgbDistance(dependencyPixels.visible, graphBackground)).toBeGreaterThan(35)
       expect(rgbDistance(dependencyPixels.visible, graphBackground)).toBeLessThan(rgbDistance(opaqueDependency, graphBackground) * 0.5)
 
-      await dependencyEdges.uncheck()
+      await dependencyDisplay.selectOption("hidden")
       await expect(graph).toHaveAttribute("data-dependency-edges", "hidden")
       await expect(graph).toHaveAttribute("data-rendered-dependency-edge-count", "0")
       await structureEdges.check()
@@ -792,8 +909,8 @@ test("uses weighted folder nodes as the primary force graph under dependency arr
       await expect(graph).toHaveAttribute("data-rendered-dependency-edge-count", "0")
       await expectStableGraph()
 
-      await dependencyEdges.check()
-      await expect(graph).toHaveAttribute("data-dependency-edges", "visible")
+      await dependencyDisplay.selectOption("all")
+      await expect(graph).toHaveAttribute("data-dependency-edges", "all")
       await expect(graph).toHaveAttribute("data-rendered-structure-edge-count", "10")
       await expect(graph).toHaveAttribute("data-rendered-dependency-edge-count", "1")
       await expectStableGraph()
@@ -822,9 +939,8 @@ test("uses weighted folder nodes as the primary force graph under dependency arr
       ).toEqual(["src/features/accounts/workflows", "src/features/accounts/create.ts"])
       await expect(graph).toHaveAttribute("data-structure-focus", accounts.id)
       await expect(graph).toHaveAttribute("data-focused-structure-edge-count", "3")
-      expect(await readJsonAttribute<readonly DependencyEdgeDiagnostic[]>(graph, "data-rendered-dependency-edges")).toEqual([
-        { id: "project-dependency-0", color: "#1c2733", size: 3 },
-      ])
+      await expect(graph).toHaveAttribute("data-dependency-edges", "focused")
+      expect(await readJsonAttribute<readonly DependencyEdgeDiagnostic[]>(graph, "data-rendered-dependency-edges")).toEqual([])
 
       const platformDirectory = page.locator('[data-directory-path="src/platform"]')
       await platformDirectory.hover()
@@ -981,9 +1097,11 @@ test("focuses only the hovered or selected file's direct dependency neighborhood
       await page.setViewportSize({ width: 1920, height: 1080 })
       await page.goto(pathToFileURL(report.path).href)
       await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
+      await openAdvancedControls(page)
+      await page.locator("#dependency-display").selectOption("all")
       const graph = page.locator("#graph")
       const structureEdges = page.getByRole("checkbox", { name: "Structure edges" })
-      const dependencyEdges = page.getByRole("checkbox", { name: "Dependency edges" })
+      const dependencyDisplay = page.locator("#dependency-display")
       const structureCanvas = graph.locator("canvas.sigma-structure")
       await expect(graph).toHaveAttribute("data-rendered-structure-edge-count", /^[1-9]\d*$/u)
       const normalStructureEdgeAlpha = await maximumCanvasAlpha(structureCanvas)
@@ -1074,18 +1192,13 @@ test("focuses only the hovered or selected file's direct dependency neighborhood
       await expect(page.locator("html")).toHaveAttribute("data-hovered-node", hovered.id)
       const focusedScreenshot = await graph.screenshot()
 
-      await dependencyEdges.evaluate((element) => {
-        if (!(element instanceof HTMLInputElement)) {
-          throw new Error("Dependency edge control is not a checkbox.")
-        }
-        element.click()
-      })
-      await expect(dependencyEdges).not.toBeChecked()
+      await dependencyDisplay.selectOption("hidden")
+      await expect(dependencyDisplay).toHaveValue("hidden")
       await expect(page.locator("html")).toHaveAttribute("data-hovered-node", hovered.id)
       await expect(graph).toHaveAttribute("data-dependency-edges", "hidden")
       await expect(graph).toHaveAttribute("data-rendered-dependency-edge-count", "0")
       await expect(graph).toHaveAttribute("data-rendered-structure-edge-count", "0")
-      await expect(graph).toHaveAttribute("data-rendered-dependency-focus-ring-count", "3")
+      await expect(graph).toHaveAttribute("data-rendered-dependency-focus-ring-count", "0")
       const hiddenEdgesScreenshot = await graph.screenshot()
 
       const pixels = await sampleDependencyFocusPixels(
@@ -1131,13 +1244,8 @@ test("focuses only the hovered or selected file's direct dependency neighborhood
       expect(pixels.edgeNoise.baselineNormalPixelCount).toBeGreaterThan(pixels.edgeNoise.focusedNormalPixelCount)
       expect(pixels.edgeNoise.focusedDimmedPixelCount).toBeGreaterThan(0)
 
-      await dependencyEdges.evaluate((element) => {
-        if (!(element instanceof HTMLInputElement)) {
-          throw new Error("Dependency edge control is not a checkbox.")
-        }
-        element.click()
-      })
-      await expect(dependencyEdges).toBeChecked()
+      await dependencyDisplay.selectOption("all")
+      await expect(dependencyDisplay).toHaveValue("all")
       await expect(graph).toHaveAttribute("data-rendered-dependency-edge-count", "4")
       const restoredEdges = await readJsonAttribute<readonly DependencyEdgeDiagnostic[]>(graph, "data-rendered-dependency-edges")
       expect(restoredEdges).toEqual(renderedEdges)
@@ -1422,6 +1530,7 @@ test("renders and filters one complete pnpm workspace without mutating its analy
     await test.step("Open with every workspace package and cross-package edge visible", async () => {
       await page.goto(pathToFileURL(reportPath).href)
       await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
+      await openAdvancedControls(page)
       await expect(page.locator("#project-file-count")).toHaveText("8 / 8 project files")
       await expect(page.locator("#workspace-package-fieldset")).toBeVisible()
       await expect(page.locator("#workspace-package-controls input")).toHaveCount(4)
@@ -1585,6 +1694,13 @@ test("opens an empty report generated by the built CLI and real browser bundle",
     })
   })
 })
+
+async function openAdvancedControls(page: Page): Promise<void> {
+  const details = page.locator("#advanced-controls")
+  if ((await details.getAttribute("open")) === null) {
+    await details.locator("summary").click()
+  }
+}
 
 type DirectoryLabelDiagnostic = {
   readonly id: string

@@ -1,12 +1,7 @@
 import { expect, it } from "vitest"
+import { reportLensPreset, type ReportLensSettings, type ReportScopeState } from "./report-lens.js"
 import { nodeSizeForLines, type BrowserPresentation } from "./report-presentation.js"
-import {
-  buildReportView,
-  initialReportViewState,
-  reportViewLayoutSignature,
-  visibleRelationships,
-  type ReportViewState,
-} from "./report-view.js"
+import { buildReportView, reportViewLayoutSignature, visibleRelationships } from "./report-view.js"
 
 const presentation: BrowserPresentation = {
   projectName: "example",
@@ -78,10 +73,11 @@ const presentation: BrowserPresentation = {
 
 it("creates the default view from every workspace package without external packages", () => {
   // Arrange
-  const state = initialReportViewState(presentation)
+  const scope = allWorkspaceScope()
+  const settings = reportLensPreset("overview")
 
   // Act
-  const view = buildReportView(presentation, state)
+  const view = buildReportView(presentation, scope, settings)
 
   // Assert
   expect(view.nodes.map(({ id }) => id)).toEqual([
@@ -115,15 +111,20 @@ it("creates the default view from every workspace package without external packa
 
 it("composes workspace filtering, external-package visibility, and line sizing in one transition", () => {
   // Arrange
-  const state: ReportViewState = {
+  const scope: ReportScopeState = {
+    workspacePackages: new Set(["apps/frontend"]),
+  }
+  const settings: ReportLensSettings = {
     lineCategories: ["code", "comment"],
     externalPackages: true,
     typeOnlyDependencies: true,
-    workspacePackages: new Set(["apps/frontend"]),
+    structureEdges: true,
+    dependencyDisplay: "all",
+    projectFileColor: "coverage",
   }
 
   // Act
-  const view = buildReportView(presentation, state)
+  const view = buildReportView(presentation, scope, settings)
 
   // Assert
   expect(view.nodes.map(({ id, size }) => ({ id, size }))).toEqual([
@@ -140,15 +141,16 @@ it("composes workspace filtering, external-package visibility, and line sizing i
 
 it("hides type-only relationships independently and removes type-only-only external packages", () => {
   // Arrange
-  const visibleState: ReportViewState = {
-    ...initialReportViewState(presentation),
+  const scope = allWorkspaceScope()
+  const visibleSettings: ReportLensSettings = {
+    ...reportLensPreset("overview"),
     externalPackages: true,
   }
 
   // Act
-  const visible = buildReportView(presentation, visibleState)
-  const hidden = buildReportView(presentation, { ...visibleState, typeOnlyDependencies: false })
-  const restored = buildReportView(presentation, visibleState)
+  const visible = buildReportView(presentation, scope, visibleSettings)
+  const hidden = buildReportView(presentation, scope, { ...visibleSettings, typeOnlyDependencies: false })
+  const restored = buildReportView(presentation, scope, visibleSettings)
 
   // Assert
   expect(visible.nodes.map(({ id }) => id)).toContain("external-package:sigma")
@@ -162,9 +164,11 @@ it("hides type-only relationships independently and removes type-only-only exter
 
 it("produces a stable layout-input signature that changes with node sizing", () => {
   // Arrange
-  const initial = buildReportView(presentation, initialReportViewState(presentation))
-  const resized = buildReportView(presentation, {
-    ...initial.state,
+  const scope = allWorkspaceScope()
+  const initialSettings = reportLensPreset("overview")
+  const initial = buildReportView(presentation, scope, initialSettings)
+  const resized = buildReportView(presentation, scope, {
+    ...initialSettings,
     lineCategories: ["code", "comment", "blank"],
   })
 
@@ -187,4 +191,8 @@ function externalPackage(id: string, packageName: string): BrowserPresentation["
     color: "#c084fc",
     size: 8,
   }
+}
+
+function allWorkspaceScope(): ReportScopeState {
+  return { workspacePackages: new Set(["apps/frontend", "apps/backend"]) }
 }

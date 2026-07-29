@@ -6,16 +6,25 @@ export type ReportHeadingElements = {
 
 /** DOM owned by report controls. */
 export type ReportControlElements = {
+  readonly lensSelector: HTMLSelectElement
+  readonly advancedControls: HTMLDetailsElement
   readonly resetCameraButton: HTMLButtonElement
   readonly externalPackageToggle: HTMLInputElement
   readonly typeOnlyDependencyToggle: HTMLInputElement
   readonly structureEdgesToggle: HTMLInputElement
-  readonly dependencyEdgesToggle: HTMLInputElement
+  readonly dependencyDisplay: HTMLSelectElement
+  readonly projectFileColor: HTMLSelectElement
   readonly workspacePackageFieldset: HTMLElement
   readonly workspacePackageControls: HTMLElement
   readonly lineCategoryCode: HTMLInputElement
   readonly lineCategoryComment: HTMLInputElement
   readonly lineCategoryBlank: HTMLInputElement
+  readonly graphKey: HTMLElement
+  readonly structureEdgeKey: HTMLElement
+  readonly runtimeDependencyEdgeKey: HTMLElement
+  readonly typeOnlyDependencyEdgeKey: HTMLElement
+  readonly externalDependencyEdgeKey: HTMLElement
+  readonly coverageLegend: HTMLElement
 }
 
 /** DOM owned by the files and selected-node panels. */
@@ -54,7 +63,6 @@ export type ReportPanelElements = {
 export type ReportElements = {
   readonly root: HTMLElement
   readonly graphContainer: HTMLElement
-  readonly coverageLegend: HTMLElement
   readonly heading: ReportHeadingElements
   readonly controls: ReportControlElements
   readonly panels: ReportPanelElements
@@ -70,22 +78,30 @@ export function getReportElements(reportDocument: Document): ReportElements {
   return {
     root: reportDocument.documentElement,
     graphContainer: requiredElement(reportDocument, "graph"),
-    coverageLegend: requiredElement(reportDocument, "coverage-legend"),
     heading: {
       projectName: requiredElement(reportDocument, "project-name"),
       projectFileCount: requiredElement(reportDocument, "project-file-count"),
     },
     controls: {
+      lensSelector: requiredSelect(reportDocument, "lens-selector"),
+      advancedControls: requiredDetails(reportDocument, "advanced-controls"),
       resetCameraButton: requiredButton(reportDocument, "reset-camera"),
       externalPackageToggle: requiredCheckbox(reportDocument, "external-packages-toggle"),
       typeOnlyDependencyToggle: requiredCheckbox(reportDocument, "type-only-dependencies-toggle"),
       structureEdgesToggle: requiredCheckbox(reportDocument, "structure-edges-toggle"),
-      dependencyEdgesToggle: requiredCheckbox(reportDocument, "dependency-edges-toggle"),
+      dependencyDisplay: requiredSelect(reportDocument, "dependency-display"),
+      projectFileColor: requiredSelect(reportDocument, "project-file-color"),
       workspacePackageFieldset: requiredElement(reportDocument, "workspace-package-fieldset"),
       workspacePackageControls: requiredElement(reportDocument, "workspace-package-controls"),
       lineCategoryCode: requiredCheckbox(reportDocument, "line-category-code"),
       lineCategoryComment: requiredCheckbox(reportDocument, "line-category-comment"),
       lineCategoryBlank: requiredCheckbox(reportDocument, "line-category-blank"),
+      graphKey: requiredElement(reportDocument, "controls").querySelector<HTMLElement>(".graph-key") ?? missingElement(".graph-key"),
+      structureEdgeKey: requiredElement(reportDocument, "structure-edge-key"),
+      runtimeDependencyEdgeKey: requiredElement(reportDocument, "runtime-dependency-edge-key"),
+      typeOnlyDependencyEdgeKey: requiredElement(reportDocument, "type-only-dependency-edge-key"),
+      externalDependencyEdgeKey: requiredElement(reportDocument, "external-dependency-edge-key"),
+      coverageLegend: requiredElement(reportDocument, "coverage-legend"),
     },
     panels: {
       fileSearch: requiredSearchInput(reportDocument, "file-search"),
@@ -142,6 +158,26 @@ function requiredButton(reportDocument: Document, id: string): HTMLButtonElement
     throw new Error("Static report #" + id + " is not a button.")
   }
   return element
+}
+
+function requiredSelect(reportDocument: Document, id: string): HTMLSelectElement {
+  const element = requiredElement(reportDocument, id)
+  if (!(element instanceof HTMLSelectElement)) {
+    throw new Error("Static report #" + id + " is not a select.")
+  }
+  return element
+}
+
+function requiredDetails(reportDocument: Document, id: string): HTMLDetailsElement {
+  const element = requiredElement(reportDocument, id)
+  if (!(element instanceof HTMLDetailsElement)) {
+    throw new Error("Static report #" + id + " is not a details element.")
+  }
+  return element
+}
+
+function missingElement(selector: string): never {
+  throw new Error(`Static report is missing ${selector}.`)
 }
 
 function requiredSearchInput(reportDocument: Document, id: string): HTMLInputElement {
