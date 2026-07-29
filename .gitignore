@@ -148,7 +148,7 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
 
-show-me.html
+reports/
 _site/
 test-results/
 .benchmark/
