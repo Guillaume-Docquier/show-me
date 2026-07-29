@@ -11,7 +11,7 @@ import { renderCoverageLegend } from "./coverage-legend.js"
 import { ReportControls, type EdgeVisibilityState } from "./report-controls.js"
 import { getReportElements } from "./report-elements.js"
 import { ReportGraph } from "./report-graph.js"
-import { type ReportInteractionState } from "./report-interaction.js"
+import { ReportNavigation, type ReportNavigationState } from "./report-navigation.js"
 import { ReportPanels } from "./report-panels.js"
 import { browserPresentationSignature, buildBrowserPresentation } from "./report-presentation.js"
 import { buildReportView, initialReportViewState, type ReportViewState } from "./report-view.js"
@@ -38,13 +38,27 @@ document.title = `Show me ${presentation.projectName}`
 elements.heading.projectName.textContent = presentation.projectName
 renderCoverageLegend(elements.coverageLegend)
 
+const navigation = new ReportNavigation({
+  onChange: renderNavigation,
+})
 const graph = new ReportGraph({
   root: elements.root,
   container: elements.graphContainer,
   initialEdgeVisibility: edgeVisibility,
   performanceProfiler,
   events: {
-    onInteractionChange: renderInteraction,
+    onActivateNode: (nodeId): void => {
+      navigation.activate(nodeId)
+    },
+    onClearSelection: (): void => {
+      navigation.clearSelection()
+    },
+    onPreviewNode: (nodeId): void => {
+      navigation.preview(nodeId)
+    },
+    onClearPreview: (nodeId): void => {
+      navigation.clearPreview(nodeId)
+    },
   },
 })
 
@@ -52,17 +66,20 @@ const panels = new ReportPanels({
   elements: elements.panels,
   presentation,
   actions: {
-    selectNode: (nodeId): void => {
-      graph.selectNode(nodeId)
+    activateNode: (nodeId): void => {
+      navigation.activate(nodeId)
     },
-    focusNode: (nodeId): void => {
-      graph.focusNode(nodeId)
+    previewNode: (nodeId): void => {
+      navigation.preview(nodeId)
     },
-    clearHover: (nodeId): void => {
-      graph.clearHover(nodeId)
+    clearPreview: (nodeId): void => {
+      navigation.clearPreview(nodeId)
     },
-    centerNode: (nodeId): void => {
-      graph.centerNode(nodeId)
+    goBack: (): void => {
+      navigation.goBack()
+    },
+    goForward: (): void => {
+      navigation.goForward()
     },
   },
 })
@@ -93,17 +110,23 @@ elements.root.dataset.performanceMeasurements = JSON.stringify(performanceProfil
 elements.root.dataset.browserLoadMilliseconds = String(performance.now() - browserStartedAt)
 elements.root.dataset.presentationSignature = browserPresentationSignature(presentation)
 
-function renderInteraction(interaction: ReportInteractionState): void {
-  panels.renderInteraction(interaction)
+function renderNavigation(state: ReportNavigationState, centeredNodeId: string | undefined): void {
+  graph.renderInteraction(state)
+  panels.renderNavigation(state)
+  elements.root.dataset.navigationHistory = JSON.stringify({ entries: state.history, index: state.historyIndex })
+  if (centeredNodeId !== undefined) {
+    graph.centerNode(centeredNodeId)
+  }
 }
 
 function applyViewState(nextViewState: ReportViewState): void {
   viewState = nextViewState
   const view = buildReportView(presentation, viewState)
-  graph.applyView(view)
-  panels.renderView(view)
   controls.render(viewState, edgeVisibility)
   elements.heading.projectFileCount.textContent = projectFileCountLabel(view.visibleProjectFileCount, analysis.files.length)
+  graph.applyView(view)
+  navigation.setVisibleNodeIds(view.graphNodeIds)
+  panels.renderView(view)
 }
 
 function projectFileCountLabel(visibleCount: number, totalCount: number): string {

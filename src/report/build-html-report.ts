@@ -39,11 +39,16 @@ export function buildHtmlReport(analysis: ProjectAnalysis, browserBundle: string
   <aside id="files" aria-labelledby="files-heading">
     <h2 id="files-heading">Project files</h2>
     <label class="file-search" for="file-search">
-      <span>Search files</span>
+      <span>Search project paths</span>
       <input id="file-search" type="search" placeholder="Filter by path" autocomplete="off">
     </label>
+    <p id="file-search-result-count" class="file-search-result-count" role="status" hidden></p>
     <p id="file-tree-empty" class="file-tree-empty" role="status" hidden></p>
     <ol id="file-list" class="file-list node-list"></ol>
+    <section id="selected-tree-section" class="selected-tree-section" hidden>
+      <h3>Selected item</h3>
+      <ol id="selected-tree-item" class="file-list node-list"></ol>
+    </section>
     <section id="external-package-section" hidden>
       <h2><span class="package-swatch" aria-hidden="true"></span>External packages</h2>
       <ol id="external-package-list" class="file-list node-list"></ol>
@@ -74,13 +79,20 @@ export function buildHtmlReport(analysis: ProjectAnalysis, browserBundle: string
       <div class="graph-key" aria-label="Graph edge types">
         <span><i class="graph-edge-swatch structure-edge-swatch" aria-hidden="true"></i>Structure</span>
         <span><i class="graph-edge-swatch dependency-edge-swatch" aria-hidden="true"></i>Runtime</span>
-        <span><i class="graph-edge-swatch external-dependency-edge-swatch" aria-hidden="true"></i>External runtime</span>
         <span><i class="graph-edge-swatch type-only-dependency-edge-swatch" aria-hidden="true"></i>Type only</span>
+        <span><i class="graph-edge-swatch external-dependency-edge-swatch" aria-hidden="true"></i>External</span>
       </div>
       <div id="coverage-legend" class="coverage-legend" aria-label="Project-file coverage colors"></div>
     </div>
   </section>
   <aside id="details" aria-label="Graph node details">
+    <nav class="selection-navigation" aria-label="Selection navigation">
+      <div class="selection-history">
+        <button id="navigation-back" type="button" aria-label="Back to previous selection" disabled>←</button>
+        <button id="navigation-forward" type="button" aria-label="Forward to next selection" disabled>→</button>
+      </div>
+      <div id="selection-breadcrumb" class="selection-breadcrumb" aria-label="Selected path"></div>
+    </nav>
     <p id="selected-empty">Hover over or select a node to inspect it.</p>
     <section id="selected-details" hidden>
       <div class="node-type" id="selected-node-type"></div>

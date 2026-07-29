@@ -21,12 +21,18 @@ export type ReportControlElements = {
 /** DOM owned by the files and selected-node panels. */
 export type ReportPanelElements = {
   readonly fileSearch: HTMLInputElement
+  readonly fileSearchResultCount: HTMLElement
   readonly fileTreeEmpty: HTMLElement
   readonly fileList: HTMLElement
+  readonly selectedTreeSection: HTMLElement
+  readonly selectedTreeItem: HTMLElement
   readonly externalPackageSection: HTMLElement
   readonly externalPackageList: HTMLElement
   readonly selectedEmpty: HTMLElement
   readonly selectedDetails: HTMLElement
+  readonly selectionBreadcrumb: HTMLElement
+  readonly navigationBackButton: HTMLButtonElement
+  readonly navigationForwardButton: HTMLButtonElement
   readonly selectedNodeType: HTMLElement
   readonly selectedPath: HTMLElement
   readonly selectedCodeLines: HTMLElement
@@ -83,12 +89,18 @@ export function getReportElements(reportDocument: Document): ReportElements {
     },
     panels: {
       fileSearch: requiredSearchInput(reportDocument, "file-search"),
+      fileSearchResultCount: requiredElement(reportDocument, "file-search-result-count"),
       fileTreeEmpty: requiredElement(reportDocument, "file-tree-empty"),
       fileList: requiredElement(reportDocument, "file-list"),
+      selectedTreeSection: requiredElement(reportDocument, "selected-tree-section"),
+      selectedTreeItem: requiredElement(reportDocument, "selected-tree-item"),
       externalPackageSection: requiredElement(reportDocument, "external-package-section"),
       externalPackageList: requiredElement(reportDocument, "external-package-list"),
       selectedEmpty: requiredElement(reportDocument, "selected-empty"),
       selectedDetails: requiredElement(reportDocument, "selected-details"),
+      selectionBreadcrumb: requiredElement(reportDocument, "selection-breadcrumb"),
+      navigationBackButton: requiredButton(reportDocument, "navigation-back"),
+      navigationForwardButton: requiredButton(reportDocument, "navigation-forward"),
       selectedNodeType: requiredElement(reportDocument, "selected-node-type"),
       selectedPath: requiredElement(reportDocument, "selected-path"),
       selectedCodeLines: requiredElement(reportDocument, "selected-code-lines"),

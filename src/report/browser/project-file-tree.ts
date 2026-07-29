@@ -31,6 +31,12 @@ export type ProjectFileTreeInput = {
   readonly path: string
 }
 
+/** Search-aware project tree derived from the current visible files. */
+export type ProjectFileTree = {
+  readonly entries: readonly ProjectFileTreeEntry[]
+  readonly matchCount: number | undefined
+}
+
 type MutableDirectory = {
   readonly directories: Map<string, MutableDirectory>
   readonly files: ProjectFileTreeFile[]
@@ -39,22 +45,18 @@ type MutableDirectory = {
 /**
  * Build a deterministic directory hierarchy from visible project files.
  *
- * Search is case-insensitive and matches the complete project-relative path, so
- * matching a directory keeps its matching descendant files in context.
+ * Search is case-insensitive and matches complete project-relative file and
+ * directory paths. Matching entries retain their ancestry so the result stays
+ * navigable without changing graph membership.
  *
  * @param files - Project files visible under the current workspace filters.
  * @param searchQuery - Text used to filter project-relative paths.
- * @returns Top-level directory and file entries without a synthetic root entry.
+ * @returns Top-level entries and the exact direct-match count when searching.
  */
-export function buildProjectFileTree(files: readonly ProjectFileTreeInput[], searchQuery: string): readonly ProjectFileTreeEntry[] {
-  const normalizedQuery = searchQuery.trim().toLowerCase()
+export function buildProjectFileTree(files: readonly ProjectFileTreeInput[], searchQuery: string): ProjectFileTree {
   const root: MutableDirectory = { directories: new Map(), files: [] }
 
   for (const file of files) {
-    if (normalizedQuery.length > 0 && !file.path.toLowerCase().includes(normalizedQuery)) {
-      continue
-    }
-
     const segments = file.path.split("/")
     const fileName = segments.at(-1)
     if (fileName === undefined) {
@@ -73,7 +75,39 @@ export function buildProjectFileTree(files: readonly ProjectFileTreeInput[], sea
     directory.files.push({ kind: "file", id: file.id, name: fileName, path: file.path })
   }
 
-  return treeEntries(root, "")
+  const entries = treeEntries(root, "")
+  const normalizedQuery = searchQuery.trim().toLowerCase()
+  if (normalizedQuery.length === 0) {
+    return { entries, matchCount: undefined }
+  }
+
+  const filtered = filterTreeEntries(entries, normalizedQuery)
+  return { entries: filtered.entries, matchCount: filtered.matchCount }
+}
+
+function filterTreeEntries(
+  entries: readonly ProjectFileTreeEntry[],
+  normalizedQuery: string,
+): { readonly entries: readonly ProjectFileTreeEntry[]; readonly matchCount: number } {
+  const filteredEntries: ProjectFileTreeEntry[] = []
+  let matchCount = 0
+  for (const entry of entries) {
+    const matches = entry.path.toLowerCase().includes(normalizedQuery)
+    matchCount += matches ? 1 : 0
+    if (entry.kind === "file") {
+      if (matches) {
+        filteredEntries.push(entry)
+      }
+      continue
+    }
+
+    const filteredChildren = filterTreeEntries(entry.children, normalizedQuery)
+    matchCount += filteredChildren.matchCount
+    if (matches || filteredChildren.entries.length > 0) {
+      filteredEntries.push({ ...entry, children: filteredChildren.entries })
+    }
+  }
+  return { entries: filteredEntries, matchCount }
 }
 
 function treeEntries(directory: MutableDirectory, parentPath: string): readonly ProjectFileTreeEntry[] {

@@ -6,7 +6,7 @@ The output is one self-contained HTML file. Open it locally, share it, or publis
 
 [Explore this codebase in the live GitHub Pages report](https://guillaume-docquier.github.io/show-me/)
 
-![Show Me report with a project file tree, dependency graph, graph controls, and node details](./docs/assets/report.jpg)
+![Show Me report with a project file tree, dependency graph, graph controls, and node details](./docs/assets/report.png)
 
 ## Install
 
@@ -107,9 +107,12 @@ Show Me also respects `.gitignore` files and always skips `.git`, `.nyc_output`,
 
 The report lets you:
 
-- search and select files from the project tree;
+- search project-file and directory paths with exact result counts while keeping the selected item reachable;
+- expand directories independently from selecting them, with top-level directories expanded initially;
+- select and center files or directories from the graph, project tree, breadcrumbs, or relationship lists;
+- move backward and forward through selection history, and clear selection by clicking empty graph space;
 - inspect dependencies, consumers, line counts, and coverage;
-- hover project files, external packages, and directories to reveal their labels and details at any zoom level;
+- hover project files, external packages, and directories to preview their labels and details without moving the camera or changing selection history;
 - select a project file or external package to highlight its direct dependency neighborhood;
 - show or hide structure, runtime, type-only, and external-package relationships;
 - filter pnpm workspace packages;

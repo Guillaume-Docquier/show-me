@@ -82,49 +82,85 @@ test("navigates a collapsible and searchable project-files tree", async ({ page 
       return { path, fileCount: analysis.value.files.length }
     })
 
-    await test.step("Expand and collapse directories without changing the visible graph", async () => {
+    await test.step("Keep disclosure separate from directory selection and restore expansion after search", async () => {
       await page.goto(pathToFileURL(report.path).href)
       await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
       await expect(page.locator("#project-file-count")).toHaveText(`${report.fileCount} / ${report.fileCount} project files`)
-      const srcDirectory = page.locator('[data-directory-path="src"]')
+      const srcDirectory = page.locator('button[data-directory-path="src"]')
+      const srcDisclosure = page.getByRole("button", { name: "Collapse directory src", exact: true })
+      const nestedDisclosure = page.getByRole("button", { name: "Expand directory src/directory" })
       const mainFile = page.locator('#file-list button[data-node-id="project-file:src/main.ts"]')
-      await expect(srcDirectory).toHaveAttribute("aria-expanded", "true")
       await expect(mainFile).toBeVisible()
       await expect(mainFile).toHaveText("main.ts")
+      await expect(nestedDisclosure).toHaveAttribute("aria-expanded", "false")
+      await expect(page.locator('#file-list button[data-node-id="project-file:src/directory/index.ts"]')).toBeHidden()
 
-      await srcDirectory.click()
-      await expect(srcDirectory).toHaveAttribute("aria-expanded", "false")
+      await srcDisclosure.click()
       await expect(mainFile).toBeHidden()
+      await expect(page.locator("html")).not.toHaveAttribute("data-selected-node", /.+/u)
+      await expect(page.locator("#graph")).not.toHaveAttribute("data-camera-focused-node", /.+/u)
       await expect(page.locator("#graph")).toHaveAttribute("data-visible-node-count", String(report.fileCount))
 
       await srcDirectory.click()
-      await expect(srcDirectory).toHaveAttribute("aria-expanded", "true")
+      await expect(page.locator("html")).toHaveAttribute("data-selected-node", "directory:src")
+      await expect(page.locator("#graph")).toHaveAttribute("data-camera-focused-node", "directory:src")
+      await expect(page.getByRole("button", { name: "Expand directory src", exact: true })).toHaveAttribute("aria-expanded", "false")
+
+      await page.getByRole("button", { name: "Expand directory src", exact: true }).click()
       await expect(mainFile).toBeVisible()
+      await nestedDisclosure.click()
+      await expect(page.locator('#file-list button[data-node-id="project-file:src/directory/index.ts"]')).toBeVisible()
+      await page.getByRole("button", { name: "Collapse directory src", exact: true }).click()
+
+      const search = page.getByRole("searchbox", { name: "Search project paths" })
+      await search.fill("directory/index")
+      await expect(page.getByRole("button", { name: "Collapse directory src", exact: true })).toBeDisabled()
+      await search.fill("")
+      await expect(page.getByRole("button", { name: "Expand directory src", exact: true })).toHaveAttribute("aria-expanded", "false")
     })
 
-    await test.step("Filter by full path while retaining the matching hierarchy", async () => {
-      const search = page.getByRole("searchbox", { name: "Search files" })
+    await test.step("Count file and directory matches while keeping an excluded selection reachable", async () => {
+      const search = page.getByRole("searchbox", { name: "Search project paths" })
+      await page.getByRole("button", { name: "Expand directory src", exact: true }).click()
+      await page.locator('#file-list button[data-node-id="project-file:src/main.ts"]').click()
       await search.fill("DIRECTORY/INDEX")
       await expect(page.locator('#file-list button[data-node-id="project-file:src/directory/index.ts"]')).toBeVisible()
       await expect(page.locator('#file-list button[data-node-id^="project-file:"]')).toHaveCount(1)
-      await expect(page.locator('[data-directory-path="src/directory"]')).toBeVisible()
+      await expect(page.locator('button[data-directory-path="src/directory"]')).toBeVisible()
+      await expect(page.locator("#file-search-result-count")).toHaveText("1 result")
+      await expect(page.locator("#selected-tree-section")).toBeVisible()
+      await expect(page.locator("#selected-tree-item")).toContainText("src/main.ts")
       await expect(page.locator("#project-file-count")).toHaveText(`${report.fileCount} / ${report.fileCount} project files`)
+
+      await search.fill("directory")
+      await expect(page.locator("#file-search-result-count")).toHaveText("2 results")
+      await expect(page.locator('button[data-directory-path="src/directory"]')).toBeVisible()
 
       await search.fill("does-not-exist")
       await expect(page.locator("#file-list")).toBeHidden()
-      await expect(page.locator("#file-tree-empty")).toHaveText("No project files match this search.")
+      await expect(page.locator("#file-search-result-count")).toHaveText("0 results")
+      await expect(page.locator("#file-tree-empty")).toHaveText("No project files or directories match this search.")
+      await page.locator("#selected-tree-item").getByRole("button", { name: "src/main.ts" }).click()
+      await expect(page.locator("#graph")).toHaveAttribute("data-camera-focused-node", "project-file:src/main.ts")
 
       await search.fill("")
       await expect(page.locator("#file-tree-empty")).toBeHidden()
+      await expect(page.locator("#file-search-result-count")).toBeHidden()
       await expect(page.locator('#file-list button[data-node-id^="project-file:"]')).toHaveCount(report.fileCount)
     })
 
     await test.step("Preview a hovered file without moving the camera, then center it when selected", async () => {
+      await page.reload()
+      await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
       const graph = page.locator("#graph")
       const mainFile = page.locator('#file-list button[data-node-id="project-file:src/main.ts"]')
       const runtimeFile = page.locator('#file-list button[data-node-id="project-file:src/runtime.ts"]')
       await mainFile.click()
       await expect(page.locator("html")).toHaveAttribute("data-selected-node", "project-file:src/main.ts")
+      await expect(page.locator("html")).toHaveAttribute(
+        "data-navigation-history",
+        JSON.stringify({ entries: ["project-file:src/main.ts"], index: 0 }),
+      )
       await expect(graph).toHaveAttribute("data-camera-focused-node", "project-file:src/main.ts")
       const cameraState = await graph.getAttribute("data-camera-state")
       Assert.isDefined(cameraState)
@@ -144,6 +180,11 @@ test("navigates a collapsible and searchable project-files tree", async ({ page 
       await expect(page.locator("html")).toHaveAttribute("data-selected-node", "project-file:src/runtime.ts")
       await expect(runtimeFile).toHaveAttribute("aria-current", "true")
       await expect(graph).toHaveAttribute("data-camera-focused-node", "project-file:src/runtime.ts")
+      await expect(page.getByRole("button", { name: "Back to previous selection" })).toBeEnabled()
+      await expect(page.getByRole("button", { name: "Forward to next selection" })).toBeDisabled()
+      await expect(page.locator('#selection-breadcrumb button[data-node-id="directory:."]')).toBeVisible()
+      await expect(page.locator('#selection-breadcrumb button[data-node-id="directory:src"]')).toHaveText("src")
+      await expect(page.locator("#selection-breadcrumb .selection-breadcrumb-current")).toHaveText("runtime.ts")
       const graphBounds = await graph.boundingBox()
       const serializedPositions = await graph.getAttribute("data-visible-node-positions")
       Assert.isDefined(graphBounds)
@@ -160,6 +201,53 @@ test("navigates a collapsible and searchable project-files tree", async ({ page 
       await page.locator("header").hover()
       await expect(page.locator("html")).not.toHaveAttribute("data-hovered-node", /.+/u)
       await expect(page.locator("#selected-path")).toHaveText("src/runtime.ts")
+    })
+
+    await test.step("Use history, breadcrumb, details, graph, and canvas clearing through one navigation contract", async () => {
+      const graph = page.locator("#graph")
+      const back = page.getByRole("button", { name: "Back to previous selection" })
+      const forward = page.getByRole("button", { name: "Forward to next selection" })
+      await back.click()
+      await expect(page.locator("html")).toHaveAttribute("data-selected-node", "project-file:src/main.ts")
+      await expect(graph).toHaveAttribute("data-camera-focused-node", "project-file:src/main.ts")
+      await forward.click()
+      await expect(page.locator("html")).toHaveAttribute("data-selected-node", "project-file:src/runtime.ts")
+
+      await graph.click({ position: { x: 2, y: 2 } })
+      await expect(page.locator("html")).not.toHaveAttribute("data-selected-node", /.+/u)
+      await expect(page.locator("#selection-breadcrumb")).toBeEmpty()
+      await expect(back).toBeEnabled()
+      await back.click()
+      await expect(page.locator("html")).toHaveAttribute("data-selected-node", "project-file:src/runtime.ts")
+
+      await page.locator('#file-list button[data-node-id="project-file:src/main.ts"]').click()
+      await page.locator("#selected-dependency-nodes").getByRole("button", { name: "src/runtime.ts", exact: true }).click()
+      await expect(page.locator("html")).toHaveAttribute("data-selected-node", "project-file:src/runtime.ts")
+      await expect(page.locator("#selected-path")).toHaveText("src/runtime.ts")
+      await expect(graph).toHaveAttribute("data-camera-focused-node", "project-file:src/runtime.ts")
+      const historyBeforeGraphActivation = await page.locator("html").getAttribute("data-navigation-history")
+
+      await page.getByRole("button", { name: "Fit current graph" }).click()
+      await expect(graph).toHaveAttribute("data-camera-reset", "complete")
+      const bounds = await graph.boundingBox()
+      const serializedPositions = await graph.getAttribute("data-visible-node-positions")
+      Assert.isDefined(bounds)
+      Assert.isDefined(serializedPositions)
+      const runtimePosition =
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Malformed browser diagnostics must fail this assertion.
+        (JSON.parse(serializedPositions) as Array<{ readonly id: string; readonly x: number; readonly y: number }>).find(
+          ({ id }) => id === "project-file:src/runtime.ts",
+        )
+      Assert.isDefined(runtimePosition)
+      await page.mouse.click(bounds.x + runtimePosition.x, bounds.y + runtimePosition.y)
+      await expect(page.locator("html")).toHaveAttribute("data-selected-node", "project-file:src/runtime.ts")
+      await expect(graph).toHaveAttribute("data-camera-focused-node", "project-file:src/runtime.ts")
+      await expect(page.locator("html")).toHaveAttribute("data-navigation-history", historyBeforeGraphActivation ?? "")
+
+      await page.locator('#selection-breadcrumb button[data-node-id="directory:src"]').click()
+      await expect(page.locator("html")).toHaveAttribute("data-selected-node", "directory:src")
+      await expect(page.locator("#selected-node-type")).toHaveText("Directory")
+      await expect(graph).toHaveAttribute("data-camera-focused-node", "directory:src")
     })
   })
 })
@@ -299,12 +387,12 @@ test("supports graph hover, selection, clearing, and side-panel navigation", asy
       await expect(codeControl).toBeDisabled()
     })
 
-    await test.step("Clear selection through the canvas and navigate back through the accessible file list", async () => {
+    await test.step("Clear selection through the canvas and restore it through navigation history", async () => {
       await page.locator("#graph").click({ position: { x: 2, y: 2 } })
       await expect(page.locator("html")).not.toHaveAttribute("data-selected-node", /.+/u)
-      await page.getByRole("button", { name: report.longPath }).click()
+      await page.getByRole("button", { name: "Back to previous selection" }).click()
       await expect(page.locator("html")).toHaveAttribute("data-selected-node", report.longPathNodeId)
-      await expect(page.getByRole("button", { name: report.longPath })).toHaveAttribute("aria-current", "true")
+      await expect(page.locator("#selected-path")).toHaveText(report.longPath)
     })
   })
 })
@@ -524,8 +612,8 @@ test("shows, distinguishes, filters, and deterministically restores type-only de
       await expect(graph).toHaveAttribute("data-rendered-dependency-edge-count", "16")
       await expect(page.locator(".graph-key")).toContainText("Structure")
       await expect(page.locator(".graph-key")).toContainText("Runtime")
-      await expect(page.locator(".graph-key")).toContainText("External runtime")
       await expect(page.locator(".graph-key")).toContainText("Type only")
+      await expect(page.locator(".graph-key")).toContainText("External")
       await expect(page.locator(".type-only-dependency-edge-swatch")).toBeVisible()
 
       const renderedEdges = await readJsonAttribute<readonly DependencyEdgeDiagnostic[]>(graph, "data-rendered-dependency-edges")
@@ -1056,6 +1144,7 @@ test("focuses only the hovered or selected file's direct dependency neighborhood
 
       await page.mouse.click(graphBounds.x + hovered.x, graphBounds.y + hovered.y)
       await expect(page.locator("html")).toHaveAttribute("data-selected-node", hovered.id)
+      await expect(graph).toHaveAttribute("data-camera-focused-node", hovered.id)
       await page.locator("header").hover()
       await expect(page.locator("html")).not.toHaveAttribute("data-hovered-node", hovered.id)
       await expect(page.locator("html")).toHaveAttribute("data-selected-node", hovered.id)
@@ -1317,6 +1406,10 @@ test("renders equivalent browser coverage from Istanbul and LCOV CLI inputs", as
 
 test("renders and filters one complete pnpm workspace without mutating its analysis", async ({ page }) => {
   await withTemporaryDirectory(async (temporaryDirectory) => {
+    const pageErrors: string[] = []
+    page.on("pageerror", (error) => {
+      pageErrors.push(error.message)
+    })
     const reportPath = await test.step("Generate one report for the complete deterministic workspace", async () => {
       const analysis = await analyzeProject({ projectRoot: fixtureProjectPath("pnpm-workspace") })
       Assert.isSuccess(analysis)
@@ -1336,7 +1429,10 @@ test("renders and filters one complete pnpm workspace without mutating its analy
       await expect(page.locator("#graph")).toHaveAttribute("data-visible-node-count", "8")
       await expect(page.locator("#graph")).toHaveAttribute("data-visible-edge-count", "7")
       await expect(page.locator('#file-list button[data-node-id^="project-file:"]')).toHaveCount(8)
+      const fileSearch = page.getByRole("searchbox", { name: "Search project paths" })
+      await fileSearch.fill("apps/frontend/src/main.ts")
       await page.getByRole("button", { name: "apps/frontend/src/main.ts", exact: true }).click()
+      await fileSearch.fill("")
       await expect(page.locator("#selected-dependencies")).toHaveText("3")
       await expect(page.locator("#selected-dependency-nodes")).toContainText("Type only")
       await page.getByRole("checkbox", { name: "Type-only dependencies" }).uncheck()
@@ -1348,9 +1444,20 @@ test("renders and filters one complete pnpm workspace without mutating its analy
     })
 
     await test.step("Scope to backend and retain only its external packages", async () => {
-      await page.getByRole("checkbox", { name: "@fixture/root", exact: true }).uncheck()
-      await page.getByRole("checkbox", { name: "@fixture/frontend", exact: true }).uncheck()
-      await page.getByRole("checkbox", { name: "@fixture/shared", exact: true }).uncheck()
+      const rootPackage = page.getByRole("checkbox", { name: "@fixture/root", exact: true })
+      const frontendPackage = page.getByRole("checkbox", { name: "@fixture/frontend", exact: true })
+      const sharedPackage = page.getByRole("checkbox", { name: "@fixture/shared", exact: true })
+      await rootPackage.uncheck()
+      await expect(rootPackage).not.toBeChecked()
+      await frontendPackage.uncheck()
+      await expect(frontendPackage).not.toBeChecked()
+      await sharedPackage.uncheck()
+      await expect(sharedPackage).not.toBeChecked()
+      expect(
+        await page
+          .locator("#workspace-package-controls input:checked")
+          .evaluateAll((inputs) => inputs.map((input) => (input instanceof HTMLInputElement ? input.dataset.workspacePackage : "invalid"))),
+      ).toEqual(["apps/backend"])
       await expect(page.locator("#graph")).toHaveAttribute("data-visible-node-count", "2")
       await expect(page.locator("#graph")).toHaveAttribute("data-visible-edge-count", "1")
       await expect(page.locator("#project-file-count")).toHaveText("2 / 8 project files")
@@ -1365,6 +1472,8 @@ test("renders and filters one complete pnpm workspace without mutating its analy
 
     await test.step("Fit the current filtered graph after explorer hover and zoom without undoing filters", async () => {
       const graph = page.locator("#graph")
+      const fileSearch = page.getByRole("searchbox", { name: "Search project paths" })
+      await fileSearch.fill("apps/backend/src/api.ts")
       const file = page.locator('#file-list button[data-node-id^="project-file:"]').first()
       const hoveredNodeId = await file.getAttribute("data-node-id")
       const settledCamera = await graph.getAttribute("data-camera-state")
@@ -1373,6 +1482,7 @@ test("renders and filters one complete pnpm workspace without mutating its analy
       await file.hover()
       await expect(page.locator("html")).toHaveAttribute("data-hovered-node", hoveredNodeId)
       await expect(graph).toHaveAttribute("data-camera-state", settledCamera)
+      await fileSearch.fill("")
       const graphBounds = await graph.boundingBox()
       Assert.isDefined(graphBounds)
       await page.mouse.move(graphBounds.x + graphBounds.width / 2, graphBounds.y + graphBounds.height / 2)
@@ -1426,6 +1536,7 @@ test("renders and filters one complete pnpm workspace without mutating its analy
       await expect(page.locator("#graph")).toHaveAttribute("data-visible-edge-count", "7")
       await expect(page.locator("#project-file-count")).toHaveText("8 / 8 project files")
       await expect(page.locator('#file-list button[data-node-id^="project-file:"]')).toHaveCount(8)
+      expect(pageErrors).toEqual([])
     })
   })
 })

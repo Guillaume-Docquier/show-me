@@ -61,7 +61,7 @@ The report does not embed source file contents. The analysis handoff is an inter
 
 The browser renderer uses Sigma.js over a Graphology directed graph. For the initial view and every interactive transition, it rebuilds the visible graph, assigns deterministic circular starting coordinates, and runs a synchronous 5,000-iteration ForceAtlas2 pass. Size adjustment keeps exact repulsion aware of rendered node radii. Barnes-Hut optimization remains disabled because the library's optimized path does not include individual node radii and allowed large nodes to cover their neighbors.
 
-The browser entrypoint is a composition root. It parses the fixed report DOM, creates the current view and edge-visibility state, and connects controls, panels, and the graph controller. Renderer-neutral visibility and sizing decisions live in the pure report-view transition. Controls own input creation and event binding, panels own the searchable tree and details DOM, and the graph controller owns Graphology, Sigma, layout, camera, and graph interaction state. Its internal modules separately contain Canvas overlays, zoom-aware label eligibility, drawing functions, renderer types, and browser-test diagnostics. This keeps the timeline visible in the entrypoint without exposing shared ambient state across browser features.
+The browser entrypoint is a composition root. It parses the fixed report DOM, creates the current view and edge-visibility state, and connects controls, panels, navigation, and the graph controller. Renderer-neutral visibility and sizing decisions live in the pure report-view transition. Controls own input creation and event binding. Panels own the searchable tree and details DOM. The navigation controller owns persistent selection, transient preview, explicit-selection history, and the one activation operation used by every report surface. The graph controller owns Graphology, Sigma, layout, camera, and a rendered copy of navigation state. Its internal modules separately contain Canvas overlays, zoom-aware label eligibility, drawing functions, renderer types, and browser-test diagnostics. This keeps the timeline visible in the entrypoint without exposing shared ambient state across browser features.
 
 The initial graph is flat:
 
@@ -104,7 +104,9 @@ Package filters compose with line-category sizing and external-package visibilit
 
 Hovering a project file, external package, or directory temporarily shows that node's complete information in the right-hand details panel without changing click selection. Project-file details include the complete path, code, comment, and blank line breakdown, visible dependency count, consumer count, and coverage when available. Package details show the canonical package root, explicit entity type, and visible relationships. Directory details show its parent directory and direct child directories and project files. Moving the pointer away restores the selected node's details or the empty state when no node is selected. The graph does not render a pointer-following tooltip.
 
-Clicking a project file, external package, or directory node selects and visually highlights that node. Project-file selection opens a side panel containing:
+Explicit activation from the graph, project tree, breadcrumb, relationship lists, or history uses one navigation transition. It selects and visually highlights the entity, records non-duplicate selection history, and centers the visible graph node. Back and forward move through explicit selections only. Hover never changes the camera or history. Clicking empty graph space clears persistent selection without erasing its history. The report deliberately has no dedicated clear-selection button because the canvas gesture is natural and preserves space for navigation and details.
+
+The selection breadcrumb starts at the project root and exposes every directory segment as a navigation target. It remains empty when there is no persistent selection. Placeholder text such as `No selection` only repeats the surrounding empty state and is deliberately omitted. Project-file selection opens a side panel containing:
 
 - the complete path;
 - line metrics;
@@ -112,6 +114,8 @@ Clicking a project file, external package, or directory node selects and visuall
 - visible project-file and external-package dependencies;
 - consumer project files.
 
-Directory selection shows its direct parent and children as selectable navigation entries. Selecting or hovering a directory emphasizes its incident structure edges and dims unrelated structure and dependency edges. Visible directory, file, and package entries in the side panels select their corresponding nodes. Clicking empty graph space clears selection.
+Directory selection shows its direct parent and children as selectable navigation entries. Selecting or hovering a directory emphasizes its incident structure edges and dims unrelated structure and dependency edges. Directory disclosure uses a separate accessible control, so expanding or collapsing never changes selection or camera position.
+
+The unfiltered project tree initially expands top-level directories and collapses deeper directories. Case-insensitive search matches complete project-file and directory paths, reports the exact number of direct matches, and temporarily expands matching ancestry without changing graph membership. Clearing search restores the user's expansion state. When the persistent selection is excluded by a search, a labeled selected-item row remains available outside the filtered results.
 
 Dependency-neighborhood highlighting, direction-specific emphasis, directory clustering, and focus modes belong to a later visualization and UX milestone.

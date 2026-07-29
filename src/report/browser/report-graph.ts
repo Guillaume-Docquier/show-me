@@ -34,15 +34,18 @@ const DEPENDENCY_FOCUS_EDGE_SIZE = 4.4
 const CONSUMER_FOCUS_EDGE_SIZE = 5.2
 
 export type ReportGraphEvents = {
-  readonly onInteractionChange: (interaction: ReportInteractionState) => void
+  readonly onActivateNode: (nodeId: string) => void
+  readonly onClearSelection: () => void
+  readonly onPreviewNode: (nodeId: string) => void
+  readonly onClearPreview: (nodeId: string) => void
 }
 
 /**
  * Owns the mutable Graphology projection, Sigma renderer, layout, and graph interactions.
  *
  * Application controls provide complete immutable views. This controller keeps
- * renderer-only state private and reports only selection/hover changes back to
- * the DOM navigation shell.
+ * renderer-only state private and reports graph gestures to the browser-owned
+ * navigation controller.
  */
 export class ReportGraph {
   readonly #root: HTMLElement
@@ -174,15 +177,9 @@ export class ReportGraph {
     const layoutMetrics = this.#performanceProfiler.measure("browser-layout", () => layoutReportGraph(this.#graph))
     this.#diagnostics.writeLayout(layoutMetrics)
 
-    if (this.#interaction.selectedNodeId !== undefined && !view.graphNodeIds.has(this.#interaction.selectedNodeId)) {
-      this.#interaction = { ...this.#interaction, selectedNodeId: undefined }
-    }
-    if (this.#interaction.hoveredNodeId !== undefined && !view.graphNodeIds.has(this.#interaction.hoveredNodeId)) {
-      this.#interaction = { ...this.#interaction, hoveredNodeId: undefined }
-    }
     this.#synchronizeEdgeFocus()
     this.#updateViewDiagnostics()
-    this.#emitInteraction()
+    this.#writeInteractionDiagnostics()
     this.#renderer.refresh()
   }
 
@@ -199,41 +196,23 @@ export class ReportGraph {
     }
   }
 
-  /** Select a visible graph node, or clear selection when called without an identity. */
-  public selectNode(nodeId: string | undefined): void {
-    const visibleNodeId = nodeId === undefined || this.#graph.hasNode(nodeId) ? nodeId : undefined
-    this.#interaction = { ...this.#interaction, selectedNodeId: visibleNodeId }
+  /** Render browser-owned selection and hover state without changing navigation. */
+  public renderInteraction(interaction: ReportInteractionState): void {
+    const previousHoveredNodeId = this.#interaction.hoveredNodeId
+    this.#interaction = interaction
+    if (
+      interaction.hoveredNodeId !== undefined &&
+      this.#graph.hasNode(interaction.hoveredNodeId) &&
+      this.#graph.getNodeAttribute(interaction.hoveredNodeId, "nodeKind") === "directory"
+    ) {
+      this.#labelVisibility.hoverDirectory(interaction.hoveredNodeId)
+    } else {
+      this.#labelVisibility.clearDirectoryHover()
+    }
     this.#synchronizeEdgeFocus()
-    this.#emitInteraction()
+    this.#writeInteractionDiagnostics()
+    this.#refreshHoverTransition(previousHoveredNodeId)
     this.#renderer.refresh()
-  }
-
-  /** Apply hover focus to a visible graph node. */
-  public focusNode(nodeId: string): void {
-    if (!this.#graph.hasNode(nodeId)) {
-      return
-    }
-    const previousHoveredNodeId = this.#interaction.hoveredNodeId
-    if (this.#graph.getNodeAttribute(nodeId, "nodeKind") === "directory") {
-      this.#labelVisibility.hoverDirectory(nodeId)
-    }
-    this.#interaction = { ...this.#interaction, hoveredNodeId: nodeId }
-    this.#synchronizeEdgeFocus()
-    this.#emitInteraction()
-    this.#refreshHoverTransition(previousHoveredNodeId)
-  }
-
-  /** Clear node and directory hover effects. */
-  public clearHover(nodeId?: string): void {
-    if (nodeId !== undefined && this.#interaction.hoveredNodeId !== nodeId) {
-      return
-    }
-    const previousHoveredNodeId = this.#interaction.hoveredNodeId
-    this.#interaction = { ...this.#interaction, hoveredNodeId: undefined }
-    this.#synchronizeEdgeFocus()
-    this.#labelVisibility.clearDirectoryHover()
-    this.#emitInteraction()
-    this.#refreshHoverTransition(previousHoveredNodeId)
   }
 
   /** Animate the camera center to one visible node. */
@@ -297,16 +276,16 @@ export class ReportGraph {
       }
     })
     this.#renderer.on("enterNode", ({ node }) => {
-      this.focusNode(node)
+      this.#events.onPreviewNode(node)
     })
     this.#renderer.on("leaveNode", ({ node }) => {
-      this.clearHover(node)
+      this.#events.onClearPreview(node)
     })
     this.#renderer.on("clickNode", ({ node }) => {
-      this.selectNode(node)
+      this.#events.onActivateNode(node)
     })
     this.#renderer.on("clickStage", () => {
-      this.selectNode(undefined)
+      this.#events.onClearSelection()
     })
   }
 
@@ -360,7 +339,7 @@ export class ReportGraph {
       : { ...attributes, ...label }
   }
 
-  #emitInteraction(): void {
+  #writeInteractionDiagnostics(): void {
     const selectedNodeId = this.#interaction.selectedNodeId
     if (selectedNodeId === undefined || !this.#graph.hasNode(selectedNodeId)) {
       delete this.#root.dataset.selectedNode
@@ -372,7 +351,6 @@ export class ReportGraph {
     } else {
       this.#root.dataset.hoveredNode = this.#interaction.hoveredNodeId
     }
-    this.#events.onInteractionChange(this.#interaction)
   }
 
   #updateViewDiagnostics(): void {

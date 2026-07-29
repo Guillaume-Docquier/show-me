@@ -1,14 +1,15 @@
 import { buildProjectFileTree, type ProjectFileTreeEntry, type ProjectFileTreeFile } from "./project-file-tree.js"
 import type { ReportPanelElements } from "./report-elements.js"
-import type { ReportInteractionState } from "./report-interaction.js"
+import type { ReportNavigationState } from "./report-navigation.js"
 import type { BrowserPresentation, ReportNode, ReportProjectFileNode } from "./report-presentation.js"
 import { visibleRelationships, type ReportView, type ReportViewDirectory, type VisibleRelationship } from "./report-view.js"
 
 export type ReportPanelActions = {
-  readonly selectNode: (nodeId: string) => void
-  readonly focusNode: (nodeId: string) => void
-  readonly clearHover: (nodeId: string) => void
-  readonly centerNode: (nodeId: string) => void
+  readonly activateNode: (nodeId: string) => void
+  readonly previewNode: (nodeId: string) => void
+  readonly clearPreview: (nodeId: string) => void
+  readonly goBack: () => void
+  readonly goForward: () => void
 }
 
 /** Owns the searchable files tree, node details, and package navigation DOM. */
@@ -17,13 +18,18 @@ export class ReportPanels {
   readonly #presentation: BrowserPresentation
   readonly #nodeById: ReadonlyMap<string, ReportNode>
   readonly #actions: ReportPanelActions
-  readonly #collapsedDirectoryPaths = new Set<string>()
+  readonly #expandedDirectoryPaths = new Set<string>()
+  readonly #knownDirectoryPaths = new Set<string>()
   #directoryById = new Map<string, ReportViewDirectory>()
   #directoryByPath = new Map<string, ReportViewDirectory>()
   #view: ReportView | undefined
-  #interaction: ReportInteractionState = {
+  #navigation: ReportNavigationState = {
     selectedNodeId: undefined,
     hoveredNodeId: undefined,
+    history: [],
+    historyIndex: -1,
+    canGoBack: false,
+    canGoForward: false,
   }
 
   public constructor({
@@ -40,9 +46,10 @@ export class ReportPanels {
     this.#nodeById = new Map(presentation.nodes.map((node) => [node.id, node]))
     this.#actions = actions
     elements.fileSearch.addEventListener("input", () => {
-      this.#collapsedDirectoryPaths.clear()
       this.#renderProjectFileList()
     })
+    elements.navigationBackButton.addEventListener("click", actions.goBack)
+    elements.navigationForwardButton.addEventListener("click", actions.goForward)
   }
 
   /** Render all panel content affected by a new visible report projection. */
@@ -50,15 +57,26 @@ export class ReportPanels {
     this.#view = view
     this.#directoryById = new Map(view.directories.map((directory) => [directory.id, directory]))
     this.#directoryByPath = new Map(view.directories.map((directory) => [directory.path, directory]))
+    for (const directory of view.directories) {
+      if (!this.#knownDirectoryPaths.has(directory.path)) {
+        this.#knownDirectoryPaths.add(directory.path)
+        if (directory.depth === 1) {
+          this.#expandedDirectoryPaths.add(directory.path)
+        }
+      }
+    }
     this.#renderProjectFileList()
     this.#renderExternalPackageList()
     this.#renderSelection()
+    this.#renderNavigation()
   }
 
-  /** Render the shared selection/hover state without rebuilding navigation. */
-  public renderInteraction(interaction: ReportInteractionState): void {
-    this.#interaction = interaction
+  /** Render shared navigation and preview state without rebuilding the graph view. */
+  public renderNavigation(navigation: ReportNavigationState): void {
+    this.#navigation = navigation
     this.#renderSelection()
+    this.#renderNavigation()
+    this.#renderSelectedTreeItem()
   }
 
   #renderProjectFileList(): void {
@@ -69,17 +87,24 @@ export class ReportPanels {
     this.#elements.fileList.replaceChildren()
     const visibleProjectFiles = view.nodes.flatMap(({ reportNode }) => (reportNode.kind === "project-file" ? [reportNode] : []))
     const tree = buildProjectFileTree(visibleProjectFiles, this.#elements.fileSearch.value)
-    this.#elements.fileList.append(...tree.map((entry) => this.#projectFileTreeItem(entry)))
+    const searchActive = tree.matchCount !== undefined
+    this.#elements.fileList.append(...tree.entries.map((entry) => this.#projectFileTreeItem(entry, searchActive)))
 
-    const emptyMessage = this.#projectFileTreeEmptyMessage(visibleProjectFiles.length, tree.length)
+    this.#elements.fileSearchResultCount.hidden = tree.matchCount === undefined || visibleProjectFiles.length === 0
+    if (tree.matchCount !== undefined) {
+      this.#elements.fileSearchResultCount.textContent = `${tree.matchCount} ${tree.matchCount === 1 ? "result" : "results"}`
+    }
+
+    const emptyMessage = this.#projectFileTreeEmptyMessage(visibleProjectFiles.length, tree.entries.length)
     this.#elements.fileTreeEmpty.hidden = emptyMessage === undefined
     this.#elements.fileList.hidden = emptyMessage !== undefined
     if (emptyMessage !== undefined) {
       this.#elements.fileTreeEmpty.textContent = emptyMessage
     }
+    this.#renderSelectedTreeItem()
   }
 
-  #projectFileTreeItem(entry: ProjectFileTreeEntry): HTMLLIElement {
+  #projectFileTreeItem(entry: ProjectFileTreeEntry, searchActive: boolean): HTMLLIElement {
     if (entry.kind === "file") {
       return this.#projectFileTreeFileItem(entry)
     }
@@ -87,38 +112,50 @@ export class ReportPanels {
     const reportDocument = this.#elements.fileList.ownerDocument
     const item = reportDocument.createElement("li")
     item.className = "file-tree-directory"
-    const button = reportDocument.createElement("button")
-    button.type = "button"
-    button.className = "file-tree-directory-toggle"
-    button.textContent = entry.name
-    button.title = entry.path
-    button.dataset.directoryPath = entry.path
     const directory = this.#requiredDirectoryByPath(entry.path)
-    button.dataset.nodeId = directory.id
-    button.setAttribute("aria-current", directory.id === this.#interaction.selectedNodeId ? "true" : "false")
+    const row = reportDocument.createElement("div")
+    row.className = "file-tree-directory-row"
+    const expanded = searchActive || this.#expandedDirectoryPaths.has(entry.path)
+    const disclosure = reportDocument.createElement("button")
+    disclosure.type = "button"
+    disclosure.className = "file-tree-directory-disclosure"
+    disclosure.setAttribute("aria-label", `${expanded ? "Collapse" : "Expand"} directory ${entry.path}`)
+    disclosure.setAttribute("aria-expanded", String(expanded))
+    disclosure.disabled = searchActive
+    const select = reportDocument.createElement("button")
+    select.type = "button"
+    select.className = "file-tree-directory-select"
+    select.textContent = entry.name
+    select.title = entry.path
+    select.dataset.directoryPath = entry.path
+    select.dataset.nodeId = directory.id
+    select.setAttribute("aria-current", directory.id === this.#navigation.selectedNodeId ? "true" : "false")
     const children = reportDocument.createElement("ol")
     children.className = "file-tree-children"
-    children.append(...entry.children.map((child) => this.#projectFileTreeItem(child)))
-    const expanded = !this.#collapsedDirectoryPaths.has(entry.path)
-    button.setAttribute("aria-expanded", String(expanded))
+    children.append(...entry.children.map((child) => this.#projectFileTreeItem(child, searchActive)))
     children.hidden = !expanded
-    button.addEventListener("pointerenter", () => {
-      this.#actions.focusNode(directory.id)
+    select.addEventListener("pointerenter", () => {
+      this.#actions.previewNode(directory.id)
     })
-    button.addEventListener("pointerleave", () => {
-      this.#actions.clearHover(directory.id)
+    select.addEventListener("pointerleave", () => {
+      this.#actions.clearPreview(directory.id)
     })
-    button.addEventListener("click", () => {
-      this.#actions.selectNode(directory.id)
-      this.#actions.centerNode(directory.id)
-      if (this.#collapsedDirectoryPaths.has(entry.path)) {
-        this.#collapsedDirectoryPaths.delete(entry.path)
+    select.addEventListener("click", () => {
+      this.#actions.activateNode(directory.id)
+    })
+    disclosure.addEventListener("click", () => {
+      if (searchActive) {
+        return
+      }
+      if (this.#expandedDirectoryPaths.has(entry.path)) {
+        this.#expandedDirectoryPaths.delete(entry.path)
       } else {
-        this.#collapsedDirectoryPaths.add(entry.path)
+        this.#expandedDirectoryPaths.add(entry.path)
       }
       this.#renderProjectFileList()
     })
-    item.append(button, children)
+    row.append(disclosure, select)
+    item.append(row, children)
     return item
   }
 
@@ -133,13 +170,10 @@ export class ReportPanels {
     const button = this.#nodeListButton(node, entry.name)
     button.setAttribute("aria-label", node.displayName)
     button.addEventListener("pointerenter", () => {
-      this.#actions.focusNode(node.id)
+      this.#actions.previewNode(node.id)
     })
     button.addEventListener("pointerleave", () => {
-      this.#actions.clearHover(node.id)
-    })
-    button.addEventListener("click", () => {
-      this.#actions.centerNode(node.id)
+      this.#actions.clearPreview(node.id)
     })
     item.append(button)
     return item
@@ -153,7 +187,7 @@ export class ReportPanels {
         : "No project files are visible. Select a workspace package to show files."
     }
     if (treeEntryCount === 0) {
-      return "No project files match this search."
+      return "No project files or directories match this search."
     }
     return undefined
   }
@@ -164,10 +198,10 @@ export class ReportPanels {
       return
     }
     for (const button of this.#elements.fileList.ownerDocument.querySelectorAll<HTMLElement>(".node-list button[data-node-id]")) {
-      button.setAttribute("aria-current", button.dataset.nodeId === this.#interaction.selectedNodeId ? "true" : "false")
+      button.setAttribute("aria-current", button.dataset.nodeId === this.#navigation.selectedNodeId ? "true" : "false")
     }
 
-    const nodeIdToDisplay = this.#interaction.hoveredNodeId ?? this.#interaction.selectedNodeId
+    const nodeIdToDisplay = this.#navigation.hoveredNodeId ?? this.#navigation.selectedNodeId
     const node = nodeIdToDisplay === undefined ? undefined : this.#nodeById.get(nodeIdToDisplay)
     const directory = nodeIdToDisplay === undefined ? undefined : this.#directoryById.get(nodeIdToDisplay)
     const entityExists = node !== undefined || directory !== undefined
@@ -205,6 +239,85 @@ export class ReportPanels {
     this.#elements.selectedConsumers.textContent = String(consumers.length)
     this.#renderRelatedNodes(this.#elements.selectedDependencyNodes, dependencies)
     this.#renderRelatedNodes(this.#elements.selectedConsumerNodes, consumers)
+  }
+
+  #renderSelectedTreeItem(): void {
+    const selectedNodeId = this.#navigation.selectedNodeId
+    const searchActive = this.#elements.fileSearch.value.trim().length > 0
+    const selectedIsInResults = [...this.#elements.fileList.querySelectorAll<HTMLElement>("button[data-node-id]")].some(
+      ({ dataset }) => dataset.nodeId === selectedNodeId,
+    )
+    const node = selectedNodeId === undefined ? undefined : this.#nodeById.get(selectedNodeId)
+    const directory = selectedNodeId === undefined ? undefined : this.#directoryById.get(selectedNodeId)
+    const treeEntity = node?.kind === "project-file" || directory !== undefined
+    const showSelectedItem = searchActive && treeEntity && !selectedIsInResults
+    this.#elements.selectedTreeSection.hidden = !showSelectedItem
+    this.#elements.selectedTreeItem.replaceChildren()
+    if (!showSelectedItem) {
+      return
+    }
+    if (directory !== undefined) {
+      this.#elements.selectedTreeItem.append(this.#directoryListItem(directory, this.#directoryDisplayName(directory)))
+      return
+    }
+    if (node?.kind === "project-file") {
+      this.#elements.selectedTreeItem.append(this.#nodeListItem(node, node.displayName, "Project file"))
+    }
+  }
+
+  #renderNavigation(): void {
+    this.#elements.navigationBackButton.disabled = !this.#navigation.canGoBack
+    this.#elements.navigationForwardButton.disabled = !this.#navigation.canGoForward
+    this.#elements.selectionBreadcrumb.replaceChildren()
+
+    const selectedNodeId = this.#navigation.selectedNodeId
+    if (selectedNodeId === undefined) {
+      return
+    }
+
+    const rootDirectory = this.#requiredDirectoryByPath("")
+    this.#elements.selectionBreadcrumb.append(
+      this.#breadcrumbButton(this.#presentation.projectName, rootDirectory.id, selectedNodeId === rootDirectory.id),
+    )
+    const directory = this.#directoryById.get(selectedNodeId)
+    const node = this.#nodeById.get(selectedNodeId)
+    const directoryPath = directory?.path ?? (node?.kind === "project-file" ? node.path.split("/").slice(0, -1).join("/") : "")
+    let currentPath = ""
+    for (const segment of directoryPath.split("/").filter((value) => value.length > 0)) {
+      currentPath = currentPath.length === 0 ? segment : `${currentPath}/${segment}`
+      const pathDirectory = this.#requiredDirectoryByPath(currentPath)
+      this.#elements.selectionBreadcrumb.append(
+        this.#breadcrumbSeparator(),
+        this.#breadcrumbButton(segment, pathDirectory.id, selectedNodeId === pathDirectory.id),
+      )
+    }
+
+    if (node !== undefined) {
+      const current = this.#elements.fileList.ownerDocument.createElement("span")
+      current.className = "selection-breadcrumb-current"
+      current.textContent = node.kind === "project-file" ? (node.path.split("/").at(-1) ?? node.path) : node.displayName
+      this.#elements.selectionBreadcrumb.append(this.#breadcrumbSeparator(), current)
+    }
+  }
+
+  #breadcrumbButton(label: string, nodeId: string, current: boolean): HTMLButtonElement {
+    const button = this.#elements.fileList.ownerDocument.createElement("button")
+    button.type = "button"
+    button.textContent = label
+    button.dataset.nodeId = nodeId
+    button.setAttribute("aria-current", current ? "true" : "false")
+    button.addEventListener("click", () => {
+      this.#actions.activateNode(nodeId)
+    })
+    return button
+  }
+
+  #breadcrumbSeparator(): HTMLSpanElement {
+    const separator = this.#elements.fileList.ownerDocument.createElement("span")
+    separator.className = "selection-breadcrumb-separator"
+    separator.textContent = "/"
+    separator.setAttribute("aria-hidden", "true")
+    return separator
   }
 
   #showProjectFileDetails(node: ReportProjectFileNode): void {
@@ -297,9 +410,9 @@ export class ReportPanels {
     }
     button.title = node.displayName
     button.dataset.nodeId = node.id
-    button.setAttribute("aria-current", node.id === this.#interaction.selectedNodeId ? "true" : "false")
+    button.setAttribute("aria-current", node.id === this.#navigation.selectedNodeId ? "true" : "false")
     button.addEventListener("click", () => {
-      this.#actions.selectNode(node.id)
+      this.#actions.activateNode(node.id)
     })
     return button
   }
@@ -317,9 +430,9 @@ export class ReportPanels {
     button.title = this.#directoryDisplayName(directory)
     button.dataset.nodeId = directory.id
     button.setAttribute("aria-label", this.#directoryDisplayName(directory))
-    button.setAttribute("aria-current", directory.id === this.#interaction.selectedNodeId ? "true" : "false")
+    button.setAttribute("aria-current", directory.id === this.#navigation.selectedNodeId ? "true" : "false")
     button.addEventListener("click", () => {
-      this.#actions.selectNode(directory.id)
+      this.#actions.activateNode(directory.id)
     })
     item.append(button)
     return item

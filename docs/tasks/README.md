@@ -4,12 +4,11 @@ This directory tracks milestones, implementation progress, verification evidence
 
 ## Roadmap
 
-Milestones 022 through 030 form one ordered report-UX sequence. Implement them in numeric order because each milestone establishes interaction or presentation contracts used by the next. Milestone 020 is independent and may be scheduled separately.
+Milestones 023 through 030 continue the ordered report-UX sequence established by completed milestone 022. Implement them in numeric order because each milestone establishes interaction or presentation contracts used by the next. Milestone 020 is independent and may be scheduled separately.
 
 | Milestone                                                                       | Status      | Outcome                                                                                     |
 | ------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------- |
 | [020 Configurable coverage locations](./020-configurable-coverage-locations.md) | Not started | Configure per-package locations and multiple explicit reports.                              |
-| [022 Coherent report navigation](./022-coherent-report-navigation.md)           | Not started | Unify search, selection, centering, directory disclosure, breadcrumbs, and history.         |
 | [023 Diagnostic lens framework](./023-diagnostic-lens-framework.md)             | Not started | Replace checkbox-first setup with deterministic task-oriented presentation presets.         |
 | [024 Findings-first overview](./024-findings-first-overview.md)                 | Not started | Surface explainable coverage, coupling, cycle, and cross-workspace candidates on open.      |
 | [025 Coverage lens](./025-coverage-lens.md)                                     | Not started | Explore file size and coverage through explicit thresholds, counts, and graph emphasis.     |
@@ -23,28 +22,29 @@ Milestones 022 through 030 form one ordered report-UX sequence. Implement them i
 
 Completed milestone files are retained under [`done/`](./done/) as implementation history and verification evidence.
 
-| Milestone                                                                      | Completed  | Outcome                                                                |
-| ------------------------------------------------------------------------------ | ---------- | ---------------------------------------------------------------------- |
-| [001 Foundation](./done/001-foundation.md)                                     | 2026-07-15 | Established build boundaries, fixtures, and test infrastructure.       |
-| [002 File discovery and LOC](./done/002-file-discovery-and-loc.md)             | 2026-07-15 | Added executable-file discovery and deterministic non-blank LOC.       |
-| [003 Static visualization](./done/003-static-visualization.md)                 | 2026-07-16 | Added the self-contained interactive graph and hardened its layout.    |
-| [004 Static ESM imports](./done/004-static-esm-imports.md)                     | 2026-07-16 | Added static runtime ESM dependencies and relationship details.        |
-| [005 Coverage](./done/005-coverage.md)                                         | 2026-07-16 | Added optional Istanbul line coverage and coverage-colored nodes.      |
-| [006 CLOC line breakdown](./done/006-cloc-line-breakdown.md)                   | 2026-07-16 | Added exclusive line categories and interactive node sizing.           |
-| [007 External packages](./done/007-external-packages.md)                       | 2026-07-16 | Added optional package nodes without analyzing installed code.         |
-| [008 pnpm workspaces](./done/008-pnpm-workspaces.md)                           | 2026-07-18 | Analyzes and filters all packages in one pnpm workspace.               |
-| [009 Import compatibility](./done/009-import-compatibility.md)                 | 2026-07-25 | Adds CommonJS, dynamic imports, and broader resolution behavior.       |
-| [010 Visualization and UX](./done/010-visualization-and-ux.md)                 | 2026-07-25 | Delivers large-desktop navigation, interpretation, and graph focus.    |
-| [011 Large-codebase performance](./done/011-large-codebase-performance.md)     | 2026-07-25 | Adds measured five-million-line analysis and collision-safe rendering. |
-| [012 GitHub Pages report](./done/012-github-pages-report.md)                   | 2026-07-16 | Publishes a validated live visualization of the repository.            |
-| [013 Default test-file exclusions](./done/013-default-test-file-exclusions.md) | 2026-07-16 | Removes conventionally named test files from default analysis.         |
-| [014 CLI file selection](./done/014-cli-file-selection.md)                     | 2026-07-25 | Replaces built-in test exclusions with one-invocation patterns.        |
-| [015 Project configuration](./done/015-project-configuration.md)               | 2026-07-25 | Persists CLI settings with explicit per-value precedence.              |
-| [016 Codebase consolidation](./done/016-codebase-consolidation.md)             | 2026-07-16 | Hardened analysis, report, CLI, build, and package boundaries.         |
-| [017 Browser-owned presentation](./done/017-browser-owned-presentation.md)     | 2026-07-18 | Embeds raw analysis and derives presentation in the browser.           |
-| [018 LCOV coverage](./done/018-lcov-coverage.md)                               | 2026-07-18 | Imports LCOV and deterministically selects one coverage report.        |
-| [019 Monorepo coverage discovery](./done/019-monorepo-coverage-discovery.md)   | 2026-07-18 | Combines conventional coverage from project and package roots.         |
-| [021 Type-only dependencies](./done/021-type-only-dependencies.md)             | 2026-07-25 | Tracks, distinguishes, and filters explicitly type-only dependencies.  |
+| Milestone                                                                      | Completed  | Outcome                                                                     |
+| ------------------------------------------------------------------------------ | ---------- | --------------------------------------------------------------------------- |
+| [001 Foundation](./done/001-foundation.md)                                     | 2026-07-15 | Established build boundaries, fixtures, and test infrastructure.            |
+| [002 File discovery and LOC](./done/002-file-discovery-and-loc.md)             | 2026-07-15 | Added executable-file discovery and deterministic non-blank LOC.            |
+| [003 Static visualization](./done/003-static-visualization.md)                 | 2026-07-16 | Added the self-contained interactive graph and hardened its layout.         |
+| [004 Static ESM imports](./done/004-static-esm-imports.md)                     | 2026-07-16 | Added static runtime ESM dependencies and relationship details.             |
+| [005 Coverage](./done/005-coverage.md)                                         | 2026-07-16 | Added optional Istanbul line coverage and coverage-colored nodes.           |
+| [006 CLOC line breakdown](./done/006-cloc-line-breakdown.md)                   | 2026-07-16 | Added exclusive line categories and interactive node sizing.                |
+| [007 External packages](./done/007-external-packages.md)                       | 2026-07-16 | Added optional package nodes without analyzing installed code.              |
+| [008 pnpm workspaces](./done/008-pnpm-workspaces.md)                           | 2026-07-18 | Analyzes and filters all packages in one pnpm workspace.                    |
+| [009 Import compatibility](./done/009-import-compatibility.md)                 | 2026-07-25 | Adds CommonJS, dynamic imports, and broader resolution behavior.            |
+| [010 Visualization and UX](./done/010-visualization-and-ux.md)                 | 2026-07-25 | Delivers large-desktop navigation, interpretation, and graph focus.         |
+| [011 Large-codebase performance](./done/011-large-codebase-performance.md)     | 2026-07-25 | Adds measured five-million-line analysis and collision-safe rendering.      |
+| [012 GitHub Pages report](./done/012-github-pages-report.md)                   | 2026-07-16 | Publishes a validated live visualization of the repository.                 |
+| [013 Default test-file exclusions](./done/013-default-test-file-exclusions.md) | 2026-07-16 | Removes conventionally named test files from default analysis.              |
+| [014 CLI file selection](./done/014-cli-file-selection.md)                     | 2026-07-25 | Replaces built-in test exclusions with one-invocation patterns.             |
+| [015 Project configuration](./done/015-project-configuration.md)               | 2026-07-25 | Persists CLI settings with explicit per-value precedence.                   |
+| [016 Codebase consolidation](./done/016-codebase-consolidation.md)             | 2026-07-16 | Hardened analysis, report, CLI, build, and package boundaries.              |
+| [017 Browser-owned presentation](./done/017-browser-owned-presentation.md)     | 2026-07-18 | Embeds raw analysis and derives presentation in the browser.                |
+| [018 LCOV coverage](./done/018-lcov-coverage.md)                               | 2026-07-18 | Imports LCOV and deterministically selects one coverage report.             |
+| [019 Monorepo coverage discovery](./done/019-monorepo-coverage-discovery.md)   | 2026-07-18 | Combines conventional coverage from project and package roots.              |
+| [021 Type-only dependencies](./done/021-type-only-dependencies.md)             | 2026-07-25 | Tracks, distinguishes, and filters explicitly type-only dependencies.       |
+| [022 Coherent report navigation](./done/022-coherent-report-navigation.md)     | 2026-07-28 | Unifies search, selection, centering, disclosure, breadcrumbs, and history. |
 
 ## Workflow
 
