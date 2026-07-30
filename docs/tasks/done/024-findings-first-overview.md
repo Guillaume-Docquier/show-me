@@ -2,7 +2,9 @@
 
 ## Status
 
-Not started.
+Complete.
+
+Completed on 2026-07-29. The Overview lens now opens with deterministic browser-derived findings, with the complete project explorer available in the adjacent `Project files` tab. Findings expose their raw metrics, respond only to workspace scope, expand from five-item summaries into complete rankings, and activate entities through the shared selection, centering, inspector, and history workflow.
 
 ## Outcome
 
@@ -11,8 +13,8 @@ Opening a report immediately presents a short, explainable set of codebase candi
 ## Dependencies
 
 - [Milestone 022](./022-coherent-report-navigation.md) establishes explicit navigation from any report surface.
-- [Milestone 023](./done/023-diagnostic-lens-framework.md) establishes the `Overview` lens and lens-specific presentation state.
-- [ADR 001](../adr/001-separate-analysis-from-rendering.md) requires findings to be derived in the browser from language-neutral analysis facts.
+- [Milestone 023](./023-diagnostic-lens-framework.md) establishes the `Overview` lens and lens-specific presentation state.
+- [ADR 001](../../adr/001-separate-analysis-from-rendering.md) requires findings to be derived in the browser from language-neutral analysis facts.
 
 ## Current behavior and problem
 
@@ -81,42 +83,46 @@ A **finding** is an explainable, browser-derived candidate that combines or rank
 - Rank groups by relationship count descending, then stable workspace names.
 - Call them cross-workspace relationships, not violations.
 
-External-package findings are added by [Milestone 029](./029-external-dependency-lens.md).
+External-package findings are added by [Milestone 029](../029-external-dependency-lens.md).
 
 ## Implementation tasks
 
-- [ ] Add renderer-neutral browser finding types and deterministic derivation helpers.
-- [ ] Derive findings from immutable browser presentation plus active workspace scope.
-- [ ] Implement deterministic percentile, fan-in, fan-out, strongly connected component, and cross-workspace grouping logic.
-- [ ] Keep graph identities and display strings in browser presentation rather than duplicating analysis facts.
-- [ ] Render categorized findings in the `Overview` lens with raw metrics and complete accessible names.
-- [ ] Support the initial five-item summary and complete list without recomputing a different ranking.
-- [ ] Route finding activation through the shared navigation operation.
-- [ ] Add deliberate all-clear copy when the active scope produces no findings.
-- [ ] Expose semantic finding categories, entity identities, ranks, and counts for browser tests.
-- [ ] Measure derivation time with the existing performance profiler and avoid per-render recomputation.
+- [x] Add renderer-neutral browser finding types and deterministic derivation helpers.
+- [x] Derive findings from immutable browser presentation plus active workspace scope.
+- [x] Implement deterministic percentile, fan-in, fan-out, strongly connected component, and cross-workspace grouping logic.
+- [x] Keep graph identities and display strings in browser presentation rather than duplicating analysis facts.
+- [x] Render categorized findings in the `Overview` lens with raw metrics and complete accessible names.
+- [x] Support the initial five-item summary and complete list without recomputing a different ranking.
+- [x] Route finding activation through the shared navigation operation.
+- [x] Add deliberate all-clear copy when the active scope produces no findings.
+- [x] Expose semantic finding categories, entity identities, ranks, and counts for browser tests.
+- [x] Measure derivation time with the existing performance profiler and avoid per-render recomputation.
 
 ## Required tests
 
-- [ ] Small hand-written fixtures cover each finding category and all tie-break rules.
-- [ ] Tests prove unknown coverage is separate from zero coverage.
-- [ ] Tests prove runtime and type-only counts remain distinct.
-- [ ] Tests prove runtime cycles, cycles that require type-only relationships, duplicate suppression, self-cycles, and acyclic graphs.
-- [ ] Tests prove findings update with workspace scope and ignore project-tree search.
-- [ ] Browser coverage proves the initial report presents findings before the user knows a file name.
-- [ ] Browser coverage activates a finding and verifies selection, centering, inspector details, and navigation history.
-- [ ] Browser coverage verifies the five-item summary and complete deterministic list.
-- [ ] Performance sentinel coverage prevents findings derivation from materially regressing browser-ready time.
+- [x] Small hand-written fixtures cover each finding category and all tie-break rules.
+- [x] Tests prove unknown coverage is separate from zero coverage.
+- [x] Tests prove runtime and type-only counts remain distinct.
+- [x] Tests prove runtime cycles, cycles that require type-only relationships, duplicate suppression, self-cycles, and acyclic graphs.
+- [x] Tests prove findings update with workspace scope and ignore project-tree search.
+- [x] Browser coverage proves the initial report presents findings before the user knows a file name.
+- [x] Browser coverage activates a finding and verifies selection, centering, inspector details, and navigation history.
+- [x] Browser coverage verifies the five-item summary and complete deterministic list.
+- [x] Performance sentinel coverage prevents findings derivation from materially regressing browser-ready time.
 
 ## Documentation
 
-- [ ] Add `Finding` to the glossary.
-- [ ] Update the README with every implemented finding category and the distinction between candidates and rule-backed violations.
-- [ ] Document the exact deterministic ranking rules so users can interpret why an entity appears.
+- [x] Add `Finding` to the glossary.
+- [x] Update the README with every implemented finding category and the distinction between candidates and rule-backed violations.
+- [x] Document the exact deterministic ranking rules so users can interpret why an entity appears.
 
 ## Verification evidence
 
-Record commands and results here before completion.
+- `pnpm exec vitest run --silent=true src/report/browser/report-findings.test.ts src/report/build-html-report.test.ts src/performance/performance-profiler.test.ts` passed 3 files and 11 tests.
+- `pnpm test:browser` passed all 16 Chromium scenarios, including the findings-first discovery, five-item expansion, navigation, scope, search-independence, and all-clear workflow.
+- `pnpm test:performance` passed. Findings derivation took 2.5 ms and 2.3 ms in the focused sentinel run, then 2.2 ms and 2.0 ms in the complete gate.
+- `pnpm checks` passed formatting, zero-warning lint, type checking, all 28 Vitest files and 270 tests, both builds, all 16 Chromium scenarios, the performance sentinel, and dogfood report generation.
+- Browser inspection of the generated dogfood report confirmed the two-tab left workspace, readable candidate cards, full-height Project files navigation, graph centering, selected-node details, and navigation history. The README screenshot was refreshed from this report.
 
 ## Non-goals
 

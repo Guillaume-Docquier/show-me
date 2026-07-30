@@ -82,12 +82,54 @@ main {
   grid-template-rows: minmax(0, 1fr) auto;
   grid-template-areas: "files graph details" "files controls details";
 }
-#files { grid-area: files; border-right: 1px solid #25303b; background: #111821; overflow: auto; padding: 18px; }
+#files {
+  grid-area: files; display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0;
+  border-right: 1px solid #25303b; background: #111821; overflow: hidden;
+}
+.findings-panel, #project-files-panel { min-height: 0; overflow: auto; padding: 18px; }
 #graph { grid-area: graph; position: relative; min-width: 0; background: #0d1117; }
 #details { grid-area: details; border-left: 1px solid #25303b; background: #111821; overflow: auto; padding: 18px; }
 #files h2, .report-controls h2 {
   margin: 0 0 12px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: #8fa3b8;
 }
+.sidebar-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin: 14px 18px 0; padding: 3px; border-radius: 7px; background: #0d141c; }
+.sidebar-tabs[hidden], .findings-panel[hidden], #project-files-panel[hidden] { display: none; }
+.sidebar-tabs button {
+  border: 1px solid transparent; border-radius: 5px; padding: 7px 8px; background: transparent; color: #8fa3b8;
+  font: 600 11px Inter, ui-sans-serif, system-ui, sans-serif; cursor: pointer;
+}
+.sidebar-tabs button[aria-selected="true"] { border-color: #42556a; background: #17202a; color: #f5f9ff; }
+.sidebar-tabs button:hover, .sidebar-tabs button:focus-visible { border-color: #79b8ff; color: #f5f9ff; outline: none; }
+.findings-intro, .findings-empty { margin: 0 0 16px; color: #8fa3b8; font-size: 11px; line-height: 1.5; }
+#findings-categories { display: grid; gap: 20px; }
+#findings-categories[hidden], .findings-empty[hidden] { display: none; }
+.finding-category h3 {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0 0 8px;
+  color: #d3dee9; font-size: 11px; line-height: 1.35;
+}
+.finding-category-count {
+  min-width: 20px; border-radius: 999px; padding: 2px 6px; background: #25303b; color: #8fa3b8;
+  font-size: 10px; font-variant-numeric: tabular-nums; text-align: center;
+}
+.finding-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.finding-list li[hidden] { display: none; }
+.finding-card {
+  display: grid; gap: 4px; width: 100%; border: 1px solid #25303b; border-radius: 7px; padding: 9px 10px;
+  background: #0d141c; color: #aebdca; text-align: left; cursor: pointer;
+}
+.finding-card:hover, .finding-card:focus-visible { border-color: #79b8ff; background: #162230; outline: none; }
+.finding-card[aria-current="true"] { border-color: #79b8ff; background: #172638; }
+.finding-entity {
+  overflow: hidden; color: #f5f9ff; font: 600 11px ui-monospace, SFMono-Regular, Consolas, monospace;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.finding-metrics { color: #79b8ff; font-size: 10px; font-variant-numeric: tabular-nums; }
+.finding-explanation { color: #8fa3b8; font-size: 10px; line-height: 1.45; }
+.finding-list-toggle {
+  margin-top: 7px; border: 0; padding: 3px 0; background: transparent; color: #79b8ff;
+  font: 600 10px Inter, ui-sans-serif, system-ui, sans-serif; cursor: pointer;
+}
+.finding-list-toggle:hover, .finding-list-toggle:focus-visible { color: #b7d9ff; text-decoration: underline; outline: none; }
 .file-search { display: grid; gap: 6px; margin-bottom: 8px; color: #8fa3b8; font-size: 11px; }
 .file-search input {
   width: 100%; border: 1px solid #344456; border-radius: 5px; padding: 8px 9px;

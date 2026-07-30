@@ -36,22 +36,34 @@ export function buildHtmlReport(analysis: ProjectAnalysis, browserBundle: string
   <div class="report-heading"><h1 id="project-name"></h1><p id="project-file-count"></p></div>
 </header>
 <main>
-  <aside id="files" aria-labelledby="files-heading">
-    <h2 id="files-heading">Project files</h2>
-    <label class="file-search" for="file-search">
-      <span>Search project paths</span>
-      <input id="file-search" type="search" placeholder="Filter by path" autocomplete="off">
-    </label>
-    <p id="file-search-result-count" class="file-search-result-count" role="status" hidden></p>
-    <p id="file-tree-empty" class="file-tree-empty" role="status" hidden></p>
-    <ol id="file-list" class="file-list node-list"></ol>
-    <section id="selected-tree-section" class="selected-tree-section" hidden>
-      <h3>Selected item</h3>
-      <ol id="selected-tree-item" class="file-list node-list"></ol>
+  <aside id="files" aria-label="Codebase navigation">
+    <div id="sidebar-tabs" class="sidebar-tabs" role="tablist" aria-label="Codebase panels">
+      <button id="findings-tab" type="button" role="tab" aria-controls="findings-panel" aria-selected="true">Findings</button>
+      <button id="project-files-tab" type="button" role="tab" aria-controls="project-files-panel" aria-selected="false" tabindex="-1">Project files</button>
+    </div>
+    <section id="findings-panel" class="findings-panel" role="tabpanel" aria-labelledby="findings-tab">
+      <h2>Findings</h2>
+      <p class="findings-intro">Explainable candidates from the active workspace scope. They are starting points for investigation, not verdicts.</p>
+      <div id="findings-categories"></div>
+      <p id="findings-empty" class="findings-empty" role="status" hidden>No findings in the active workspace scope.</p>
     </section>
-    <section id="external-package-section" hidden>
-      <h2><span class="package-swatch" aria-hidden="true"></span>External packages</h2>
-      <ol id="external-package-list" class="file-list node-list"></ol>
+    <section id="project-files-panel" role="tabpanel" aria-labelledby="project-files-tab" hidden>
+      <h2 id="files-heading">Project files</h2>
+      <label class="file-search" for="file-search">
+        <span>Search project paths</span>
+        <input id="file-search" type="search" placeholder="Filter by path" autocomplete="off">
+      </label>
+      <p id="file-search-result-count" class="file-search-result-count" role="status" hidden></p>
+      <p id="file-tree-empty" class="file-tree-empty" role="status" hidden></p>
+      <ol id="file-list" class="file-list node-list"></ol>
+      <section id="selected-tree-section" class="selected-tree-section" hidden>
+        <h3>Selected item</h3>
+        <ol id="selected-tree-item" class="file-list node-list"></ol>
+      </section>
+      <section id="external-package-section" hidden>
+        <h2><span class="package-swatch" aria-hidden="true"></span>External packages</h2>
+        <ol id="external-package-list" class="file-list node-list"></ol>
+      </section>
     </section>
   </aside>
   <section id="graph" aria-label="Project folder and file structure with dependency arrows"></section>

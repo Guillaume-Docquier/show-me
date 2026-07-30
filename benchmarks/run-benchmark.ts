@@ -37,6 +37,7 @@ const budgets =
         peakRssMiB: 775,
         reportSizeMiB: 0.85,
         browserReadyMilliseconds: 900,
+        browserFindingsMilliseconds: 50,
         browserLayoutMilliseconds: 500,
         interactionMilliseconds: 800,
       }
@@ -45,6 +46,7 @@ const budgets =
         peakRssMiB: 750,
         reportSizeMiB: 1,
         browserReadyMilliseconds: 8_000,
+        browserFindingsMilliseconds: 500,
         browserLayoutMilliseconds: 5_000,
         interactionMilliseconds: 1_000,
       }
@@ -96,6 +98,11 @@ assertAtMost("warm CLI peak RSS", warmCli.peakRssMiB, budgets.peakRssMiB)
 assertAtMost("report size", warmCli.reportSizeMiB, budgets.reportSizeMiB)
 for (const browser of [firstBrowser, repeatedBrowser]) {
   assertAtMost(`${browser.kind} ready duration`, browser.readyMilliseconds, budgets.browserReadyMilliseconds)
+  const findings = browser.phases.find(({ phase }) => phase === "browser-findings")
+  if (findings === undefined) {
+    throw new Error(`${browser.kind} did not record browser findings duration.`)
+  }
+  assertAtMost(`${browser.kind} findings duration`, findings.durationMilliseconds, budgets.browserFindingsMilliseconds)
   const layout = browser.phases.find(({ phase }) => phase === "browser-layout")
   if (layout === undefined) {
     throw new Error(`${browser.kind} did not record browser layout duration.`)

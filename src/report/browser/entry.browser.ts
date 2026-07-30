@@ -10,6 +10,8 @@ import { PerformanceProfiler } from "../../performance/performance-profiler.js"
 import { renderCoverageLegend } from "./coverage-legend.js"
 import { ReportControls } from "./report-controls.js"
 import { getReportElements } from "./report-elements.js"
+import { ReportFindingsPanel } from "./report-findings-panel.js"
+import { deriveReportFindings } from "./report-findings.js"
 import { ReportGraph } from "./report-graph.js"
 import { activeReportLens, initialReportPresentationState, reportLensSettings, type ReportPresentationState } from "./report-lens.js"
 import { ReportNavigation, type ReportNavigationState } from "./report-navigation.js"
@@ -31,6 +33,7 @@ const presentation = performanceProfiler.measure("browser-presentation", () => b
 const elements = getReportElements(document)
 let presentationState = initialReportPresentationState(presentation.workspacePackages.map(({ path }) => path))
 let renderedViewSignature: string | undefined
+let renderedFindingsScopeSignature: string | undefined
 
 document.title = `Show me ${presentation.projectName}`
 elements.heading.projectName.textContent = presentation.projectName
@@ -83,6 +86,13 @@ const panels = new ReportPanels({
   },
 })
 
+const findingsPanel = new ReportFindingsPanel({
+  elements: elements.findings,
+  activateNode: (nodeId): void => {
+    navigation.activate(nodeId)
+  },
+})
+
 const controls = new ReportControls({
   elements: elements.controls,
   presentation,
@@ -106,6 +116,7 @@ elements.root.dataset.presentationSignature = browserPresentationSignature(prese
 function renderNavigation(state: ReportNavigationState, centeredNodeId: string | undefined): void {
   graph.renderInteraction(state)
   panels.renderNavigation(state)
+  findingsPanel.renderSelection(state.selectedNodeId)
   elements.root.dataset.navigationHistory = JSON.stringify({ entries: state.history, index: state.historyIndex })
   if (centeredNodeId !== undefined) {
     graph.centerNode(centeredNodeId)
@@ -118,6 +129,13 @@ function applyPresentationState(nextPresentationState: ReportPresentationState):
   const view = buildReportView(presentation, presentationState.scope, settings)
   const nextViewSignature = reportViewGraphSignature(view)
   controls.render(presentationState)
+  findingsPanel.renderLens(presentationState.lens)
+  const nextFindingsScopeSignature = JSON.stringify([...presentationState.scope.workspacePackages].toSorted())
+  if (nextFindingsScopeSignature !== renderedFindingsScopeSignature) {
+    const findings = performanceProfiler.measure("browser-findings", () => deriveReportFindings(presentation, presentationState.scope))
+    findingsPanel.render(findings)
+    renderedFindingsScopeSignature = nextFindingsScopeSignature
+  }
   elements.heading.projectFileCount.textContent = projectFileCountLabel(view.visibleProjectFileCount, analysis.files.length)
   graph.setLensSettings(settings)
   if (nextViewSignature !== renderedViewSignature) {

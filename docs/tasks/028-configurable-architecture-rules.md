@@ -13,7 +13,7 @@ Repositories can declare named architecture modules and allowed directed depende
 - [Milestone 027](./027-boundary-lens.md) establishes factual boundary aggregation and drill-down.
 - [Milestone 015](./done/015-project-configuration.md) and [ADR 007](../adr/007-use-jsonc-and-zod-for-project-configuration.md) establish strict root JSONC configuration and per-value translation.
 - [ADR 001](../adr/001-separate-analysis-from-rendering.md) establishes the versioned language-neutral analysis boundary.
-- [Milestone 024](./024-findings-first-overview.md) establishes explainable findings.
+- [Milestone 024](./done/024-findings-first-overview.md) establishes explainable findings.
 
 This milestone changes configuration and authoritative analysis. Write and accept a new ADR before implementation. If the accepted design differs from the baseline contract below, update this task before writing production code.
 

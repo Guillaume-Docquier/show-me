@@ -3,9 +3,11 @@ import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 import { promisify } from "node:util"
-import { Assert } from "@guillaume-docquier/tools-ts"
+import { Assert, branded } from "@guillaume-docquier/tools-ts"
 import { expect, test, type Locator, type Page } from "@playwright/test"
 import { analyzeProject } from "../../src/analysis/analyze-project.js"
+import type { ProjectAnalysis } from "../../src/analysis/project-analysis.js"
+import type { ProjectFilePath } from "../../src/project-files/project-file-path.js"
 import { buildHtmlReport } from "../../src/report/build-html-report.js"
 import { fixtureProjectPath } from "../../src/testing/fixture-project.js"
 import { withTemporaryDirectory } from "../../src/testing/temporary-directory.js"
@@ -55,6 +57,7 @@ test("keeps every report region usable together on a large desktop", async ({ pa
     await test.step("Navigate files, inspect details, and change controls without losing the graph", async () => {
       const graph = page.locator("#graph")
       await expect(graph.locator("canvas.sigma-structure")).toBeVisible()
+      await showProjectFilesPanel(page)
       await page.locator("#files").getByRole("button", { name: "src/entry.ts", exact: true }).click()
       await expect(page.locator("#selected-path")).toHaveText("src/entry.ts")
 
@@ -85,6 +88,7 @@ test("navigates a collapsible and searchable project-files tree", async ({ page 
     await test.step("Keep disclosure separate from directory selection and restore expansion after search", async () => {
       await page.goto(pathToFileURL(report.path).href)
       await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
+      await showProjectFilesPanel(page)
       await expect(page.locator("#project-file-count")).toHaveText(`${report.fileCount} / ${report.fileCount} project files`)
       const srcDirectory = page.locator('button[data-directory-path="src"]')
       const srcDisclosure = page.getByRole("button", { name: "Collapse directory src", exact: true })
@@ -152,6 +156,7 @@ test("navigates a collapsible and searchable project-files tree", async ({ page 
     await test.step("Preview a hovered file without moving the camera, then center it when selected", async () => {
       await page.reload()
       await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
+      await showProjectFilesPanel(page)
       const graph = page.locator("#graph")
       const mainFile = page.locator('#file-list button[data-node-id="project-file:src/main.ts"]')
       const runtimeFile = page.locator('#file-list button[data-node-id="project-file:src/runtime.ts"]')
@@ -279,6 +284,7 @@ test("supports graph hover, selection, clearing, and side-panel navigation", asy
     const pointer = await test.step("Preview complete node details on hover without replacing selection", async () => {
       await page.goto(pathToFileURL(report.reportPath).href)
       await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
+      await showProjectFilesPanel(page)
       await expect(page).toHaveTitle("Show me project")
       await expect(page.locator("#project-name")).toHaveText("project")
       await expect(page.locator("#project-file-count")).toHaveText("2 / 2 project files")
@@ -286,7 +292,7 @@ test("supports graph hover, selection, clearing, and side-panel navigation", asy
       await expect(page.locator("#graph")).toHaveAttribute("data-visible-edge-count", "0")
       await expect(page.locator("#details h2")).toHaveCount(0)
       await expect(page.getByRole("button", { name: "Clear selection" })).toHaveCount(0)
-      const selectedFileButton = page.getByRole("button", { name: report.selectedPath })
+      const selectedFileButton = page.locator("#file-list").getByRole("button", { name: report.selectedPath, exact: true })
       await selectedFileButton.focus()
       await selectedFileButton.press("Enter")
       await expect(page.locator("html")).toHaveAttribute("data-selected-node", report.selectedNodeId)
@@ -431,6 +437,7 @@ test("keeps packages hidden by default and rebuilds one combined metric and pack
     const defaultLayoutSignature = await test.step("Open the default file-only projection", async () => {
       await page.goto(pathToFileURL(reports.reportPath).href)
       await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
+      await showProjectFilesPanel(page)
       await openAdvancedControls(page)
       await page.locator("#dependency-display").selectOption("all")
       const graph = page.locator("#graph")
@@ -466,6 +473,7 @@ test("keeps packages hidden by default and rebuilds one combined metric and pack
       await expect(page.locator("#selected-dependency-nodes")).toContainText("External package")
       expect(await graph.getAttribute("data-layout-signature")).not.toBe(defaultLayoutSignature)
 
+      await closeAdvancedControls(page)
       const reactNodeId = "external-package:react"
       const reactPackage = page.locator(`#external-package-list button[data-node-id="${reactNodeId}"]`)
       await reactPackage.click()
@@ -566,6 +574,7 @@ test("applies deterministic diagnostic lenses without losing compatible scope or
 
     await test.step("Reveal only the direct neighborhood on hover and selection", async () => {
       const graph = page.locator("#graph")
+      await showProjectFilesPanel(page)
       const fileSearch = page.getByRole("searchbox", { name: "Search project paths" })
       await fileSearch.fill("apps/backend/src/api.ts")
       const backendApi = page.getByRole("button", { name: "apps/backend/src/api.ts", exact: true })
@@ -635,6 +644,7 @@ test("applies deterministic diagnostic lenses without losing compatible scope or
     await test.step("Clear and announce a selection that a named lens cannot show", async () => {
       await page.getByRole("checkbox", { name: "External packages" }).check()
       await expect(page.locator("html")).toHaveAttribute("data-active-lens", "custom")
+      await showProjectFilesPanel(page)
       await page.locator("#external-package-list button").filter({ hasText: "backend-library" }).click()
       await expect(page.locator("html")).toHaveAttribute("data-selected-node", "external-package:backend-library")
 
@@ -644,6 +654,109 @@ test("applies deterministic diagnostic lenses without losing compatible scope or
         "Selection cleared because it is not available in the current lens or workspace scope.",
       )
       await expect(page.locator("#selected-empty")).toBeVisible()
+    })
+  })
+})
+
+test("opens with ranked findings that navigate through the shared report workflow", async ({ page }) => {
+  await withTemporaryDirectory(async (temporaryDirectory) => {
+    const reportPath = await test.step("Generate a deterministic report with more than five coupling candidates", async () => {
+      const browserBundle = await readFile(join(process.cwd(), "dist", "report", "browser.js"), "utf8")
+      const path = join(temporaryDirectory, "findings-overview.html")
+      await writeFile(path, buildHtmlReport(findingsOverviewAnalysis(), browserBundle), "utf8")
+      return path
+    })
+
+    await test.step("Present explainable findings before the user searches for a file", async () => {
+      await page.goto(pathToFileURL(reportPath).href)
+      await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
+      await expect(page.locator("html")).toHaveAttribute("data-active-lens", "overview")
+      await expect(page.locator("#findings-panel")).toBeVisible()
+      await expect(page.locator("#project-files-panel")).toBeHidden()
+      await expect(page.locator("#findings-tab")).toHaveAttribute("aria-selected", "true")
+      await expect(page.locator("#project-files-tab")).toHaveAttribute("aria-selected", "false")
+      await expect(page.locator("#findings-panel")).toHaveAttribute("data-finding-count", "13")
+      await expect(page.locator('.finding-category[data-finding-category="large-low-coverage"]')).toHaveAttribute("data-finding-count", "1")
+      await expect(page.locator('.finding-category[data-finding-category="cross-workspace-relationships"]')).toHaveAttribute(
+        "data-finding-count",
+        "2",
+      )
+      const measurements = await readJsonAttribute<readonly PerformanceMeasurementDiagnostic[]>(
+        page.locator("html"),
+        "data-performance-measurements",
+      )
+      expect(measurements.map(({ phase }) => phase)).toContain("browser-findings")
+
+      await showProjectFilesPanel(page)
+      await expect(page.locator("#findings-panel")).toBeHidden()
+      await expect(page.locator("#project-files-panel")).toBeVisible()
+      await page.locator("#findings-tab").click()
+      await expect(page.locator("#findings-panel")).toBeVisible()
+    })
+
+    await test.step("Show five fan-out candidates first, then reveal the complete deterministic ranking", async () => {
+      const fanOut = page.locator('.finding-category[data-finding-category="highest-fan-out"]')
+      await expect(fanOut.locator(".finding-card:visible")).toHaveCount(5)
+      await expect(fanOut.locator(".finding-entity:visible")).toHaveText([
+        "apps/a/source-01.ts",
+        "apps/a/source-02.ts",
+        "apps/a/source-03.ts",
+        "apps/a/source-04.ts",
+        "apps/a/source-05.ts",
+      ])
+      await fanOut.getByRole("button", { name: "Show all 7" }).click()
+      await expect(fanOut.locator(".finding-card:visible")).toHaveCount(7)
+      await expect(fanOut.locator(".finding-entity:visible")).toHaveText([
+        "apps/a/source-01.ts",
+        "apps/a/source-02.ts",
+        "apps/a/source-03.ts",
+        "apps/a/source-04.ts",
+        "apps/a/source-05.ts",
+        "apps/a/source-06.ts",
+        "apps/b/target.ts",
+      ])
+    })
+
+    await test.step("Activate a finding and reuse selection, centering, inspector, and history", async () => {
+      await page
+        .locator('.finding-category[data-finding-category="large-low-coverage"]')
+        .getByRole("button", { name: /apps\/a\/large\.ts/u })
+        .click()
+      await expect(page.locator("html")).toHaveAttribute("data-selected-node", "project-file:apps/a/large.ts")
+      await expect(page.locator("#graph")).toHaveAttribute("data-camera-focused-node", "project-file:apps/a/large.ts")
+      await expect(page.locator("#selected-path")).toHaveText("apps/a/large.ts")
+      await expect(page.locator("#selected-code-lines")).toHaveText("100")
+      await expect(page.locator("#selected-coverage")).toHaveText("25%")
+      expect(await readJsonAttribute(page.locator("html"), "data-navigation-history")).toEqual({
+        entries: ["project-file:apps/a/large.ts"],
+        index: 0,
+      })
+    })
+
+    await test.step("Ignore project-tree search and rederive only when workspace scope changes", async () => {
+      await showProjectFilesPanel(page)
+      const search = page.getByRole("searchbox", { name: "Search project paths" })
+      await search.fill("large")
+      await expect(page.locator("#findings-panel")).toHaveAttribute("data-finding-count", "13")
+      await page.getByRole("checkbox", { name: "@findings/b", exact: true }).uncheck()
+      await expect(page.locator("html")).toHaveAttribute("data-workspace-packages", '["apps/a"]')
+      await expect(page.locator("#findings-panel")).toHaveAttribute("data-finding-count", "1")
+      await expect(page.locator("#findings-categories > section")).toHaveCount(1)
+      await expect(page.locator('.finding-category[data-finding-category="large-low-coverage"] .finding-entity')).toHaveText(
+        "apps/a/large.ts",
+      )
+      await expect(page.locator("html")).toHaveAttribute("data-selected-node", "project-file:apps/a/large.ts")
+      await page.getByRole("checkbox", { name: "@findings/a", exact: true }).uncheck()
+      await page.locator("#findings-tab").click()
+      await expect(page.locator("#findings-empty")).toHaveText("No findings in the active workspace scope.")
+      await expect(page.locator("#findings-empty")).toBeVisible()
+    })
+
+    await test.step("Give Structure the complete project explorer column", async () => {
+      await page.locator("#lens-selector").selectOption("structure")
+      await expect(page.locator("#sidebar-tabs")).toBeHidden()
+      await expect(page.locator("#findings-panel")).toBeHidden()
+      await expect(page.locator("#project-files-panel")).toBeVisible()
     })
   })
 })
@@ -662,6 +775,7 @@ test("derives project-file edges and relationships in the browser", async ({ pag
     await test.step("Inspect browser-derived dependency and consumer navigation", async () => {
       await page.goto(pathToFileURL(reportPath).href)
       await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
+      await showProjectFilesPanel(page)
       await expect(page.locator("#graph")).toHaveAttribute("data-visible-edge-count", "16")
       await page.locator("#file-list").getByRole("button", { name: "src/main.ts", exact: true }).click()
       await expect(page.getByRole("heading", { name: "Dependencies", exact: true })).toBeVisible()
@@ -699,6 +813,7 @@ test("shows, distinguishes, filters, and deterministically restores type-only de
     const initialLayoutSignature = await test.step("Open with distinct type-only arrows and relationship details visible", async () => {
       await page.goto(pathToFileURL(reportPath).href)
       await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
+      await showProjectFilesPanel(page)
       await openAdvancedControls(page)
       await page.locator("#dependency-display").selectOption("all")
       const graph = page.locator("#graph")
@@ -788,6 +903,7 @@ test("uses weighted folder nodes as the primary force graph under dependency arr
     const settledGraphState = await test.step("Inspect the structural graph, force weights, and dependency rendering", async () => {
       await page.goto(pathToFileURL(reportPath).href)
       await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
+      await showProjectFilesPanel(page)
       await openAdvancedControls(page)
       await page.locator("#dependency-display").selectOption("all")
       const graph = page.locator("#graph")
@@ -899,6 +1015,7 @@ test("uses weighted folder nodes as the primary force graph under dependency arr
     await test.step("Select directories from the graph and explorer, preview their contents, and focus their structure edges", async () => {
       await page.reload()
       await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
+      await showProjectFilesPanel(page)
       const graph = page.locator("#graph")
       const graphBounds = await graph.boundingBox()
       Assert.isDefined(graphBounds)
@@ -1070,6 +1187,7 @@ test("focuses only the hovered or selected file's direct dependency neighborhood
     await test.step("Render distinct direct-neighborhood treatments without changing coverage fills", async () => {
       await page.goto(pathToFileURL(report.path).href)
       await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
+      await showProjectFilesPanel(page)
       await openAdvancedControls(page)
       await page.locator("#dependency-display").selectOption("all")
       const graph = page.locator("#graph")
@@ -1380,6 +1498,7 @@ test("explains project-file coverage colors and shows exact coverage in node det
     await test.step("Open the report and inspect its coverage color mapping and legend", async () => {
       await page.goto(pathToFileURL(reportPath).href)
       await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
+      await showProjectFilesPanel(page)
       const serializedColors = await page.locator("#graph").getAttribute("data-visible-node-colors")
       Assert.isDefined(serializedColors)
       expect(JSON.parse(serializedColors)).toEqual([
@@ -1465,6 +1584,7 @@ test("renders equivalent browser coverage from Istanbul and LCOV CLI inputs", as
     const istanbulColors = await test.step("Inspect browser-derived Istanbul coverage", async () => {
       await page.goto(pathToFileURL(reports.istanbulReport).href)
       await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
+      await showProjectFilesPanel(page)
       await page.locator("#file-list").getByRole("button", { name: "partial.ts", exact: true }).click()
       await expect(page.locator("#selected-coverage")).toHaveText("50%")
       const serializedColors = await page.locator("#graph").getAttribute("data-visible-node-colors")
@@ -1475,6 +1595,7 @@ test("renders equivalent browser coverage from Istanbul and LCOV CLI inputs", as
     await test.step("Inspect equivalent browser-derived LCOV coverage", async () => {
       await page.goto(pathToFileURL(reports.lcovReport).href)
       await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
+      await showProjectFilesPanel(page)
       await page.locator("#file-list").getByRole("button", { name: "partial.ts", exact: true }).click()
       await expect(page.locator("#selected-coverage")).toHaveText("50%")
       const serializedColors = await page.locator("#graph").getAttribute("data-visible-node-colors")
@@ -1503,6 +1624,7 @@ test("renders and filters one complete pnpm workspace without mutating its analy
     await test.step("Open with every workspace package and cross-package edge visible", async () => {
       await page.goto(pathToFileURL(reportPath).href)
       await expect(page.locator("html")).toHaveAttribute("data-show-me-ready", "true")
+      await showProjectFilesPanel(page)
       await openAdvancedControls(page)
       await expect(page.locator("#project-file-count")).toHaveText("8 / 8 project files")
       await expect(page.locator("#workspace-package-fieldset")).toBeVisible()
@@ -1680,6 +1802,65 @@ async function openAdvancedControls(page: Page): Promise<void> {
   }
 }
 
+async function showProjectFilesPanel(page: Page): Promise<void> {
+  const projectFilesTab = page.locator("#project-files-tab")
+  if ((await projectFilesTab.isVisible()) && (await projectFilesTab.getAttribute("aria-selected")) !== "true") {
+    await projectFilesTab.click()
+  }
+  await expect(page.locator("#project-files-panel")).toBeVisible()
+}
+
+function findingsOverviewAnalysis(): ProjectAnalysis {
+  const largePath = branded<ProjectFilePath>("apps/a/large.ts")
+  const sourcePaths = [
+    branded<ProjectFilePath>("apps/a/source-01.ts"),
+    branded<ProjectFilePath>("apps/a/source-02.ts"),
+    branded<ProjectFilePath>("apps/a/source-03.ts"),
+    branded<ProjectFilePath>("apps/a/source-04.ts"),
+    branded<ProjectFilePath>("apps/a/source-05.ts"),
+    branded<ProjectFilePath>("apps/a/source-06.ts"),
+  ]
+  const targetPath = branded<ProjectFilePath>("apps/b/target.ts")
+  return {
+    schemaVersion: 5,
+    project: { name: "findings-overview" },
+    workspacePackages: [
+      { path: "apps/a", name: "@findings/a" },
+      { path: "apps/b", name: "@findings/b" },
+    ],
+    files: [
+      {
+        path: largePath,
+        language: "typescript",
+        lines: { code: 100, comment: 0, blank: 0 },
+        coverage: { lines: 25 },
+        workspacePackage: "apps/a",
+      },
+      ...sourcePaths.map((path) => ({
+        path,
+        language: "typescript",
+        lines: { code: 20, comment: 0, blank: 0 },
+        coverage: { lines: 100 },
+        workspacePackage: "apps/a",
+      })),
+      {
+        path: targetPath,
+        language: "typescript",
+        lines: { code: 10, comment: 0, blank: 0 },
+        coverage: { lines: 100 },
+        workspacePackage: "apps/b",
+      },
+    ],
+    dependencies: [
+      ...sourcePaths.map((source) => ({ source, target: targetPath, kind: "runtime" as const })),
+      { source: targetPath, target: sourcePaths[0] ?? largePath, kind: "type-only" },
+    ],
+    externalPackages: [],
+    externalPackageDependencies: [],
+    diagnostics: [],
+  }
+}
+
 async function closeAdvancedControls(page: Page): Promise<void> {
   const details = page.locator("#advanced-controls")
   if ((await details.getAttribute("open")) !== null) {
@@ -1713,6 +1894,11 @@ type DirectoryLabelDiagnostic = {
     readonly right: number
     readonly bottom: number
   }
+}
+
+type PerformanceMeasurementDiagnostic = {
+  readonly phase: string
+  readonly durationMilliseconds: number
 }
 
 type NodeLabelDiagnostic = DirectoryLabelDiagnostic & {

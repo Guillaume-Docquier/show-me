@@ -11,7 +11,7 @@ Users can identify dependency hubs, high fan-out files, heavily consumed files, 
 ## Dependencies
 
 - [Milestone 023](./done/023-diagnostic-lens-framework.md) establishes deterministic lenses and custom presentation state.
-- [Milestone 024](./024-findings-first-overview.md) establishes fan-in, fan-out, and cycle derivation.
+- [Milestone 024](./done/024-findings-first-overview.md) establishes fan-in, fan-out, and cycle derivation.
 - [Milestone 021](./done/021-type-only-dependencies.md) establishes runtime and type-only relationship kinds.
 - [ADR 003](../adr/003-use-sigma-graphology-forceatlas2.md) establishes the graph renderer, layout, and browser ownership.
 

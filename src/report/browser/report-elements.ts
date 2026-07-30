@@ -4,6 +4,17 @@ export type ReportHeadingElements = {
   readonly projectFileCount: HTMLElement
 }
 
+/** DOM owned by the Overview findings and left-workspace tabs. */
+export type ReportFindingPanelElements = {
+  readonly tabs: HTMLElement
+  readonly findingsTab: HTMLButtonElement
+  readonly projectFilesTab: HTMLButtonElement
+  readonly panel: HTMLElement
+  readonly categories: HTMLElement
+  readonly empty: HTMLElement
+  readonly projectFilesPanel: HTMLElement
+}
+
 /** DOM owned by report controls. */
 export type ReportControlElements = {
   readonly lensSelector: HTMLSelectElement
@@ -64,6 +75,7 @@ export type ReportElements = {
   readonly root: HTMLElement
   readonly graphContainer: HTMLElement
   readonly heading: ReportHeadingElements
+  readonly findings: ReportFindingPanelElements
   readonly controls: ReportControlElements
   readonly panels: ReportPanelElements
 }
@@ -81,6 +93,15 @@ export function getReportElements(reportDocument: Document): ReportElements {
     heading: {
       projectName: requiredElement(reportDocument, "project-name"),
       projectFileCount: requiredElement(reportDocument, "project-file-count"),
+    },
+    findings: {
+      tabs: requiredElement(reportDocument, "sidebar-tabs"),
+      findingsTab: requiredButton(reportDocument, "findings-tab"),
+      projectFilesTab: requiredButton(reportDocument, "project-files-tab"),
+      panel: requiredElement(reportDocument, "findings-panel"),
+      categories: requiredElement(reportDocument, "findings-categories"),
+      empty: requiredElement(reportDocument, "findings-empty"),
+      projectFilesPanel: requiredElement(reportDocument, "project-files-panel"),
     },
     controls: {
       lensSelector: requiredSelect(reportDocument, "lens-selector"),

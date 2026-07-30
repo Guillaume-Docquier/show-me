@@ -107,7 +107,8 @@ Show Me also respects `.gitignore` files and always skips `.git`, `.nyc_output`,
 
 The report lets you:
 
-- start in the `Overview` lens, which sizes files by code lines, colors them by coverage, keeps directory structure visible, and reveals only the hovered or selected file's direct dependencies;
+- start in the `Overview` lens on the `Findings` tab, with the complete project explorer one click away on the `Project files` tab. The graph sizes files by code lines, colors them by coverage, keeps directory structure visible, and reveals only the hovered or selected file's direct dependencies;
+- investigate large files with low or unavailable coverage, highest fan-out and fan-in, dependency cycles, and cross-workspace relationships. Findings show the raw facts behind each candidate and navigate through the same selection, centering, details, and history workflow as the graph;
 - switch to the `Structure` lens for neutral file colors, containment edges, and relationship details without dependency arrows or focus decoration;
 - open `Advanced` to customize file sizing and color, dependency display, type-only relationships, structure edges, and external packages. A changed preset is labeled `Custom`, and selecting a named lens restores its defaults without changing workspace scope;
 - search project-file and directory paths with exact result counts while keeping the selected item reachable;
@@ -119,6 +120,21 @@ The report lets you:
 - select a project file or external package to highlight its direct dependency neighborhood when the active presentation enables dependency focus;
 - filter pnpm workspace packages;
 - pan, zoom, and fit the graph.
+
+Findings are investigation candidates, not claims that code is wrong. Cross-workspace relationships are not architecture violations unless an explicit rule says so. Coverage that is unavailable is kept separate from 0% coverage.
+
+### Finding rankings
+
+Each category initially shows five candidates. `Show all` reveals the complete list without changing its order. Project-tree search does not change findings. Workspace-package filters do.
+
+| Category                              | Deterministic inclusion and ranking                                                                                                                                                                                                                                    |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Large files with low known coverage   | Use the nearest-rank 75th-percentile code-line count as the inclusive large-file threshold, ignoring zero-code files. Include known coverage below 80%. Sort by coverage ascending, code lines descending, then path.                                                  |
+| Large files with unavailable coverage | Use the same large-file threshold. Include files with no coverage value. Sort by code lines descending, then path.                                                                                                                                                     |
+| Highest fan-out                       | Count distinct visible direct project-file dependencies, with runtime and type-only counts shown separately. Exclude zero. Sort by total descending, runtime descending, then path.                                                                                    |
+| Highest fan-in                        | Count distinct visible project-file consumers, with runtime and type-only counts shown separately. Exclude zero. Sort by total descending, runtime descending, then path.                                                                                              |
+| Dependency cycles                     | Find strongly connected components in the runtime graph and then the combined runtime and type-only graph. Suppress combined components already reported as runtime cycles. Rank runtime first, component size descending, then member paths. Self-dependencies count. |
+| Cross-workspace relationships         | Group visible project-file dependencies by directed source and target workspace plus relationship kind. Sort by relationship count descending, workspace names, then relationship kind.                                                                                |
 
 ## Feedback and contributions
 

@@ -11,6 +11,7 @@ export const PERFORMANCE_PHASES = [
   "html-packaging",
   "report-writing",
   "browser-presentation",
+  "browser-findings",
   "browser-layout",
 ] as const
 
