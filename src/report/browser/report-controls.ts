@@ -109,7 +109,7 @@ export class ReportControls {
   #bindEvents(): void {
     this.#elements.lensSelector.addEventListener("change", () => {
       const lens = this.#elements.lensSelector.value
-      if (lens === "overview" || lens === "structure" || lens === "coverage" || lens === "coupling") {
+      if (lens === "overview" || lens === "structure" || lens === "coverage" || lens === "coupling" || lens === "boundaries") {
         this.#events.onPresentationStateChange(selectReportLens(this.#presentationState, lens))
       }
     })

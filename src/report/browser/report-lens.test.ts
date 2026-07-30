@@ -45,7 +45,8 @@ it("preserves scope and deterministically restores each named lens", () => {
   const structure = selectReportLens(customized, "structure")
   const coverage = selectReportLens(structure, "coverage")
   const coupling = selectReportLens(coverage, "coupling")
-  const overview = selectReportLens(coupling, "overview")
+  const boundaries = selectReportLens(coupling, "boundaries")
+  const overview = selectReportLens(boundaries, "overview")
 
   // Assert
   expect(structure.scope.workspacePackages).toEqual(new Set(["apps/frontend"]))
@@ -74,6 +75,18 @@ it("preserves scope and deterministically restores each named lens", () => {
     dependencyDisplay: "focused",
     projectFileColor: "coverage",
     projectFileSize: "visible-degree",
+  })
+  expect(boundaries.scope.workspacePackages).toEqual(new Set(["apps/frontend"]))
+  expect(activeReportLens(boundaries)).toBe("boundaries")
+  expect(reportLensSettings(boundaries)).toEqual({
+    lineCategories: ["code"],
+    externalPackages: false,
+    typeOnlyDependencies: true,
+    runtimeDependencies: true,
+    structureEdges: false,
+    dependencyDisplay: "focused",
+    projectFileColor: "coverage",
+    projectFileSize: "line-categories",
   })
   expect(overview.scope.workspacePackages).toEqual(new Set(["apps/frontend"]))
   expect(activeReportLens(overview)).toBe("overview")

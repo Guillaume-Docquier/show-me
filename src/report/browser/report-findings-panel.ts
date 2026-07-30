@@ -1,3 +1,5 @@
+import { ReportBoundariesPanel } from "./report-boundaries-panel.js"
+import type { BoundaryDrillDown, BoundaryFilterState, BoundaryLensResults, BoundarySelection } from "./report-boundaries.js"
 import { ReportCouplingPanel } from "./report-coupling-panel.js"
 import type { CouplingCycle, CouplingFilterState, CouplingLensResults } from "./report-coupling.js"
 import type { CoverageFilterState, CoverageLensResults } from "./report-coverage.js"
@@ -13,7 +15,8 @@ export class ReportFindingsPanel {
   readonly #activateNode: (nodeId: string) => void
   readonly #updateCoverageFilters: (filters: CoverageFilterState) => void
   readonly #couplingPanel: ReportCouplingPanel
-  #activePanel: "findings" | "coverage" | "coupling" | "project-files" = "findings"
+  readonly #boundariesPanel: ReportBoundariesPanel
+  #activePanel: "findings" | "coverage" | "coupling" | "boundaries" | "project-files" = "findings"
   #selectedNodeId: string | undefined
   #selectedLens: ReportLens = "overview"
 
@@ -29,6 +32,9 @@ export class ReportFindingsPanel {
     updateCoverageFilters,
     activateCycle,
     updateCouplingFilters,
+    activateBoundary,
+    clearBoundary,
+    updateBoundaryFilters,
   }: {
     readonly elements: ReportFindingPanelElements
     readonly activateNode: (nodeId: string) => void
@@ -36,6 +42,9 @@ export class ReportFindingsPanel {
     readonly updateCoverageFilters: (filters: CoverageFilterState) => void
     readonly activateCycle: (cycle: CouplingCycle) => void
     readonly updateCouplingFilters: (filters: CouplingFilterState) => void
+    readonly activateBoundary: (selection: BoundarySelection) => void
+    readonly clearBoundary: () => void
+    readonly updateBoundaryFilters: (filters: BoundaryFilterState) => void
   }) {
     this.#elements = elements
     this.#activateNode = activateNode
@@ -45,6 +54,12 @@ export class ReportFindingsPanel {
       activateNode,
       activateCycle,
       updateFilters: updateCouplingFilters,
+    })
+    this.#boundariesPanel = new ReportBoundariesPanel({
+      elements,
+      activateSelection: activateBoundary,
+      clearSelection: clearBoundary,
+      updateFilters: updateBoundaryFilters,
     })
     this.#elements.coverageMinimumCodeLines.value = String(initialCoverageFilters.minimumCodeLines)
     this.#elements.coverageMaximumPercentage.value = String(initialCoverageFilters.maximumCoverage)
@@ -57,6 +72,9 @@ export class ReportFindingsPanel {
     })
     elements.couplingTab.addEventListener("click", () => {
       this.#selectPanel("coupling")
+    })
+    elements.boundariesTab.addEventListener("click", () => {
+      this.#selectPanel("boundaries")
     })
     elements.projectFilesTab.addEventListener("click", () => {
       this.#selectPanel("project-files")
@@ -100,7 +118,15 @@ export class ReportFindingsPanel {
   public renderLens(lens: ReportLens): void {
     if (lens !== this.#selectedLens) {
       this.#activePanel =
-        lens === "overview" ? "findings" : lens === "coverage" ? "coverage" : lens === "coupling" ? "coupling" : "project-files"
+        lens === "overview"
+          ? "findings"
+          : lens === "coverage"
+            ? "coverage"
+            : lens === "coupling"
+              ? "coupling"
+              : lens === "boundaries"
+                ? "boundaries"
+                : "project-files"
       this.#selectedLens = lens
     }
     this.#renderPanelVisibility()
@@ -164,6 +190,16 @@ export class ReportFindingsPanel {
   /** Render Coupling lens metrics, filters, and selectable cycles. */
   public renderCoupling(results: CouplingLensResults, filters: CouplingFilterState): void {
     this.#couplingPanel.render(results, filters)
+  }
+
+  /** Render the directed boundary matrix for the active scope and filters. */
+  public renderBoundaries(results: BoundaryLensResults, filters: BoundaryFilterState): void {
+    this.#boundariesPanel.render(results, filters)
+  }
+
+  /** Reflect a boundary or directed pair selection in the matrix. */
+  public renderBoundarySelection(drillDown: BoundaryDrillDown | undefined): void {
+    this.#boundariesPanel.renderSelection(drillDown)
   }
 
   #category(group: ReportFindingGroup): HTMLElement {
@@ -239,7 +275,7 @@ export class ReportFindingsPanel {
     return button
   }
 
-  #selectPanel(panel: "findings" | "coverage" | "coupling" | "project-files"): void {
+  #selectPanel(panel: "findings" | "coverage" | "coupling" | "boundaries" | "project-files"): void {
     this.#activePanel = panel
     this.#renderPanelVisibility()
   }
@@ -248,25 +284,31 @@ export class ReportFindingsPanel {
     const overview = this.#selectedLens === "overview"
     const coverage = this.#selectedLens === "coverage"
     const coupling = this.#selectedLens === "coupling"
+    const boundaries = this.#selectedLens === "boundaries"
     const showFindings = overview && this.#activePanel === "findings"
     const showCoverage = coverage && this.#activePanel === "coverage"
     const showCoupling = coupling && this.#activePanel === "coupling"
-    const showProjectFiles = !showFindings && !showCoverage && !showCoupling
-    this.#elements.tabs.hidden = !overview && !coverage && !coupling
+    const showBoundaries = boundaries && this.#activePanel === "boundaries"
+    const showProjectFiles = !showFindings && !showCoverage && !showCoupling && !showBoundaries
+    this.#elements.tabs.hidden = !overview && !coverage && !coupling && !boundaries
     this.#elements.findingsTab.hidden = !overview
     this.#elements.coverageTab.hidden = !coverage
     this.#elements.couplingTab.hidden = !coupling
+    this.#elements.boundariesTab.hidden = !boundaries
     this.#elements.findingsTab.setAttribute("aria-selected", String(showFindings))
     this.#elements.coverageTab.setAttribute("aria-selected", String(showCoverage))
     this.#elements.couplingTab.setAttribute("aria-selected", String(showCoupling))
+    this.#elements.boundariesTab.setAttribute("aria-selected", String(showBoundaries))
     this.#elements.projectFilesTab.setAttribute("aria-selected", String(showProjectFiles))
     this.#elements.findingsTab.tabIndex = showFindings ? 0 : -1
     this.#elements.coverageTab.tabIndex = showCoverage ? 0 : -1
     this.#elements.couplingTab.tabIndex = showCoupling ? 0 : -1
+    this.#elements.boundariesTab.tabIndex = showBoundaries ? 0 : -1
     this.#elements.projectFilesTab.tabIndex = showProjectFiles ? 0 : -1
     this.#elements.panel.hidden = !showFindings
     this.#elements.coveragePanel.hidden = !showCoverage
     this.#elements.couplingPanel.hidden = !showCoupling
+    this.#elements.boundariesPanel.hidden = !showBoundaries
     this.#elements.projectFilesPanel.hidden = !showProjectFiles
   }
 

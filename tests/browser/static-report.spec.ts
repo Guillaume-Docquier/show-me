@@ -942,6 +942,91 @@ test("explores direct coupling and selectable dependency cycles without backgrou
   })
 })
 
+test("drills from directed boundary aggregates into exact project-file relationships", async ({ page }) => {
+  await withTemporaryDirectory(async (temporaryDirectory) => {
+    const reportPath = await test.step("Generate a multi-workspace boundary report", async () => {
+      const browserBundle = await readFile(join(process.cwd(), "dist", "report", "browser.js"), "utf8")
+      const path = join(temporaryDirectory, "boundary-lens.html")
+      await writeFile(path, buildHtmlReport(boundaryLensAnalysis(), browserBundle), "utf8")
+      return path
+    })
+
+    await test.step("Show an ordered directed matrix with separate relationship-kind counts", async () => {
+      await page.goto(pathToFileURL(reportPath).href)
+      await page.locator("#lens-selector").selectOption("boundaries")
+      const panel = page.locator("#boundaries-panel")
+      await expect(page.locator("html")).toHaveAttribute("data-active-lens", "boundaries")
+      await expect(panel).toBeVisible()
+      await expect(panel).toHaveAttribute("data-boundary-order", '["workspace:apps/api","workspace:apps/web","root-files"]')
+      await expect(panel).toHaveAttribute("data-boundary-count", "3")
+      await expect(panel).toHaveAttribute("data-runtime-count", "4")
+      await expect(panel).toHaveAttribute("data-type-only-count", "1")
+      await expect(page.locator(".boundary-matrix caption")).toHaveText("Source rows → target columns")
+      await expect(page.locator(".boundary-cell-self")).toHaveCount(3)
+      await expect(page.locator(".boundary-cell-cross")).toHaveCount(6)
+      await expect(page.locator("#boundaries-panel .findings-intro")).toContainText("facts, not violations")
+      expect(
+        await page.locator(".boundary-cell-cross").evaluateAll((cells) => cells.every((cell) => !cell.hasAttribute("data-violation"))),
+      ).toBe(true)
+      const measurements = await readJsonAttribute<readonly PerformanceMeasurementDiagnostic[]>(
+        page.locator("html"),
+        "data-performance-measurements",
+      )
+      expect(measurements.map(({ phase }) => phase)).toContain("browser-boundaries")
+    })
+
+    await test.step("Filter graph and inspector to one exact directed boundary pair", async () => {
+      const cell = page.locator('button[data-source-boundary-id="workspace:apps/web"][data-target-boundary-id="workspace:apps/api"]')
+      await expect(cell).toHaveAttribute(
+        "aria-label",
+        "@boundary/web source to @boundary/api target: 1 runtime and 1 type-only relationships.",
+      )
+      await cell.click()
+      await expect(page.locator("#boundaries-panel")).toHaveAttribute("data-selected-boundary-kind", "pair")
+      await expect(page.locator("#boundaries-panel")).toHaveAttribute("data-selected-relationship-count", "2")
+      await expect(page.locator("#graph")).toHaveAttribute("data-visible-node-count", "3")
+      await expect(page.locator("#graph")).toHaveAttribute("data-visible-edge-count", "2")
+      await expect(page.locator("#graph")).toHaveAttribute("data-rendered-dependency-edge-count", "2")
+      await expect(page.locator("#selected-boundary-kind")).toHaveText("Directed boundary pair")
+      await expect(page.locator("#selected-boundary-direction")).toHaveText("@boundary/web source → @boundary/api target")
+      await expect(page.locator("#selected-boundary-relationship-count")).toHaveText("2")
+      await expect(page.locator(".boundary-relationship")).toHaveCount(2)
+      await expect(page.locator(".boundary-relationship").first()).toHaveAttribute("data-relationship-kind", "runtime")
+      await expect(page.locator("#selected-boundary-details")).toContainText("apps/web/src/main.ts")
+      await expect(page.locator("#selected-boundary-details")).toContainText("apps/api/src/server.ts")
+    })
+
+    await test.step("Compose relationship filters across matrix, graph, and inspector", async () => {
+      await page.locator("#boundaries-type-only-dependencies").uncheck()
+      await expect(page.locator("#boundaries-panel")).toHaveAttribute("data-runtime-count", "4")
+      await expect(page.locator("#boundaries-panel")).toHaveAttribute("data-type-only-count", "0")
+      await expect(page.locator("#boundaries-panel")).toHaveAttribute("data-selected-relationship-count", "1")
+      await expect(page.locator("#graph")).toHaveAttribute("data-visible-edge-count", "1")
+      await expect(page.locator("#selected-boundary-relationship-count")).toHaveText("1")
+      await expect(page.locator(".boundary-relationship")).toHaveCount(1)
+      await page.locator("#boundaries-type-only-dependencies").check()
+      await expect(page.locator("#boundaries-panel")).toHaveAttribute("data-selected-relationship-count", "2")
+    })
+
+    await test.step("Return to the complete matrix, focus one boundary, and update workspace scope", async () => {
+      await page.locator("#boundaries-complete-matrix").click()
+      await expect(page.locator("#boundaries-panel")).not.toHaveAttribute("data-selected-boundary-kind")
+      await expect(page.locator("#graph")).toHaveAttribute("data-visible-node-count", "6")
+      await expect(page.locator("#graph")).toHaveAttribute("data-rendered-dependency-edge-count", "0")
+      await page.locator('th button[data-boundary-id="workspace:apps/api"]').first().click()
+      await expect(page.locator("#boundaries-panel")).toHaveAttribute("data-selected-boundary-kind", "boundary")
+      await expect(page.locator("#selected-boundary-direction")).toHaveText("@boundary/api internal relationships")
+      await expect(page.locator("#graph")).toHaveAttribute("data-visible-node-count", "2")
+      await expect(page.locator("#graph")).toHaveAttribute("data-visible-edge-count", "1")
+      await page.locator("#boundaries-complete-matrix").click()
+      await page.getByRole("checkbox", { name: "@boundary/api", exact: true }).uncheck()
+      await expect(page.locator("#boundaries-panel")).toHaveAttribute("data-boundary-order", '["directory:apps/web:src","root-files"]')
+      await expect(page.locator("#boundaries-panel")).toHaveAttribute("data-runtime-count", "1")
+      await expect(page.locator("#boundaries-panel")).toHaveAttribute("data-type-only-count", "0")
+    })
+  })
+})
+
 test("derives project-file edges and relationships in the browser", async ({ page }) => {
   await withTemporaryDirectory(async (temporaryDirectory) => {
     const reportPath = await test.step("Generate the static-ESM report", async () => {
@@ -2135,6 +2220,71 @@ function couplingLensAnalysis(): ProjectAnalysis {
       { source: a, target: c, kind: "runtime" },
       { source: c, target: d, kind: "type-only" },
       { source: d, target: c, kind: "type-only" },
+    ],
+    externalPackages: [],
+    externalPackageDependencies: [],
+    diagnostics: [],
+  }
+}
+
+function boundaryLensAnalysis(): ProjectAnalysis {
+  const root = branded<ProjectFilePath>("config.ts")
+  const webMain = branded<ProjectFilePath>("apps/web/src/main.ts")
+  const webTypes = branded<ProjectFilePath>("apps/web/src/types.ts")
+  const webIsolated = branded<ProjectFilePath>("apps/web/src/isolated.ts")
+  const apiServer = branded<ProjectFilePath>("apps/api/src/server.ts")
+  const apiRepository = branded<ProjectFilePath>("apps/api/src/repository.ts")
+  return {
+    schemaVersion: 5,
+    project: { name: "boundary-lens" },
+    workspacePackages: [
+      { path: "apps/web", name: "@boundary/web" },
+      { path: "apps/api", name: "@boundary/api" },
+    ],
+    files: [
+      { path: root, language: "typescript", lines: { code: 10, comment: 0, blank: 0 }, coverage: undefined },
+      {
+        path: webMain,
+        language: "typescript",
+        lines: { code: 20, comment: 0, blank: 0 },
+        coverage: { lines: 50 },
+        workspacePackage: "apps/web",
+      },
+      {
+        path: webTypes,
+        language: "typescript",
+        lines: { code: 5, comment: 0, blank: 0 },
+        coverage: { lines: 100 },
+        workspacePackage: "apps/web",
+      },
+      {
+        path: webIsolated,
+        language: "typescript",
+        lines: { code: 3, comment: 0, blank: 0 },
+        coverage: undefined,
+        workspacePackage: "apps/web",
+      },
+      {
+        path: apiServer,
+        language: "typescript",
+        lines: { code: 30, comment: 0, blank: 0 },
+        coverage: { lines: 75 },
+        workspacePackage: "apps/api",
+      },
+      {
+        path: apiRepository,
+        language: "typescript",
+        lines: { code: 15, comment: 0, blank: 0 },
+        coverage: { lines: 25 },
+        workspacePackage: "apps/api",
+      },
+    ],
+    dependencies: [
+      { source: webMain, target: apiServer, kind: "runtime" },
+      { source: webTypes, target: apiServer, kind: "type-only" },
+      { source: apiServer, target: webMain, kind: "runtime" },
+      { source: apiServer, target: apiRepository, kind: "runtime" },
+      { source: root, target: webMain, kind: "runtime" },
     ],
     externalPackages: [],
     externalPackageDependencies: [],

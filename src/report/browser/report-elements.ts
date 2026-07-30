@@ -10,6 +10,7 @@ export type ReportFindingPanelElements = {
   readonly findingsTab: HTMLButtonElement
   readonly coverageTab: HTMLButtonElement
   readonly couplingTab: HTMLButtonElement
+  readonly boundariesTab: HTMLButtonElement
   readonly projectFilesTab: HTMLButtonElement
   readonly panel: HTMLElement
   readonly categories: HTMLElement
@@ -35,6 +36,15 @@ export type ReportFindingPanelElements = {
   readonly couplingResults: HTMLOListElement
   readonly couplingCyclesSection: HTMLElement
   readonly couplingCycles: HTMLOListElement
+  readonly boundariesPanel: HTMLElement
+  readonly boundariesRuntimeDependencies: HTMLInputElement
+  readonly boundariesTypeOnlyDependencies: HTMLInputElement
+  readonly boundariesBoundaryCount: HTMLElement
+  readonly boundariesRuntimeCount: HTMLElement
+  readonly boundariesTypeOnlyCount: HTMLElement
+  readonly boundariesCompleteMatrix: HTMLButtonElement
+  readonly boundariesEmpty: HTMLElement
+  readonly boundariesMatrix: HTMLElement
 }
 
 /** DOM owned by report controls. */
@@ -105,6 +115,15 @@ export type ReportPanelElements = {
   readonly selectedCycleMemberCount: HTMLElement
   readonly selectedCycleRelationshipCount: HTMLElement
   readonly selectedCycleMembers: HTMLOListElement
+  readonly selectedBoundaryDetails: HTMLElement
+  readonly selectedBoundaryKind: HTMLElement
+  readonly selectedBoundaryDirection: HTMLElement
+  readonly selectedBoundaryFileCount: HTMLElement
+  readonly selectedBoundaryRelationshipCount: HTMLElement
+  readonly selectedBoundaryRuntimeCount: HTMLElement
+  readonly selectedBoundaryTypeOnlyCount: HTMLElement
+  readonly selectedBoundaryRelationships: HTMLOListElement
+  readonly selectedBoundaryEmpty: HTMLElement
 }
 
 /** Complete generated-report DOM organized by the module that owns it. */
@@ -136,6 +155,7 @@ export function getReportElements(reportDocument: Document): ReportElements {
       findingsTab: requiredButton(reportDocument, "findings-tab"),
       coverageTab: requiredButton(reportDocument, "coverage-tab"),
       couplingTab: requiredButton(reportDocument, "coupling-tab"),
+      boundariesTab: requiredButton(reportDocument, "boundaries-tab"),
       projectFilesTab: requiredButton(reportDocument, "project-files-tab"),
       panel: requiredElement(reportDocument, "findings-panel"),
       categories: requiredElement(reportDocument, "findings-categories"),
@@ -161,6 +181,15 @@ export function getReportElements(reportDocument: Document): ReportElements {
       couplingResults: requiredOrderedList(reportDocument, "coupling-results"),
       couplingCyclesSection: requiredElement(reportDocument, "coupling-cycles-section"),
       couplingCycles: requiredOrderedList(reportDocument, "coupling-cycles"),
+      boundariesPanel: requiredElement(reportDocument, "boundaries-panel"),
+      boundariesRuntimeDependencies: requiredCheckbox(reportDocument, "boundaries-runtime-dependencies"),
+      boundariesTypeOnlyDependencies: requiredCheckbox(reportDocument, "boundaries-type-only-dependencies"),
+      boundariesBoundaryCount: requiredElement(reportDocument, "boundaries-boundary-count"),
+      boundariesRuntimeCount: requiredElement(reportDocument, "boundaries-runtime-count"),
+      boundariesTypeOnlyCount: requiredElement(reportDocument, "boundaries-type-only-count"),
+      boundariesCompleteMatrix: requiredButton(reportDocument, "boundaries-complete-matrix"),
+      boundariesEmpty: requiredElement(reportDocument, "boundaries-empty"),
+      boundariesMatrix: requiredElement(reportDocument, "boundaries-matrix"),
     },
     controls: {
       lensSelector: requiredSelect(reportDocument, "lens-selector"),
@@ -227,6 +256,15 @@ export function getReportElements(reportDocument: Document): ReportElements {
       selectedCycleMemberCount: requiredElement(reportDocument, "selected-cycle-member-count"),
       selectedCycleRelationshipCount: requiredElement(reportDocument, "selected-cycle-relationship-count"),
       selectedCycleMembers: requiredOrderedList(reportDocument, "selected-cycle-members"),
+      selectedBoundaryDetails: requiredElement(reportDocument, "selected-boundary-details"),
+      selectedBoundaryKind: requiredElement(reportDocument, "selected-boundary-kind"),
+      selectedBoundaryDirection: requiredElement(reportDocument, "selected-boundary-direction"),
+      selectedBoundaryFileCount: requiredElement(reportDocument, "selected-boundary-file-count"),
+      selectedBoundaryRelationshipCount: requiredElement(reportDocument, "selected-boundary-relationship-count"),
+      selectedBoundaryRuntimeCount: requiredElement(reportDocument, "selected-boundary-runtime-count"),
+      selectedBoundaryTypeOnlyCount: requiredElement(reportDocument, "selected-boundary-type-only-count"),
+      selectedBoundaryRelationships: requiredOrderedList(reportDocument, "selected-boundary-relationships"),
+      selectedBoundaryEmpty: requiredElement(reportDocument, "selected-boundary-empty"),
     },
   }
 }

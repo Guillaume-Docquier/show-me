@@ -204,6 +204,24 @@ it("produces a stable layout-input signature that changes with node sizing", () 
   expect(resizedSignature).not.toBe(firstInitialSignature)
 })
 
+it("filters the graph to exact aggregate files and relationships without changing scope", () => {
+  // Arrange
+  const scope = allWorkspaceScope()
+  const settings = reportLensPreset("boundaries")
+
+  // Act
+  const view = buildReportView(presentation, scope, settings, {
+    projectFileNodeIds: new Set(["project-file:root.ts", "project-file:apps/frontend/main.ts"]),
+    dependencyEdgeIds: new Set(["project-dependency-0"]),
+  })
+
+  // Assert
+  expect(view.scope).toBe(scope)
+  expect(view.nodes.map(({ id }) => id)).toEqual(["project-file:root.ts", "project-file:apps/frontend/main.ts"])
+  expect(view.dependencyEdges.map(({ id }) => id)).toEqual(["project-dependency-0"])
+  expect(view.visibleProjectFileCount).toBe(2)
+})
+
 function externalPackage(id: string, packageName: string): BrowserPresentation["nodes"][number] {
   return {
     id,

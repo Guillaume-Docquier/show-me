@@ -13,6 +13,7 @@ export const PERFORMANCE_PHASES = [
   "browser-presentation",
   "browser-findings",
   "browser-coupling",
+  "browser-boundaries",
   "browser-layout",
 ] as const
 

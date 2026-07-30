@@ -37,18 +37,31 @@ export type ReportView = {
   readonly visibleProjectFileCount: number
 }
 
+/** Optional aggregate drill-down that narrows the graph without changing analysis or scope. */
+export type ReportViewFilter = {
+  readonly projectFileNodeIds: ReadonlySet<string>
+  readonly dependencyEdgeIds: ReadonlySet<string>
+}
+
 /**
  * Derive the visible, sized report graph from immutable presentation facts.
  *
  * This is the single transition for scope and lens settings that change graph
  * membership, node appearance, or layout inputs.
  */
-export function buildReportView(presentation: BrowserPresentation, scope: ReportScopeState, settings: ReportLensSettings): ReportView {
+export function buildReportView(
+  presentation: BrowserPresentation,
+  scope: ReportScopeState,
+  settings: ReportLensSettings,
+  filter?: ReportViewFilter,
+): ReportView {
   const visibleProjectNodeIds = new Set(
     presentation.nodes
       .filter(
         (node) =>
-          node.kind === "project-file" && (node.workspacePackage === undefined || scope.workspacePackages.has(node.workspacePackage)),
+          node.kind === "project-file" &&
+          (node.workspacePackage === undefined || scope.workspacePackages.has(node.workspacePackage)) &&
+          (filter === undefined || filter.projectFileNodeIds.has(node.id)),
       )
       .map(({ id }) => id),
   )
@@ -68,7 +81,9 @@ export function buildReportView(presentation: BrowserPresentation, scope: Report
       (node.kind === "external-package" && visibleExternalPackageNodeIds.has(node.id)),
   )
   const nodeIds = new Set(visibleReportNodes.map(({ id }) => id))
-  const dependencyEdges = visiblePresentationEdges.filter(({ source, target }) => nodeIds.has(source) && nodeIds.has(target))
+  const dependencyEdges = visiblePresentationEdges.filter(
+    ({ id, source, target }) => nodeIds.has(source) && nodeIds.has(target) && (filter === undefined || filter.dependencyEdgeIds.has(id)),
+  )
   const visibleProjectFileNodes = visibleReportNodes.filter((node) => node.kind === "project-file")
   const coupling = deriveCouplingFacts(
     visibleProjectFileNodes,

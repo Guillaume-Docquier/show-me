@@ -6,7 +6,7 @@ The output is one self-contained HTML file. Open it locally, share it, or publis
 
 [Explore this codebase in the live GitHub Pages report](https://guillaume-docquier.github.io/show-me/)
 
-![Show Me Coupling lens with direct-degree rankings, relationship filters, cycle counts, and a coverage-colored graph](./docs/assets/report-lenses.png)
+![Show Me Boundaries lens with a directed dependency matrix, exact relationship drill-down, and a filtered graph](./docs/assets/report-lenses.png)
 
 ## Install
 
@@ -112,6 +112,7 @@ The report lets you:
 - switch to the `Structure` lens for neutral file colors, containment edges, and relationship details without dependency arrows or focus decoration;
 - switch to the `Coverage` lens to find files with at least 100 physical code lines and at most 80% imported executable-line coverage by default. Change either inclusive threshold, include or exclude unavailable coverage independently, and inspect matching, known-coverage, and unavailable-coverage counts without removing non-matches from search;
 - switch to the `Coupling` lens to size files by visible direct fan-in plus fan-out while preserving coverage fills. Runtime and type-only controls update rankings, cycle groups, inspector metrics, node sizes, and graph focus together;
+- switch to the `Boundaries` lens to aggregate directed project-file dependencies by workspace package or top-level directory, then select a boundary or matrix cell to inspect the exact files and relationships it represents;
 - open `Advanced` to customize file sizing and color, dependency display, type-only relationships, structure edges, and external packages. A changed preset is labeled `Custom`, and selecting a named lens restores its defaults without changing workspace scope;
 - search project-file and directory paths with exact result counts while keeping the selected item reachable;
 - expand directories independently from selecting them, with top-level directories expanded initially;
@@ -128,6 +129,8 @@ Findings are investigation candidates, not claims that code is wrong. Cross-work
 The Coverage lens sizes project files by physical code lines, preserves imported coverage as the fill color, keeps directory context, and hides dependency arrows. Matching files receive an outline while every scoped file remains in the graph and project explorer. Show Me ranks imported coverage percentages and does not multiply code-line counts by coverage to claim an exact uncovered source-line count.
 
 The Coupling lens hides structure and background dependency edges initially. Selecting or hovering a file reveals only its direct dependencies and consumers with a direction legend, including separate treatments when another file has both roles. Its file list reports fan-in, fan-out, runtime, type-only, and cycle facts. Select a cycle to focus all members and internal edges, then select a member to return to ordinary file focus. `Show all background dependencies` is an advanced override that enters `Custom` without moving nodes. High coupling and cycles are investigation candidates, not rule violations.
+
+The Boundaries lens uses workspace packages as primary boundaries when a project has more than one package. Selecting one workspace changes the matrix to its first internal directory segments. Single-package projects use first path segments directly, and root-level files use `(root files)`. Matrix rows are sources and columns are targets. Runtime and type-only counts remain separate, including self-boundary cells. Select a row or column heading to focus one boundary, or select a non-empty cell to filter the graph and inspector to that exact directed relationship set. Workspace and relationship filters update all three surfaces together. Cross-boundary dependencies are facts, not architecture violations.
 
 ### Finding rankings
 

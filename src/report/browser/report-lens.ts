@@ -2,7 +2,7 @@ import { DEFAULT_COVERAGE_FILTERS, type CoverageFilterState } from "./report-cov
 import type { ReportLineCategory } from "./report-presentation.js"
 
 /** Named report lenses with complete browser behavior. */
-export const REPORT_LENSES = ["overview", "structure", "coverage", "coupling"] as const
+export const REPORT_LENSES = ["overview", "structure", "coverage", "coupling", "boundaries"] as const
 
 /** One named task-oriented report presentation. */
 export type ReportLens = (typeof REPORT_LENSES)[number]
@@ -109,6 +109,17 @@ const COUPLING_SETTINGS: ReportLensSettings = {
   projectFileSize: "visible-degree",
 }
 
+const BOUNDARIES_SETTINGS: ReportLensSettings = {
+  lineCategories: ["code"],
+  externalPackages: false,
+  typeOnlyDependencies: true,
+  runtimeDependencies: true,
+  structureEdges: false,
+  dependencyDisplay: "focused",
+  projectFileColor: "coverage",
+  projectFileSize: "line-categories",
+}
+
 /** Create the initial Overview state over every discovered workspace package. */
 export function initialReportPresentationState(workspacePackagePaths: readonly string[]): ReportPresentationState {
   return {
@@ -128,7 +139,9 @@ export function reportLensPreset(lens: ReportLens): ReportLensSettings {
         ? STRUCTURE_SETTINGS
         : lens === "coverage"
           ? COVERAGE_SETTINGS
-          : COUPLING_SETTINGS
+          : lens === "coupling"
+            ? COUPLING_SETTINGS
+            : BOUNDARIES_SETTINGS
   return { ...preset, lineCategories: [...preset.lineCategories] }
 }
 

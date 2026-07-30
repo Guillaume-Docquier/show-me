@@ -41,6 +41,7 @@ export function buildHtmlReport(analysis: ProjectAnalysis, browserBundle: string
       <button id="findings-tab" type="button" role="tab" aria-controls="findings-panel" aria-selected="true">Findings</button>
       <button id="coverage-tab" type="button" role="tab" aria-controls="coverage-panel" aria-selected="false" tabindex="-1" hidden>Coverage</button>
       <button id="coupling-tab" type="button" role="tab" aria-controls="coupling-panel" aria-selected="false" tabindex="-1" hidden>Coupling</button>
+      <button id="boundaries-tab" type="button" role="tab" aria-controls="boundaries-panel" aria-selected="false" tabindex="-1" hidden>Boundaries</button>
       <button id="project-files-tab" type="button" role="tab" aria-controls="project-files-panel" aria-selected="false" tabindex="-1">Project files</button>
     </div>
     <section id="findings-panel" class="findings-panel" role="tabpanel" aria-labelledby="findings-tab">
@@ -72,6 +73,23 @@ export function buildHtmlReport(analysis: ProjectAnalysis, browserBundle: string
         <h3>Dependency cycles</h3>
         <ol id="coupling-cycles" class="diagnostic-results"></ol>
       </section>
+    </section>
+    <section id="boundaries-panel" class="diagnostic-panel boundaries-panel" role="tabpanel" aria-labelledby="boundaries-tab" hidden>
+      <h2>Boundaries</h2>
+      <p class="findings-intro">Directed project-file dependencies grouped by workspace or top-level directory. Cross-boundary relationships are facts, not violations.</p>
+      <fieldset class="diagnostic-filters boundary-filters">
+        <legend>Relationships</legend>
+        <label><input id="boundaries-runtime-dependencies" type="checkbox" checked>Runtime</label>
+        <label><input id="boundaries-type-only-dependencies" type="checkbox" checked>Type only</label>
+      </fieldset>
+      <dl class="diagnostic-counts">
+        <dt>Boundaries</dt><dd id="boundaries-boundary-count">0</dd>
+        <dt>Runtime</dt><dd id="boundaries-runtime-count">0</dd>
+        <dt>Type only</dt><dd id="boundaries-type-only-count">0</dd>
+      </dl>
+      <button id="boundaries-complete-matrix" class="boundary-complete-matrix" type="button" hidden>Return to complete matrix</button>
+      <p id="boundaries-empty" class="findings-empty" role="status" hidden>No project files are available in the active workspace scope.</p>
+      <div id="boundaries-matrix" class="boundary-matrix-scroll"></div>
     </section>
     <section id="coverage-panel" class="diagnostic-panel coverage-panel" role="tabpanel" aria-labelledby="coverage-tab" hidden>
       <h2>Coverage</h2>
@@ -124,6 +142,7 @@ export function buildHtmlReport(analysis: ProjectAnalysis, browserBundle: string
           <option value="structure">Structure</option>
           <option value="coverage">Coverage</option>
           <option value="coupling">Coupling</option>
+          <option value="boundaries">Boundaries</option>
           <option value="custom" hidden disabled>Custom</option>
         </select>
       </label>
@@ -223,6 +242,19 @@ export function buildHtmlReport(analysis: ProjectAnalysis, browserBundle: string
       </dl>
       <h3>Cycle members</h3>
       <ol id="selected-cycle-members" class="file-list relationship-list"></ol>
+    </section>
+    <section id="selected-boundary-details" hidden>
+      <div class="node-type" id="selected-boundary-kind">Boundary</div>
+      <div id="selected-boundary-direction" class="detail-path"></div>
+      <dl>
+        <dt>Project files</dt><dd id="selected-boundary-file-count"></dd>
+        <dt>Exact relationships</dt><dd id="selected-boundary-relationship-count"></dd>
+        <dt>Runtime</dt><dd id="selected-boundary-runtime-count"></dd>
+        <dt>Type only</dt><dd id="selected-boundary-type-only-count"></dd>
+      </dl>
+      <h3>Underlying dependencies</h3>
+      <ol id="selected-boundary-relationships" class="boundary-relationship-list"></ol>
+      <p id="selected-boundary-empty" class="relationship-empty" hidden>This boundary pair has no matching relationships.</p>
     </section>
   </aside>
 </main>

@@ -166,6 +166,32 @@ main {
 .coupling-section h3 { margin: 0 0 8px; color: #d3dee9; font-size: 11px; }
 .coupling-section[hidden] { display: none; }
 .coupling-cycle-indicator { grid-column: 1 / -1; color: #c9a7f5; }
+.boundary-complete-matrix {
+  width: 100%; margin: 0 0 12px; border: 1px solid #42556a; border-radius: 6px; padding: 7px 9px;
+  background: #172638; color: #b7d9ff; font: 600 10px Inter, ui-sans-serif, system-ui, sans-serif; cursor: pointer;
+}
+.boundary-complete-matrix[hidden], .boundary-matrix-scroll[hidden] { display: none; }
+.boundary-matrix-scroll { max-width: 100%; overflow: auto; padding-bottom: 5px; }
+.boundary-matrix { border-collapse: separate; border-spacing: 3px; min-width: 100%; font-size: 9px; }
+.boundary-matrix caption { margin-bottom: 8px; color: #8fa3b8; text-align: left; font-size: 10px; }
+.boundary-matrix th { max-width: 92px; color: #8fa3b8; font-weight: 600; text-align: left; }
+.boundary-matrix th button {
+  max-width: 92px; border: 1px solid transparent; border-radius: 4px; padding: 5px; background: transparent; color: #aebdca;
+  overflow: hidden; font: 600 9px ui-monospace, SFMono-Regular, Consolas, monospace; text-overflow: ellipsis; white-space: nowrap; cursor: pointer;
+}
+.boundary-matrix th button:hover, .boundary-matrix th button:focus-visible, .boundary-matrix th button[aria-current="true"] {
+  border-color: #79b8ff; background: #172638; color: #f5f9ff; outline: none;
+}
+.boundary-cell { min-width: 48px; border-radius: 4px; text-align: center; font-variant-numeric: tabular-nums; }
+.boundary-cell-self { background: #19232d; }
+.boundary-cell-cross { background: #101b27; box-shadow: inset 0 0 0 1px #263c52; }
+.boundary-cell > button {
+  display: grid; gap: 2px; width: 100%; border: 1px solid transparent; border-radius: 4px; padding: 5px 3px;
+  background: transparent; color: #aebdca; font: 9px ui-monospace, SFMono-Regular, Consolas, monospace; cursor: pointer;
+}
+.boundary-cell > button:hover, .boundary-cell > button:focus-visible, .boundary-cell > button[aria-current="true"] {
+  border-color: #79b8ff; background: #17304a; color: #f5f9ff; outline: none;
+}
 .file-search { display: grid; gap: 6px; margin-bottom: 8px; color: #8fa3b8; font-size: 11px; }
 .file-search input {
   width: 100%; border: 1px solid #344456; border-radius: 5px; padding: 8px 9px;
@@ -181,7 +207,7 @@ main {
 .report-controls h2 { margin: 0; padding-right: 18px; border-right: 1px solid #25303b; white-space: nowrap; }
 #details h3 { margin: 16px 0 7px; font-size: 11px; color: #8fa3b8; }
 #selected-empty { color: #6f8295; line-height: 1.5; }
-#selected-details[hidden], #selected-cycle-details[hidden], #external-package-section[hidden], [data-project-file-detail][hidden], [data-dependency-detail][hidden], [data-directory-detail][hidden], [data-coupling-detail][hidden] { display: none; }
+#selected-details[hidden], #selected-cycle-details[hidden], #selected-boundary-details[hidden], #external-package-section[hidden], [data-project-file-detail][hidden], [data-dependency-detail][hidden], [data-directory-detail][hidden], [data-coupling-detail][hidden] { display: none; }
 .node-type { color: #c9a7f5; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .node-type { margin-bottom: 6px; }
 .detail-path { overflow-wrap: anywhere; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; line-height: 1.45; }
@@ -203,6 +229,17 @@ dt { color: #8fa3b8; } dd { margin: 0; font-variant-numeric: tabular-nums; }
 .file-list button:hover, .file-list button:focus-visible { border-color: #42556a; background: #18222d; outline: none; }
 .relationship-list { margin-bottom: 10px; }
 .relationship-empty { padding: 5px 8px; color: #6f8295; font-size: 11px; }
+.boundary-relationship-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.boundary-relationship-list[hidden], #selected-boundary-empty[hidden] { display: none; }
+.boundary-relationship {
+  display: grid; gap: 4px; border: 1px solid #25303b; border-radius: 6px; padding: 7px; background: #0d141c;
+}
+.boundary-relationship span { color: #79b8ff; font-size: 9px; text-transform: uppercase; }
+.boundary-relationship button {
+  border: 0; padding: 0; background: transparent; color: #d3dee9; overflow-wrap: anywhere;
+  font: 10px ui-monospace, SFMono-Regular, Consolas, monospace; text-align: left; cursor: pointer;
+}
+.boundary-relationship button:hover, .boundary-relationship button:focus-visible { color: #79b8ff; outline: none; text-decoration: underline; }
 .file-list button[aria-current="true"] { border-color: #79b8ff; color: #f5f9ff; background: #172638; }
 .node-kind-label { display: block; margin-top: 2px; color: #c9a7f5; font: 9px ui-sans-serif, system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase; }
 .package-swatch { display: inline-block; width: 9px; height: 9px; margin-right: 6px; border: 2px solid #f0ddff; border-radius: 50%; background: #c084fc; }

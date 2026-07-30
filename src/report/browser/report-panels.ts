@@ -1,4 +1,5 @@
 import { buildProjectFileTree, type ProjectFileTreeEntry, type ProjectFileTreeFile } from "./project-file-tree.js"
+import type { BoundaryDrillDown } from "./report-boundaries.js"
 import type { CouplingCycle, CouplingLensResults, CouplingMetric } from "./report-coupling.js"
 import type { ReportPanelElements } from "./report-elements.js"
 import type { ReportNavigationState } from "./report-navigation.js"
@@ -92,6 +93,7 @@ export class ReportPanels {
     this.#elements.selectedEmpty.hidden = true
     this.#elements.selectedDetails.hidden = true
     this.#elements.selectedCycleDetails.hidden = false
+    this.#elements.selectedBoundaryDetails.hidden = true
     this.#elements.selectedCycleKind.textContent = cycle.kind === "runtime" ? "Runtime cycle" : "Cycle includes type-only dependencies"
     this.#elements.selectedCycleMemberCount.textContent = String(cycle.memberNodeIds.length)
     this.#elements.selectedCycleRelationshipCount.textContent = String(cycle.internalEdgeIds.length)
@@ -102,6 +104,50 @@ export class ReportPanels {
           throw new Error(`Coupling cycle references unavailable project file ${nodeId}.`)
         }
         return this.#nodeListItem(node, node.displayName, "Project file")
+      }),
+    )
+  }
+
+  /** Replace ordinary node details with one exact boundary drill-down. */
+  public showBoundaryDrillDown(drillDown: BoundaryDrillDown): void {
+    this.#elements.selectedEmpty.hidden = true
+    this.#elements.selectedDetails.hidden = true
+    this.#elements.selectedCycleDetails.hidden = true
+    this.#elements.selectedBoundaryDetails.hidden = false
+    this.#elements.selectedBoundaryKind.textContent = drillDown.kind === "boundary" ? "Boundary" : "Directed boundary pair"
+    this.#elements.selectedBoundaryDirection.textContent =
+      drillDown.kind === "boundary"
+        ? `${drillDown.sourceLabel} internal relationships`
+        : `${drillDown.sourceLabel} source → ${drillDown.targetLabel} target`
+    this.#elements.selectedBoundaryFileCount.textContent = String(drillDown.fileNodeIds.length)
+    this.#elements.selectedBoundaryRelationshipCount.textContent = String(drillDown.relationships.length)
+    this.#elements.selectedBoundaryRuntimeCount.textContent = String(
+      drillDown.relationships.filter(({ kind }) => kind === "runtime").length,
+    )
+    this.#elements.selectedBoundaryTypeOnlyCount.textContent = String(
+      drillDown.relationships.filter(({ kind }) => kind === "type-only").length,
+    )
+    this.#elements.selectedBoundaryEmpty.hidden = drillDown.relationships.length > 0
+    this.#elements.selectedBoundaryRelationships.hidden = drillDown.relationships.length === 0
+    this.#elements.selectedBoundaryRelationships.replaceChildren(
+      ...drillDown.relationships.map((relationship) => {
+        const item = this.#elements.selectedBoundaryRelationships.ownerDocument.createElement("li")
+        item.className = "boundary-relationship"
+        item.dataset.edgeId = relationship.edgeId
+        item.dataset.sourceNodeId = relationship.sourceNodeId
+        item.dataset.targetNodeId = relationship.targetNodeId
+        item.dataset.relationshipKind = relationship.kind
+        const source = this.#nodeById.get(relationship.sourceNodeId)
+        const target = this.#nodeById.get(relationship.targetNodeId)
+        if (source === undefined || target === undefined) {
+          throw new Error(`Boundary relationship ${relationship.edgeId} references an unavailable project file.`)
+        }
+        const sourceButton = this.#nodeListButton(source, relationship.sourcePath)
+        const direction = this.#elements.selectedBoundaryRelationships.ownerDocument.createElement("span")
+        direction.textContent = `source → target · ${relationship.kind === "runtime" ? "Runtime" : "Type only"}`
+        const targetButton = this.#nodeListButton(target, relationship.targetPath)
+        item.append(sourceButton, direction, targetButton)
+        return item
       }),
     )
   }
@@ -235,6 +281,7 @@ export class ReportPanels {
       return
     }
     this.#elements.selectedCycleDetails.hidden = true
+    this.#elements.selectedBoundaryDetails.hidden = true
     for (const button of this.#elements.fileList.ownerDocument.querySelectorAll<HTMLElement>(".node-list button[data-node-id]")) {
       button.setAttribute("aria-current", button.dataset.nodeId === this.#navigation.selectedNodeId ? "true" : "false")
     }

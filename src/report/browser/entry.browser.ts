@@ -8,6 +8,13 @@
 import type { ProjectAnalysis } from "../../analysis/project-analysis.js"
 import { PerformanceProfiler } from "../../performance/performance-profiler.js"
 import { renderCoverageLegend } from "./coverage-legend.js"
+import {
+  deriveBoundaryDrillDown,
+  deriveBoundaryLensResults,
+  type BoundaryDrillDown,
+  type BoundaryFilterState,
+  type BoundarySelection,
+} from "./report-boundaries.js"
 import { ReportControls } from "./report-controls.js"
 import { deriveCouplingLensResults, type CouplingCycle, type CouplingFilterState } from "./report-coupling.js"
 import { deriveCoverageLensResults, normalizeCoverageFilters } from "./report-coverage.js"
@@ -44,6 +51,7 @@ let presentationState = initialReportPresentationState(presentation.workspacePac
 let renderedViewSignature: string | undefined
 let renderedFindingsScopeSignature: string | undefined
 let selectedCouplingCycle: CouplingCycle | undefined
+let selectedBoundary: BoundarySelection | undefined
 let currentNavigationState: ReportNavigationState | undefined
 
 document.title = `Show me ${presentation.projectName}`
@@ -64,6 +72,7 @@ const graph = new ReportGraph({
     },
     onClearSelection: (): void => {
       clearCouplingCycle()
+      clearBoundarySelection()
       navigation.clearSelection()
       panels.showDefaultSelectionPrompt()
     },
@@ -113,6 +122,15 @@ const findingsPanel = new ReportFindingsPanel({
   updateCouplingFilters: (filters): void => {
     applyCouplingFilters(filters)
   },
+  activateBoundary: (selection): void => {
+    activateBoundarySelection(selection)
+  },
+  clearBoundary: (): void => {
+    clearBoundarySelection(true)
+  },
+  updateBoundaryFilters: (filters): void => {
+    applyBoundaryFilters(filters)
+  },
 })
 
 const controls = new ReportControls({
@@ -141,7 +159,8 @@ function renderNavigation(state: ReportNavigationState, centeredNodeId: string |
   panels.renderNavigation(state)
   findingsPanel.renderSelection(state.selectedNodeId, selectedCouplingCycle?.id)
   controls.renderFocusLegend(
-    presentationState.lens === "coupling" && (state.hoveredNodeId !== undefined || state.selectedNodeId !== undefined),
+    (presentationState.lens === "coupling" && (state.hoveredNodeId !== undefined || state.selectedNodeId !== undefined)) ||
+      (presentationState.lens === "boundaries" && selectedBoundary !== undefined),
   )
   elements.root.dataset.navigationHistory = JSON.stringify({ entries: state.history, index: state.historyIndex })
   if (centeredNodeId !== undefined) {
@@ -152,7 +171,31 @@ function renderNavigation(state: ReportNavigationState, centeredNodeId: string |
 function applyPresentationState(nextPresentationState: ReportPresentationState): void {
   presentationState = nextPresentationState
   const settings = reportLensSettings(presentationState)
-  const view = buildReportView(presentation, presentationState.scope, settings)
+  const boundaryFilters: BoundaryFilterState = {
+    runtimeDependencies: settings.runtimeDependencies,
+    typeOnlyDependencies: settings.typeOnlyDependencies,
+  }
+  const boundaryResults = performanceProfiler.measure("browser-boundaries", () =>
+    deriveBoundaryLensResults(presentation, presentationState.scope, boundaryFilters),
+  )
+  let boundaryDrillDown: BoundaryDrillDown | undefined
+  if (presentationState.lens === "boundaries" && selectedBoundary !== undefined) {
+    boundaryDrillDown = deriveBoundaryDrillDown(boundaryResults, selectedBoundary)
+    if (boundaryDrillDown === undefined) {
+      selectedBoundary = undefined
+    }
+  }
+  const view = buildReportView(
+    presentation,
+    presentationState.scope,
+    settings,
+    boundaryDrillDown === undefined
+      ? undefined
+      : {
+          projectFileNodeIds: new Set(boundaryDrillDown.fileNodeIds),
+          dependencyEdgeIds: new Set(boundaryDrillDown.relationships.map(({ edgeId }) => edgeId)),
+        },
+  )
   const nextViewSignature = reportViewGraphSignature(view)
   controls.render(presentationState)
   findingsPanel.renderLens(presentationState.lens)
@@ -168,6 +211,9 @@ function applyPresentationState(nextPresentationState: ReportPresentationState):
     deriveCouplingLensResults(presentation, presentationState.scope, couplingFilters),
   )
   findingsPanel.renderCoupling(couplingResults, couplingFilters)
+  performanceProfiler.measure("browser-boundaries", () => {
+    findingsPanel.renderBoundaries(boundaryResults, boundaryFilters)
+  })
   panels.renderCoupling(presentationState.lens === "coupling" ? couplingResults : undefined)
   const nextFindingsScopeSignature = JSON.stringify([...presentationState.scope.workspacePackages].toSorted())
   if (nextFindingsScopeSignature !== renderedFindingsScopeSignature) {
@@ -199,8 +245,20 @@ function applyPresentationState(nextPresentationState: ReportPresentationState):
       findingsPanel.renderSelection(undefined, currentCycle.id)
     }
   }
+  if (presentationState.lens !== "boundaries") {
+    clearBoundarySelection()
+  } else if (boundaryDrillDown !== undefined) {
+    graph.setBoundaryFocus(boundaryDrillDown)
+    panels.showBoundaryDrillDown(boundaryDrillDown)
+    findingsPanel.renderBoundarySelection(boundaryDrillDown)
+  } else {
+    graph.setBoundaryFocus(undefined)
+    findingsPanel.renderBoundarySelection(undefined)
+  }
   controls.renderFocusLegend(
-    presentationState.lens === "coupling" && (selectedCouplingCycle !== undefined || currentNavigationState?.selectedNodeId !== undefined),
+    (presentationState.lens === "coupling" &&
+      (selectedCouplingCycle !== undefined || currentNavigationState?.selectedNodeId !== undefined)) ||
+      (presentationState.lens === "boundaries" && selectedBoundary !== undefined),
   )
   elements.root.dataset.activeLens = activeReportLens(presentationState)
   elements.root.dataset.selectedLens = presentationState.lens
@@ -210,7 +268,27 @@ function applyPresentationState(nextPresentationState: ReportPresentationState):
 
 function activateNode(nodeId: string): void {
   clearCouplingCycle()
+  clearBoundarySelection()
   navigation.activate(nodeId)
+}
+
+function activateBoundarySelection(selection: BoundarySelection): void {
+  clearCouplingCycle()
+  selectedBoundary = selection
+  navigation.clearSelection()
+  applyPresentationState(presentationState)
+}
+
+function clearBoundarySelection(rebuildView = false): void {
+  if (selectedBoundary === undefined) {
+    return
+  }
+  selectedBoundary = undefined
+  graph.setBoundaryFocus(undefined)
+  findingsPanel.renderBoundarySelection(undefined)
+  if (rebuildView) {
+    applyPresentationState(presentationState)
+  }
 }
 
 function activateCouplingCycle(cycle: CouplingCycle): void {
@@ -238,6 +316,17 @@ function applyCouplingFilters(filters: CouplingFilterState): void {
       runtimeDependencies: filters.runtimeDependencies,
       typeOnlyDependencies: filters.typeOnlyDependencies,
       dependencyDisplay: filters.showBackgroundDependencies ? "all" : "focused",
+    }),
+  )
+}
+
+function applyBoundaryFilters(filters: BoundaryFilterState): void {
+  const settings = reportLensSettings(presentationState)
+  applyPresentationState(
+    customizeReportLens(presentationState, {
+      ...settings,
+      runtimeDependencies: filters.runtimeDependencies,
+      typeOnlyDependencies: filters.typeOnlyDependencies,
     }),
   )
 }

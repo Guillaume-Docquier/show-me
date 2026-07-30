@@ -3,6 +3,7 @@ import { Sigma } from "sigma"
 import { createEdgeArrowProgram } from "sigma/rendering"
 import type { EdgeDisplayData, NodeDisplayData } from "sigma/types"
 import type { PerformanceProfiler } from "../../performance/performance-profiler.js"
+import type { BoundaryDrillDown } from "./report-boundaries.js"
 import type { CouplingCycle } from "./report-coupling.js"
 import { ReportGraphDiagnostics } from "./report-graph-diagnostics.js"
 import { ReportGraphLabelVisibility } from "./report-graph-label-visibility.js"
@@ -41,6 +42,12 @@ export type ReportGraphEvents = {
   readonly onClearPreview: (nodeId: string) => void
 }
 
+type AggregateFocus = {
+  readonly id: string
+  readonly memberNodeIds: readonly string[]
+  readonly internalEdgeIds: readonly string[]
+}
+
 /**
  * Owns the mutable Graphology projection, Sigma renderer, layout, and graph interactions.
  *
@@ -67,7 +74,7 @@ export class ReportGraph {
   #lensSettings: ReportLensSettings
   #dependencyFocus: DependencyFocus | undefined
   #diagnosticEmphasisNodeIds: ReadonlySet<string> | undefined
-  #couplingCycleFocus: CouplingCycle | undefined
+  #aggregateFocus: AggregateFocus | undefined
   #structureFocusNodeId: string | undefined
   #cameraResetAwaitingSettledRender = false
   #cameraAnimationGeneration = 0
@@ -209,11 +216,29 @@ export class ReportGraph {
 
   /** Focus every member and internal edge of one selected Coupling cycle. */
   public setCouplingCycleFocus(cycle: CouplingCycle | undefined): void {
-    this.#couplingCycleFocus = cycle
+    this.#aggregateFocus = cycle
+    delete this.#root.dataset.selectedBoundaryDrillDown
     if (cycle === undefined) {
       delete this.#root.dataset.selectedCouplingCycle
     } else {
       this.#root.dataset.selectedCouplingCycle = cycle.id
+    }
+    this.#synchronizeEdgeFocus()
+    this.#refreshDependencyEdges()
+    this.#renderer.scheduleRender()
+  }
+
+  /** Focus every file and exact dependency represented by one boundary drill-down. */
+  public setBoundaryFocus(drillDown: BoundaryDrillDown | undefined): void {
+    this.#aggregateFocus =
+      drillDown === undefined
+        ? undefined
+        : { id: drillDown.id, memberNodeIds: drillDown.fileNodeIds, internalEdgeIds: drillDown.relationships.map(({ edgeId }) => edgeId) }
+    delete this.#root.dataset.selectedCouplingCycle
+    if (drillDown === undefined) {
+      delete this.#root.dataset.selectedBoundaryDrillDown
+    } else {
+      this.#root.dataset.selectedBoundaryDrillDown = drillDown.id
     }
     this.#synchronizeEdgeFocus()
     this.#refreshDependencyEdges()
@@ -289,7 +314,7 @@ export class ReportGraph {
         this.#structureFocusNodeId,
       )
       this.#overlays.renderDiagnosticEmphasis(
-        new Set([...(this.#diagnosticEmphasisNodeIds ?? []), ...(this.#couplingCycleFocus?.memberNodeIds ?? [])]),
+        new Set([...(this.#diagnosticEmphasisNodeIds ?? []), ...(this.#aggregateFocus?.memberNodeIds ?? [])]),
       )
       this.#overlays.renderDependencyFocus(this.#dependencyFocus)
       this.#overlays.renderHoveredNodeLabel(this.#interaction.hoveredNodeId)
@@ -332,8 +357,8 @@ export class ReportGraph {
       return { ...attributes, hidden: true }
     }
 
-    if (this.#couplingCycleFocus !== undefined) {
-      return this.#couplingCycleFocus.internalEdgeIds.includes(edge)
+    if (this.#aggregateFocus !== undefined) {
+      return this.#aggregateFocus.internalEdgeIds.includes(edge)
         ? { ...attributes, hidden: false, color: DEPENDENCY_FOCUS_COLOR, size: CONSUMER_FOCUS_EDGE_SIZE, zIndex: 1 }
         : { ...attributes, hidden: true }
     }
@@ -500,7 +525,7 @@ export class ReportGraph {
   }
 
   #synchronizeEdgeFocus(): void {
-    if (this.#couplingCycleFocus !== undefined) {
+    if (this.#aggregateFocus !== undefined) {
       this.#structureFocusNodeId = undefined
       this.#dependencyFocus = undefined
       this.#diagnostics.writeDependencyFocus(undefined)
