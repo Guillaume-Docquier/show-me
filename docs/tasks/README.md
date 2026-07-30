@@ -9,7 +9,6 @@ Milestones 024 through 030 continue the ordered report-UX sequence established b
 | Milestone                                                                       | Status      | Outcome                                                                                     |
 | ------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------- |
 | [020 Configurable coverage locations](./020-configurable-coverage-locations.md) | Not started | Configure per-package locations and multiple explicit reports.                              |
-| [025 Coverage lens](./025-coverage-lens.md)                                     | Not started | Explore file size and coverage through explicit thresholds, counts, and graph emphasis.     |
 | [026 Coupling lens](./026-coupling-lens.md)                                     | Not started | Reveal dependency hubs, consumers, fan-out, cycles, and focused relationship direction.     |
 | [027 Boundary lens](./027-boundary-lens.md)                                     | Not started | Aggregate directed dependencies between workspace and directory boundaries with drill-down. |
 | [028 Configurable architecture rules](./028-configurable-architecture-rules.md) | Not started | Declare modules and allowed directions, then report exact rule-backed violations.           |
@@ -45,6 +44,7 @@ Completed milestone files are retained under [`done/`](./done/) as implementatio
 | [022 Coherent report navigation](./done/022-coherent-report-navigation.md)     | 2026-07-28 | Unifies search, selection, centering, disclosure, breadcrumbs, and history.     |
 | [023 Diagnostic lens framework](./done/023-diagnostic-lens-framework.md)       | 2026-07-29 | Replaces checkbox-first setup with deterministic Overview and Structure lenses. |
 | [024 Findings-first overview](./done/024-findings-first-overview.md)           | 2026-07-29 | Opens on explainable coverage, coupling, cycle, and workspace candidates.       |
+| [025 Coverage lens](./done/025-coverage-lens.md)                               | 2026-07-29 | Explores file size and imported coverage through explicit filters and emphasis. |
 
 ## Workflow
 

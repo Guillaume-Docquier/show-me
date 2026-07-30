@@ -91,12 +91,13 @@ export class ReportControls {
     this.#elements.externalDependencyEdgeKey.hidden = !dependencyLegendVisible || !settings.externalPackages
     this.#elements.graphKey.hidden = !settings.structureEdges && !dependencyLegendVisible
     this.#elements.coverageLegend.hidden = settings.projectFileColor !== "coverage"
+    this.#elements.activeSizeKey.textContent = `Size: ${settings.lineCategories.map(lineCategoryLabel).join(" + ")} lines`
   }
 
   #bindEvents(): void {
     this.#elements.lensSelector.addEventListener("change", () => {
       const lens = this.#elements.lensSelector.value
-      if (lens === "overview" || lens === "structure") {
+      if (lens === "overview" || lens === "structure" || lens === "coverage") {
         this.#events.onPresentationStateChange(selectReportLens(this.#presentationState, lens))
       }
     })
@@ -185,4 +186,8 @@ export class ReportControls {
     }
     throw new Error(`Unknown project-file color ${value}.`)
   }
+}
+
+function lineCategoryLabel(category: ReportLineCategory): string {
+  return category === "comment" ? "comment" : category
 }

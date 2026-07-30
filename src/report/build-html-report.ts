@@ -39,6 +39,7 @@ export function buildHtmlReport(analysis: ProjectAnalysis, browserBundle: string
   <aside id="files" aria-label="Codebase navigation">
     <div id="sidebar-tabs" class="sidebar-tabs" role="tablist" aria-label="Codebase panels">
       <button id="findings-tab" type="button" role="tab" aria-controls="findings-panel" aria-selected="true">Findings</button>
+      <button id="coverage-tab" type="button" role="tab" aria-controls="coverage-panel" aria-selected="false" tabindex="-1" hidden>Coverage</button>
       <button id="project-files-tab" type="button" role="tab" aria-controls="project-files-panel" aria-selected="false" tabindex="-1">Project files</button>
     </div>
     <section id="findings-panel" class="findings-panel" role="tabpanel" aria-labelledby="findings-tab">
@@ -46,6 +47,27 @@ export function buildHtmlReport(analysis: ProjectAnalysis, browserBundle: string
       <p class="findings-intro">Explainable candidates from the active workspace scope. They are starting points for investigation, not verdicts.</p>
       <div id="findings-categories"></div>
       <p id="findings-empty" class="findings-empty" role="status" hidden>No findings in the active workspace scope.</p>
+    </section>
+    <section id="coverage-panel" class="diagnostic-panel coverage-panel" role="tabpanel" aria-labelledby="coverage-tab" hidden>
+      <h2>Coverage</h2>
+      <p class="findings-intro">Filter physical code-line size and imported executable-line coverage independently. Show Me does not infer exact uncovered source lines.</p>
+      <fieldset class="diagnostic-filters">
+        <legend>Coverage filters</legend>
+        <label for="coverage-minimum-code-lines">Minimum code lines
+          <input id="coverage-minimum-code-lines" type="number" min="0" step="1" value="100">
+        </label>
+        <label for="coverage-maximum-percentage">Maximum coverage
+          <span><input id="coverage-maximum-percentage" type="number" min="0" max="100" step="1" value="80">%</span>
+        </label>
+        <label><input id="coverage-include-unavailable" type="checkbox" checked>Include unavailable coverage</label>
+      </fieldset>
+      <dl id="coverage-result-counts" class="diagnostic-counts">
+        <dt>Matching files</dt><dd id="coverage-matching-count">0</dd>
+        <dt>Known coverage</dt><dd id="coverage-known-count">0</dd>
+        <dt>Unavailable coverage</dt><dd id="coverage-unavailable-count">0</dd>
+      </dl>
+      <p id="coverage-empty" class="findings-empty" role="status" hidden>No files match the active coverage filters.</p>
+      <ol id="coverage-results" class="diagnostic-results"></ol>
     </section>
     <section id="project-files-panel" role="tabpanel" aria-labelledby="project-files-tab" hidden>
       <h2 id="files-heading">Project files</h2>
@@ -75,6 +97,7 @@ export function buildHtmlReport(analysis: ProjectAnalysis, browserBundle: string
         <select id="lens-selector">
           <option value="overview" selected>Overview</option>
           <option value="structure">Structure</option>
+          <option value="coverage">Coverage</option>
           <option value="custom" hidden disabled>Custom</option>
         </select>
       </label>
@@ -120,6 +143,7 @@ export function buildHtmlReport(analysis: ProjectAnalysis, browserBundle: string
         <span id="external-dependency-edge-key"><i class="graph-edge-swatch external-dependency-edge-swatch" aria-hidden="true"></i>External</span>
       </div>
       <div id="coverage-legend" class="coverage-legend" aria-label="Project-file coverage colors"></div>
+      <span id="active-size-key" class="active-size-key">Size: code lines</span>
     </div>
   </section>
   <aside id="details" aria-label="Graph node details">

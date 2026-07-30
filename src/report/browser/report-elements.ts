@@ -8,11 +8,21 @@ export type ReportHeadingElements = {
 export type ReportFindingPanelElements = {
   readonly tabs: HTMLElement
   readonly findingsTab: HTMLButtonElement
+  readonly coverageTab: HTMLButtonElement
   readonly projectFilesTab: HTMLButtonElement
   readonly panel: HTMLElement
   readonly categories: HTMLElement
   readonly empty: HTMLElement
   readonly projectFilesPanel: HTMLElement
+  readonly coveragePanel: HTMLElement
+  readonly coverageMinimumCodeLines: HTMLInputElement
+  readonly coverageMaximumPercentage: HTMLInputElement
+  readonly coverageIncludeUnavailable: HTMLInputElement
+  readonly coverageMatchingCount: HTMLElement
+  readonly coverageKnownCount: HTMLElement
+  readonly coverageUnavailableCount: HTMLElement
+  readonly coverageEmpty: HTMLElement
+  readonly coverageResults: HTMLOListElement
 }
 
 /** DOM owned by report controls. */
@@ -36,6 +46,7 @@ export type ReportControlElements = {
   readonly typeOnlyDependencyEdgeKey: HTMLElement
   readonly externalDependencyEdgeKey: HTMLElement
   readonly coverageLegend: HTMLElement
+  readonly activeSizeKey: HTMLElement
 }
 
 /** DOM owned by the files and selected-node panels. */
@@ -97,11 +108,21 @@ export function getReportElements(reportDocument: Document): ReportElements {
     findings: {
       tabs: requiredElement(reportDocument, "sidebar-tabs"),
       findingsTab: requiredButton(reportDocument, "findings-tab"),
+      coverageTab: requiredButton(reportDocument, "coverage-tab"),
       projectFilesTab: requiredButton(reportDocument, "project-files-tab"),
       panel: requiredElement(reportDocument, "findings-panel"),
       categories: requiredElement(reportDocument, "findings-categories"),
       empty: requiredElement(reportDocument, "findings-empty"),
       projectFilesPanel: requiredElement(reportDocument, "project-files-panel"),
+      coveragePanel: requiredElement(reportDocument, "coverage-panel"),
+      coverageMinimumCodeLines: requiredNumberInput(reportDocument, "coverage-minimum-code-lines"),
+      coverageMaximumPercentage: requiredNumberInput(reportDocument, "coverage-maximum-percentage"),
+      coverageIncludeUnavailable: requiredCheckbox(reportDocument, "coverage-include-unavailable"),
+      coverageMatchingCount: requiredElement(reportDocument, "coverage-matching-count"),
+      coverageKnownCount: requiredElement(reportDocument, "coverage-known-count"),
+      coverageUnavailableCount: requiredElement(reportDocument, "coverage-unavailable-count"),
+      coverageEmpty: requiredElement(reportDocument, "coverage-empty"),
+      coverageResults: requiredOrderedList(reportDocument, "coverage-results"),
     },
     controls: {
       lensSelector: requiredSelect(reportDocument, "lens-selector"),
@@ -123,6 +144,7 @@ export function getReportElements(reportDocument: Document): ReportElements {
       typeOnlyDependencyEdgeKey: requiredElement(reportDocument, "type-only-dependency-edge-key"),
       externalDependencyEdgeKey: requiredElement(reportDocument, "external-dependency-edge-key"),
       coverageLegend: requiredElement(reportDocument, "coverage-legend"),
+      activeSizeKey: requiredElement(reportDocument, "active-size-key"),
     },
     panels: {
       fileSearch: requiredSearchInput(reportDocument, "file-search"),
@@ -205,6 +227,22 @@ function requiredSearchInput(reportDocument: Document, id: string): HTMLInputEle
   const element = requiredElement(reportDocument, id)
   if (!(element instanceof HTMLInputElement) || element.type !== "search") {
     throw new Error("Static report #" + id + " is not a search input.")
+  }
+  return element
+}
+
+function requiredNumberInput(reportDocument: Document, id: string): HTMLInputElement {
+  const element = requiredElement(reportDocument, id)
+  if (!(element instanceof HTMLInputElement) || element.type !== "number") {
+    throw new Error("Static report #" + id + " is not a number input.")
+  }
+  return element
+}
+
+function requiredOrderedList(reportDocument: Document, id: string): HTMLOListElement {
+  const element = requiredElement(reportDocument, id)
+  if (!(element instanceof HTMLOListElement)) {
+    throw new Error("Static report #" + id + " is not an ordered list.")
   }
   return element
 }

@@ -72,6 +72,7 @@ header p { margin: 0; color: #8fa3b8; font-size: 12px; }
 .coverage-legend, .coverage-legend-scale, .coverage-legend-entry { display: flex; align-items: center; }
 .coverage-legend { gap: 8px; color: #8fa3b8; font-size: 11px; }
 .coverage-legend-title { color: #8fa3b8; }
+.active-size-key { color: #8fa3b8; font-size: 11px; white-space: nowrap; }
 .coverage-legend-scale { gap: 5px; }
 .coverage-legend-gradient { display: inline-block; width: 48px; height: 7px; border-radius: 999px; }
 .coverage-legend-entry { gap: 4px; white-space: nowrap; }
@@ -86,14 +87,14 @@ main {
   grid-area: files; display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0;
   border-right: 1px solid #25303b; background: #111821; overflow: hidden;
 }
-.findings-panel, #project-files-panel { min-height: 0; overflow: auto; padding: 18px; }
+.findings-panel, .diagnostic-panel, #project-files-panel { min-height: 0; overflow: auto; padding: 18px; }
 #graph { grid-area: graph; position: relative; min-width: 0; background: #0d1117; }
 #details { grid-area: details; border-left: 1px solid #25303b; background: #111821; overflow: auto; padding: 18px; }
 #files h2, .report-controls h2 {
   margin: 0 0 12px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: #8fa3b8;
 }
-.sidebar-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin: 14px 18px 0; padding: 3px; border-radius: 7px; background: #0d141c; }
-.sidebar-tabs[hidden], .findings-panel[hidden], #project-files-panel[hidden] { display: none; }
+.sidebar-tabs { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; margin: 14px 18px 0; padding: 3px; border-radius: 7px; background: #0d141c; }
+.sidebar-tabs[hidden], .findings-panel[hidden], .diagnostic-panel[hidden], #project-files-panel[hidden] { display: none; }
 .sidebar-tabs button {
   border: 1px solid transparent; border-radius: 5px; padding: 7px 8px; background: transparent; color: #8fa3b8;
   font: 600 11px Inter, ui-sans-serif, system-ui, sans-serif; cursor: pointer;
@@ -130,6 +131,29 @@ main {
   font: 600 10px Inter, ui-sans-serif, system-ui, sans-serif; cursor: pointer;
 }
 .finding-list-toggle:hover, .finding-list-toggle:focus-visible { color: #b7d9ff; text-decoration: underline; outline: none; }
+.diagnostic-filters { display: grid; gap: 10px; margin: 0 0 14px; padding: 12px; border: 1px solid #25303b; border-radius: 7px; }
+.diagnostic-filters legend { padding: 0 5px; color: #8fa3b8; font-size: 10px; }
+.diagnostic-filters label { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #aebdca; font-size: 10px; }
+.diagnostic-filters input[type="number"] {
+  width: 70px; border: 1px solid #344456; border-radius: 5px; padding: 5px 6px;
+  background: #0d141c; color: #e7edf4; font: 11px ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+.diagnostic-filters input:focus-visible { border-color: #79b8ff; outline: 1px solid #79b8ff; outline-offset: 1px; }
+.diagnostic-filters input[type="checkbox"] { accent-color: #79b8ff; }
+.diagnostic-counts { margin: 0 0 14px; padding: 0 2px; font-size: 10px; }
+.diagnostic-results { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.diagnostic-results[hidden] { display: none; }
+.diagnostic-result {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 8px; width: 100%;
+  border: 1px solid #25303b; border-radius: 7px; padding: 9px 10px; background: #0d141c; color: #8fa3b8;
+  font-size: 10px; font-variant-numeric: tabular-nums; text-align: left; cursor: pointer;
+}
+.diagnostic-result strong {
+  grid-column: 1 / -1; overflow: hidden; color: #f5f9ff;
+  font: 600 11px ui-monospace, SFMono-Regular, Consolas, monospace; text-overflow: ellipsis; white-space: nowrap;
+}
+.diagnostic-result:hover, .diagnostic-result:focus-visible { border-color: #79b8ff; background: #162230; outline: none; }
+.diagnostic-result[aria-current="true"] { border-color: #79b8ff; background: #172638; }
 .file-search { display: grid; gap: 6px; margin-bottom: 8px; color: #8fa3b8; font-size: 11px; }
 .file-search input {
   width: 100%; border: 1px solid #344456; border-radius: 5px; padding: 8px 9px;

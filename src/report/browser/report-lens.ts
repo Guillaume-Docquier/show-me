@@ -1,7 +1,8 @@
+import { DEFAULT_COVERAGE_FILTERS, type CoverageFilterState } from "./report-coverage.js"
 import type { ReportLineCategory } from "./report-presentation.js"
 
 /** Named report lenses with complete browser behavior. */
-export const REPORT_LENSES = ["overview", "structure"] as const
+export const REPORT_LENSES = ["overview", "structure", "coverage"] as const
 
 /** One named task-oriented report presentation. */
 export type ReportLens = (typeof REPORT_LENSES)[number]
@@ -52,6 +53,7 @@ export type ReportPresentationState = {
   readonly scope: ReportScopeState
   readonly lens: ReportLens
   readonly advancedOverrides: ReportAdvancedOverrides
+  readonly coverageFilters: CoverageFilterState
 }
 
 const OVERVIEW_SETTINGS: ReportLensSettings = {
@@ -72,18 +74,28 @@ const STRUCTURE_SETTINGS: ReportLensSettings = {
   projectFileColor: "neutral",
 }
 
+const COVERAGE_SETTINGS: ReportLensSettings = {
+  lineCategories: ["code"],
+  externalPackages: false,
+  typeOnlyDependencies: true,
+  structureEdges: true,
+  dependencyDisplay: "hidden",
+  projectFileColor: "coverage",
+}
+
 /** Create the initial Overview state over every discovered workspace package. */
 export function initialReportPresentationState(workspacePackagePaths: readonly string[]): ReportPresentationState {
   return {
     scope: { workspacePackages: new Set(workspacePackagePaths) },
     lens: "overview",
     advancedOverrides: {},
+    coverageFilters: DEFAULT_COVERAGE_FILTERS,
   }
 }
 
 /** Return a fresh copy of one named lens's deterministic settings. */
 export function reportLensPreset(lens: ReportLens): ReportLensSettings {
-  const preset = lens === "overview" ? OVERVIEW_SETTINGS : STRUCTURE_SETTINGS
+  const preset = lens === "overview" ? OVERVIEW_SETTINGS : lens === "structure" ? STRUCTURE_SETTINGS : COVERAGE_SETTINGS
   return { ...preset, lineCategories: [...preset.lineCategories] }
 }
 
@@ -111,12 +123,18 @@ export function selectReportLens(state: ReportPresentationState, lens: ReportLen
     scope: state.scope,
     lens,
     advancedOverrides: {},
+    coverageFilters: state.coverageFilters,
   }
 }
 
 /** Replace codebase scope without changing the selected lens or its advanced overrides. */
 export function updateReportScope(state: ReportPresentationState, scope: ReportScopeState): ReportPresentationState {
   return { ...state, scope }
+}
+
+/** Replace Coverage lens thresholds without changing scope or presentation settings. */
+export function updateCoverageFilters(state: ReportPresentationState, coverageFilters: CoverageFilterState): ReportPresentationState {
+  return { ...state, coverageFilters }
 }
 
 /**

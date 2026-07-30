@@ -761,6 +761,72 @@ test("opens with ranked findings that navigate through the shared report workflo
   })
 })
 
+test("filters coverage risk without removing project files from navigation", async ({ page }) => {
+  await withTemporaryDirectory(async (temporaryDirectory) => {
+    const reportPath = await test.step("Generate a report with zero, complete, and unavailable coverage", async () => {
+      const browserBundle = await readFile(join(process.cwd(), "dist", "report", "browser.js"), "utf8")
+      const path = join(temporaryDirectory, "coverage-lens.html")
+      await writeFile(path, buildHtmlReport(coverageLensAnalysis(), browserBundle), "utf8")
+      return path
+    })
+
+    await test.step("Open the Coverage preset with exact metrics, counts, and graph emphasis", async () => {
+      await page.goto(pathToFileURL(reportPath).href)
+      await page.locator("#lens-selector").selectOption("coverage")
+      await expect(page.locator("html")).toHaveAttribute("data-active-lens", "coverage")
+      await expect(page.locator("#coverage-panel")).toBeVisible()
+      await expect(page.locator("#project-files-panel")).toBeHidden()
+      await expect(page.locator("#coverage-minimum-code-lines")).toHaveValue("100")
+      await expect(page.locator("#coverage-maximum-percentage")).toHaveValue("80")
+      await expect(page.locator("#coverage-include-unavailable")).toBeChecked()
+      await expect(page.locator("#coverage-panel")).toHaveAttribute("data-matching-file-count", "3")
+      await expect(page.locator("#coverage-known-count")).toHaveText("4")
+      await expect(page.locator("#coverage-unavailable-count")).toHaveText("1")
+      await expect(page.locator(".coverage-result strong")).toHaveText(["apps/a/zero.ts", "apps/b/partial.ts", "apps/a/unavailable.ts"])
+      await expect(page.locator("#coverage-legend")).toBeVisible()
+      await expect(page.locator("#active-size-key")).toHaveText("Size: code lines")
+      await expect(page.locator("#graph")).toHaveAttribute("data-rendered-dependency-edge-count", "0")
+      await expect(page.locator("#graph")).toHaveAttribute("data-rendered-diagnostic-emphasis-count", "3")
+    })
+
+    await test.step("Exclude unavailable coverage independently from zero coverage", async () => {
+      await page.locator("#coverage-include-unavailable").uncheck()
+      await expect(page.locator("#coverage-panel")).toHaveAttribute("data-matching-file-count", "2")
+      await expect(page.locator(".coverage-result strong")).toHaveText(["apps/a/zero.ts", "apps/b/partial.ts"])
+      await expect(page.locator('.coverage-result[data-coverage="0"]')).toHaveCount(1)
+      await expect(page.locator('.coverage-result[data-coverage="unavailable"]')).toHaveCount(0)
+    })
+
+    await test.step("Keep a filtered-out file searchable and preserve filters during inspection", async () => {
+      await page.locator("#coverage-minimum-code-lines").fill("200")
+      await expect(page.locator("#coverage-empty")).toBeVisible()
+      await page.locator("#project-files-tab").click()
+      const search = page.getByRole("searchbox", { name: "Search project paths" })
+      await search.fill("zero.ts")
+      await page.locator("#file-list").getByRole("button", { name: "apps/a/zero.ts", exact: true }).click()
+      await expect(page.locator("html")).toHaveAttribute("data-selected-node", "project-file:apps/a/zero.ts")
+      await expect(page.locator("#selected-code-lines")).toHaveText("150")
+      await expect(page.locator("#selected-coverage")).toHaveText("0%")
+      await expect(page.locator("html")).toHaveAttribute(
+        "data-coverage-filters",
+        '{"minimumCodeLines":200,"maximumCoverage":80,"includeUnavailableCoverage":false}',
+      )
+      await page.locator("#coverage-tab").click()
+      await expect(page.locator("#coverage-minimum-code-lines")).toHaveValue("200")
+    })
+
+    await test.step("Compose workspace scope with the active Coverage filters", async () => {
+      await page.locator("#coverage-minimum-code-lines").fill("100")
+      await page.getByRole("checkbox", { name: "@coverage/b", exact: true }).uncheck()
+      await expect(page.locator("#coverage-known-count")).toHaveText("3")
+      await expect(page.locator("#coverage-unavailable-count")).toHaveText("1")
+      await expect(page.locator("#coverage-panel")).toHaveAttribute("data-matching-file-count", "1")
+      await expect(page.locator(".coverage-result strong")).toHaveText("apps/a/zero.ts")
+      await expect(page.locator("html")).toHaveAttribute("data-selected-node", "project-file:apps/a/zero.ts")
+    })
+  })
+})
+
 test("derives project-file edges and relationships in the browser", async ({ page }) => {
   await withTemporaryDirectory(async (temporaryDirectory) => {
     const reportPath = await test.step("Generate the static-ESM report", async () => {
@@ -1854,6 +1920,66 @@ function findingsOverviewAnalysis(): ProjectAnalysis {
     dependencies: [
       ...sourcePaths.map((source) => ({ source, target: targetPath, kind: "runtime" as const })),
       { source: targetPath, target: sourcePaths[0] ?? largePath, kind: "type-only" },
+    ],
+    externalPackages: [],
+    externalPackageDependencies: [],
+    diagnostics: [],
+  }
+}
+
+function coverageLensAnalysis(): ProjectAnalysis {
+  const zero = branded<ProjectFilePath>("apps/a/zero.ts")
+  const unavailable = branded<ProjectFilePath>("apps/a/unavailable.ts")
+  const complete = branded<ProjectFilePath>("apps/a/complete.ts")
+  const small = branded<ProjectFilePath>("apps/a/small.ts")
+  const partial = branded<ProjectFilePath>("apps/b/partial.ts")
+  return {
+    schemaVersion: 5,
+    project: { name: "coverage-lens" },
+    workspacePackages: [
+      { path: "apps/a", name: "@coverage/a" },
+      { path: "apps/b", name: "@coverage/b" },
+    ],
+    files: [
+      {
+        path: zero,
+        language: "typescript",
+        lines: { code: 150, comment: 10, blank: 5 },
+        coverage: { lines: 0 },
+        workspacePackage: "apps/a",
+      },
+      {
+        path: unavailable,
+        language: "typescript",
+        lines: { code: 120, comment: 0, blank: 0 },
+        coverage: undefined,
+        workspacePackage: "apps/a",
+      },
+      {
+        path: complete,
+        language: "typescript",
+        lines: { code: 110, comment: 0, blank: 0 },
+        coverage: { lines: 100 },
+        workspacePackage: "apps/a",
+      },
+      {
+        path: small,
+        language: "typescript",
+        lines: { code: 50, comment: 0, blank: 0 },
+        coverage: { lines: 20 },
+        workspacePackage: "apps/a",
+      },
+      {
+        path: partial,
+        language: "typescript",
+        lines: { code: 130, comment: 0, blank: 0 },
+        coverage: { lines: 50 },
+        workspacePackage: "apps/b",
+      },
+    ],
+    dependencies: [
+      { source: zero, target: partial, kind: "runtime" },
+      { source: unavailable, target: zero, kind: "type-only" },
     ],
     externalPackages: [],
     externalPackageDependencies: [],

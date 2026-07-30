@@ -14,6 +14,7 @@ const FOCUSED_STRUCTURE_EDGE_COLOR = "rgba(121, 184, 255, 0.95)"
 const FOCUS_RING_OFFSET = 5
 const FOCUS_RING_SEPARATION = 5
 const FOCUS_RING_WIDTH = 3
+const DIAGNOSTIC_EMPHASIS_COLOR = "rgba(245, 249, 255, 0.9)"
 
 export type DependencyFocus = {
   readonly nodeId: string
@@ -28,6 +29,8 @@ export class ReportGraphOverlays {
   readonly #container: HTMLElement
   readonly #structureLayer: HTMLCanvasElement
   readonly #structureContext: CanvasRenderingContext2D
+  readonly #diagnosticEmphasisLayer: HTMLCanvasElement
+  readonly #diagnosticEmphasisContext: CanvasRenderingContext2D
   readonly #dependencyFocusLayer: HTMLCanvasElement
   readonly #dependencyFocusContext: CanvasRenderingContext2D
   readonly #hoverLabelLayer: HTMLCanvasElement
@@ -50,6 +53,11 @@ export class ReportGraphOverlays {
       style: { pointerEvents: "none" },
     })
     this.#structureContext = requiredCanvasContext(this.#structureLayer)
+    this.#diagnosticEmphasisLayer = renderer.createCanvas("diagnostic-emphasis", {
+      afterLayer: "nodes",
+      style: { pointerEvents: "none" },
+    })
+    this.#diagnosticEmphasisContext = requiredCanvasContext(this.#diagnosticEmphasisLayer)
     this.#dependencyFocusLayer = renderer.createCanvas("dependency-focus", {
       afterLayer: "hoverNodes",
       style: { pointerEvents: "none" },
@@ -60,6 +68,30 @@ export class ReportGraphOverlays {
       style: { pointerEvents: "none" },
     })
     this.#hoverLabelContext = requiredCanvasContext(this.#hoverLabelLayer)
+  }
+
+  /** Ring every diagnostic match without replacing its metric-driven fill. */
+  public renderDiagnosticEmphasis(nodeIds: ReadonlySet<string> | undefined): void {
+    this.#resizeCanvas(this.#diagnosticEmphasisLayer)
+    const pixelRatio = this.#devicePixelRatio()
+    this.#diagnosticEmphasisContext.setTransform(1, 0, 0, 1, 0, 0)
+    this.#diagnosticEmphasisContext.clearRect(0, 0, this.#diagnosticEmphasisLayer.width, this.#diagnosticEmphasisLayer.height)
+    this.#diagnosticEmphasisContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0)
+    let renderedCount = 0
+    for (const nodeId of nodeIds ?? []) {
+      if (!this.#graph.hasNode(nodeId)) {
+        continue
+      }
+      const attributes = this.#graph.getNodeAttributes(nodeId)
+      const node = this.#renderer.graphToViewport(attributes)
+      this.#diagnosticEmphasisContext.beginPath()
+      this.#diagnosticEmphasisContext.lineWidth = 2
+      this.#diagnosticEmphasisContext.strokeStyle = DIAGNOSTIC_EMPHASIS_COLOR
+      this.#diagnosticEmphasisContext.arc(node.x, node.y, this.#renderer.scaleSize(attributes.size) + 3, 0, Math.PI * 2)
+      this.#diagnosticEmphasisContext.stroke()
+      renderedCount += 1
+    }
+    this.#container.dataset.renderedDiagnosticEmphasisCount = String(renderedCount)
   }
 
   /** A correctly configured 2D context for label measurement. */

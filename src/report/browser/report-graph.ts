@@ -65,6 +65,7 @@ export class ReportGraph {
   }
   #lensSettings: ReportLensSettings
   #dependencyFocus: DependencyFocus | undefined
+  #diagnosticEmphasisNodeIds: ReadonlySet<string> | undefined
   #structureFocusNodeId: string | undefined
   #cameraResetAwaitingSettledRender = false
   #cameraAnimationGeneration = 0
@@ -197,6 +198,13 @@ export class ReportGraph {
     }
   }
 
+  /** Emphasize diagnostic result nodes without changing their metric-driven fill. */
+  public setDiagnosticEmphasis(nodeIds: ReadonlySet<string> | undefined): void {
+    this.#diagnosticEmphasisNodeIds = nodeIds
+    this.#root.dataset.diagnosticEmphasisNodeIds = JSON.stringify([...(nodeIds ?? [])])
+    this.#renderer.scheduleRender()
+  }
+
   /** Render browser-owned selection and hover state without changing navigation. */
   public renderInteraction(interaction: ReportInteractionState): void {
     const previousHoveredNodeId = this.#interaction.hoveredNodeId
@@ -265,6 +273,7 @@ export class ReportGraph {
         this.#hasEdgeFocus(),
         this.#structureFocusNodeId,
       )
+      this.#overlays.renderDiagnosticEmphasis(this.#diagnosticEmphasisNodeIds)
       this.#overlays.renderDependencyFocus(this.#dependencyFocus)
       this.#overlays.renderHoveredNodeLabel(this.#interaction.hoveredNodeId)
       this.#diagnostics.writeDependencyEdges(this.#dependencyEdgeIds(), this.#lensSettings.dependencyDisplay)

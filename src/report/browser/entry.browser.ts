@@ -9,11 +9,18 @@ import type { ProjectAnalysis } from "../../analysis/project-analysis.js"
 import { PerformanceProfiler } from "../../performance/performance-profiler.js"
 import { renderCoverageLegend } from "./coverage-legend.js"
 import { ReportControls } from "./report-controls.js"
+import { deriveCoverageLensResults, normalizeCoverageFilters } from "./report-coverage.js"
 import { getReportElements } from "./report-elements.js"
 import { ReportFindingsPanel } from "./report-findings-panel.js"
 import { deriveReportFindings } from "./report-findings.js"
 import { ReportGraph } from "./report-graph.js"
-import { activeReportLens, initialReportPresentationState, reportLensSettings, type ReportPresentationState } from "./report-lens.js"
+import {
+  activeReportLens,
+  initialReportPresentationState,
+  reportLensSettings,
+  updateCoverageFilters,
+  type ReportPresentationState,
+} from "./report-lens.js"
 import { ReportNavigation, type ReportNavigationState } from "./report-navigation.js"
 import { ReportPanels } from "./report-panels.js"
 import { browserPresentationSignature, buildBrowserPresentation } from "./report-presentation.js"
@@ -88,8 +95,12 @@ const panels = new ReportPanels({
 
 const findingsPanel = new ReportFindingsPanel({
   elements: elements.findings,
+  initialCoverageFilters: presentationState.coverageFilters,
   activateNode: (nodeId): void => {
     navigation.activate(nodeId)
+  },
+  updateCoverageFilters: (filters): void => {
+    applyPresentationState(updateCoverageFilters(presentationState, normalizeCoverageFilters(filters)))
   },
 })
 
@@ -130,6 +141,9 @@ function applyPresentationState(nextPresentationState: ReportPresentationState):
   const nextViewSignature = reportViewGraphSignature(view)
   controls.render(presentationState)
   findingsPanel.renderLens(presentationState.lens)
+  const coverageResults = deriveCoverageLensResults(presentation, presentationState.scope, presentationState.coverageFilters)
+  findingsPanel.renderCoverage(coverageResults, presentationState.coverageFilters)
+  graph.setDiagnosticEmphasis(presentationState.lens === "coverage" ? coverageResults.matchingNodeIds : undefined)
   const nextFindingsScopeSignature = JSON.stringify([...presentationState.scope.workspacePackages].toSorted())
   if (nextFindingsScopeSignature !== renderedFindingsScopeSignature) {
     const findings = performanceProfiler.measure("browser-findings", () => deriveReportFindings(presentation, presentationState.scope))
@@ -150,6 +164,7 @@ function applyPresentationState(nextPresentationState: ReportPresentationState):
   elements.root.dataset.activeLens = activeReportLens(presentationState)
   elements.root.dataset.selectedLens = presentationState.lens
   elements.root.dataset.lensSettings = JSON.stringify(settings)
+  elements.root.dataset.coverageFilters = JSON.stringify(presentationState.coverageFilters)
 }
 
 function projectFileCountLabel(visibleCount: number, totalCount: number): string {

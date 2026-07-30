@@ -1,14 +1,16 @@
+import type { CoverageFilterState, CoverageLensResults } from "./report-coverage.js"
 import type { ReportFindingPanelElements } from "./report-elements.js"
 import type { ReportFinding, ReportFindingGroup } from "./report-findings.js"
 import type { ReportLens } from "./report-lens.js"
 
 const SUMMARY_LIMIT = 5
 
-/** Owns the Overview findings, complete-list expansion, and left-panel tabs. */
+/** Owns diagnostic result panels, their filters, and the project-files tab. */
 export class ReportFindingsPanel {
   readonly #elements: ReportFindingPanelElements
   readonly #activateNode: (nodeId: string) => void
-  #activePanel: "findings" | "project-files" = "findings"
+  readonly #updateCoverageFilters: (filters: CoverageFilterState) => void
+  #activePanel: "findings" | "coverage" | "project-files" = "findings"
   #selectedNodeId: string | undefined
   #selectedLens: ReportLens = "overview"
 
@@ -20,17 +22,37 @@ export class ReportFindingsPanel {
   public constructor({
     elements,
     activateNode,
+    initialCoverageFilters,
+    updateCoverageFilters,
   }: {
     readonly elements: ReportFindingPanelElements
     readonly activateNode: (nodeId: string) => void
+    readonly initialCoverageFilters: CoverageFilterState
+    readonly updateCoverageFilters: (filters: CoverageFilterState) => void
   }) {
     this.#elements = elements
     this.#activateNode = activateNode
+    this.#updateCoverageFilters = updateCoverageFilters
+    this.#elements.coverageMinimumCodeLines.value = String(initialCoverageFilters.minimumCodeLines)
+    this.#elements.coverageMaximumPercentage.value = String(initialCoverageFilters.maximumCoverage)
+    this.#elements.coverageIncludeUnavailable.checked = initialCoverageFilters.includeUnavailableCoverage
     elements.findingsTab.addEventListener("click", () => {
       this.#selectPanel("findings")
     })
+    elements.coverageTab.addEventListener("click", () => {
+      this.#selectPanel("coverage")
+    })
     elements.projectFilesTab.addEventListener("click", () => {
       this.#selectPanel("project-files")
+    })
+    elements.coverageMinimumCodeLines.addEventListener("input", () => {
+      this.#emitCoverageFilters()
+    })
+    elements.coverageMaximumPercentage.addEventListener("input", () => {
+      this.#emitCoverageFilters()
+    })
+    elements.coverageIncludeUnavailable.addEventListener("change", () => {
+      this.#emitCoverageFilters()
     })
     this.#renderPanelVisibility()
   }
@@ -61,7 +83,7 @@ export class ReportFindingsPanel {
    */
   public renderLens(lens: ReportLens): void {
     if (lens !== this.#selectedLens) {
-      this.#activePanel = lens === "overview" ? "findings" : "project-files"
+      this.#activePanel = lens === "overview" ? "findings" : lens === "coverage" ? "coverage" : "project-files"
       this.#selectedLens = lens
     }
     this.#renderPanelVisibility()
@@ -75,6 +97,50 @@ export class ReportFindingsPanel {
   public renderSelection(selectedNodeId: string | undefined): void {
     this.#selectedNodeId = selectedNodeId
     this.#renderSelection()
+  }
+
+  /** Render Coverage lens controls, scoped counts, and stable matching rows. */
+  public renderCoverage(results: CoverageLensResults, filters: CoverageFilterState): void {
+    this.#elements.coverageMinimumCodeLines.value = String(filters.minimumCodeLines)
+    this.#elements.coverageMaximumPercentage.value = String(filters.maximumCoverage)
+    this.#elements.coverageIncludeUnavailable.checked = filters.includeUnavailableCoverage
+    this.#elements.coverageMatchingCount.textContent = String(results.matches.length)
+    this.#elements.coverageKnownCount.textContent = String(results.knownCoverageFileCount)
+    this.#elements.coverageUnavailableCount.textContent = String(results.unavailableCoverageFileCount)
+    this.#elements.coverageEmpty.hidden = results.matches.length > 0
+    this.#elements.coverageResults.hidden = results.matches.length === 0
+    this.#elements.coveragePanel.dataset.matchingFileCount = String(results.matches.length)
+    this.#elements.coveragePanel.dataset.knownCoverageFileCount = String(results.knownCoverageFileCount)
+    this.#elements.coveragePanel.dataset.unavailableCoverageFileCount = String(results.unavailableCoverageFileCount)
+    this.#elements.coveragePanel.dataset.coverageFilters = JSON.stringify(filters)
+    this.#elements.coverageResults.replaceChildren(
+      ...results.matches.map((result) => {
+        const item = this.#elements.coverageResults.ownerDocument.createElement("li")
+        const button = this.#elements.coverageResults.ownerDocument.createElement("button")
+        button.type = "button"
+        button.className = "diagnostic-result coverage-result"
+        button.dataset.coverageEntityId = result.nodeId
+        button.dataset.codeLines = String(result.codeLines)
+        button.dataset.coverage = result.coverage === undefined ? "unavailable" : String(result.coverage)
+        button.setAttribute("aria-current", String(result.nodeId === this.#selectedNodeId))
+        button.setAttribute(
+          "aria-label",
+          `${result.path}, ${result.codeLines} physical code lines, ${result.coverage === undefined ? "coverage unavailable" : `${result.coverage}% executable-line coverage`}.`,
+        )
+        const path = this.#elements.coverageResults.ownerDocument.createElement("strong")
+        path.textContent = result.path
+        const codeLines = this.#elements.coverageResults.ownerDocument.createElement("span")
+        codeLines.textContent = `${result.codeLines} code lines`
+        const coverage = this.#elements.coverageResults.ownerDocument.createElement("span")
+        coverage.textContent = result.coverage === undefined ? "Coverage unavailable" : `${result.coverage}% coverage`
+        button.append(path, codeLines, coverage)
+        button.addEventListener("click", () => {
+          this.#activateNode(result.nodeId)
+        })
+        item.append(button)
+        return item
+      }),
+    )
   }
 
   #category(group: ReportFindingGroup): HTMLElement {
@@ -150,27 +216,51 @@ export class ReportFindingsPanel {
     return button
   }
 
-  #selectPanel(panel: "findings" | "project-files"): void {
+  #selectPanel(panel: "findings" | "coverage" | "project-files"): void {
     this.#activePanel = panel
     this.#renderPanelVisibility()
   }
 
   #renderPanelVisibility(): void {
     const overview = this.#selectedLens === "overview"
+    const coverage = this.#selectedLens === "coverage"
     const showFindings = overview && this.#activePanel === "findings"
-    this.#elements.tabs.hidden = !overview
+    const showCoverage = coverage && this.#activePanel === "coverage"
+    const showProjectFiles = !showFindings && !showCoverage
+    this.#elements.tabs.hidden = !overview && !coverage
+    this.#elements.findingsTab.hidden = !overview
+    this.#elements.coverageTab.hidden = !coverage
     this.#elements.findingsTab.setAttribute("aria-selected", String(showFindings))
-    this.#elements.projectFilesTab.setAttribute("aria-selected", String(!showFindings))
+    this.#elements.coverageTab.setAttribute("aria-selected", String(showCoverage))
+    this.#elements.projectFilesTab.setAttribute("aria-selected", String(showProjectFiles))
     this.#elements.findingsTab.tabIndex = showFindings ? 0 : -1
-    this.#elements.projectFilesTab.tabIndex = showFindings ? -1 : 0
+    this.#elements.coverageTab.tabIndex = showCoverage ? 0 : -1
+    this.#elements.projectFilesTab.tabIndex = showProjectFiles ? 0 : -1
     this.#elements.panel.hidden = !showFindings
-    this.#elements.projectFilesPanel.hidden = showFindings
+    this.#elements.coveragePanel.hidden = !showCoverage
+    this.#elements.projectFilesPanel.hidden = !showProjectFiles
   }
 
   #renderSelection(): void {
     for (const button of this.#elements.categories.querySelectorAll<HTMLButtonElement>(".finding-card")) {
       button.setAttribute("aria-current", String(button.dataset.findingEntityId === this.#selectedNodeId))
     }
+    for (const button of this.#elements.coverageResults.querySelectorAll<HTMLButtonElement>(".coverage-result")) {
+      button.setAttribute("aria-current", String(button.dataset.coverageEntityId === this.#selectedNodeId))
+    }
+  }
+
+  #emitCoverageFilters(): void {
+    const minimumCodeLines = this.#elements.coverageMinimumCodeLines.valueAsNumber
+    const maximumCoverage = this.#elements.coverageMaximumPercentage.valueAsNumber
+    if (!Number.isFinite(minimumCodeLines) || !Number.isFinite(maximumCoverage)) {
+      return
+    }
+    this.#updateCoverageFilters({
+      minimumCodeLines,
+      maximumCoverage,
+      includeUnavailableCoverage: this.#elements.coverageIncludeUnavailable.checked,
+    })
   }
 }
 

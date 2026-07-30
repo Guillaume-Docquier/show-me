@@ -41,12 +41,23 @@ it("preserves scope and deterministically restores each named lens", () => {
 
   // Act
   const structure = selectReportLens(customized, "structure")
-  const overview = selectReportLens(structure, "overview")
+  const coverage = selectReportLens(structure, "coverage")
+  const overview = selectReportLens(coverage, "overview")
 
   // Assert
   expect(structure.scope.workspacePackages).toEqual(new Set(["apps/frontend"]))
   expect(activeReportLens(structure)).toBe("structure")
   expect(reportLensSettings(structure)).toEqual(reportLensPreset("structure"))
+  expect(coverage.scope.workspacePackages).toEqual(new Set(["apps/frontend"]))
+  expect(activeReportLens(coverage)).toBe("coverage")
+  expect(reportLensSettings(coverage)).toEqual({
+    lineCategories: ["code"],
+    externalPackages: false,
+    typeOnlyDependencies: true,
+    structureEdges: true,
+    dependencyDisplay: "hidden",
+    projectFileColor: "coverage",
+  })
   expect(overview.scope.workspacePackages).toEqual(new Set(["apps/frontend"]))
   expect(activeReportLens(overview)).toBe("overview")
   expect(reportLensSettings(overview)).toEqual(reportLensPreset("overview"))
