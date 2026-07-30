@@ -40,6 +40,7 @@ export function buildHtmlReport(analysis: ProjectAnalysis, browserBundle: string
     <div id="sidebar-tabs" class="sidebar-tabs" role="tablist" aria-label="Codebase panels">
       <button id="findings-tab" type="button" role="tab" aria-controls="findings-panel" aria-selected="true">Findings</button>
       <button id="coverage-tab" type="button" role="tab" aria-controls="coverage-panel" aria-selected="false" tabindex="-1" hidden>Coverage</button>
+      <button id="coupling-tab" type="button" role="tab" aria-controls="coupling-panel" aria-selected="false" tabindex="-1" hidden>Coupling</button>
       <button id="project-files-tab" type="button" role="tab" aria-controls="project-files-panel" aria-selected="false" tabindex="-1">Project files</button>
     </div>
     <section id="findings-panel" class="findings-panel" role="tabpanel" aria-labelledby="findings-tab">
@@ -47,6 +48,30 @@ export function buildHtmlReport(analysis: ProjectAnalysis, browserBundle: string
       <p class="findings-intro">Explainable candidates from the active workspace scope. They are starting points for investigation, not verdicts.</p>
       <div id="findings-categories"></div>
       <p id="findings-empty" class="findings-empty" role="status" hidden>No findings in the active workspace scope.</p>
+    </section>
+    <section id="coupling-panel" class="diagnostic-panel coupling-panel" role="tabpanel" aria-labelledby="coupling-tab" hidden>
+      <h2>Coupling</h2>
+      <p class="findings-intro">Direct dependency hubs and cycles are investigation candidates, not automatic defects.</p>
+      <fieldset class="diagnostic-filters coupling-filters">
+        <legend>Relationships</legend>
+        <label><input id="coupling-runtime-dependencies" type="checkbox" checked>Runtime</label>
+        <label><input id="coupling-type-only-dependencies" type="checkbox" checked>Type only</label>
+        <label><input id="coupling-background-dependencies" type="checkbox">Show all background dependencies</label>
+      </fieldset>
+      <dl class="diagnostic-counts">
+        <dt>Files with relationships</dt><dd id="coupling-file-count">0</dd>
+        <dt>Visible relationships</dt><dd id="coupling-relationship-count">0</dd>
+        <dt>Cycles</dt><dd id="coupling-cycle-count">0</dd>
+      </dl>
+      <section class="coupling-section">
+        <h3>Files by direct degree</h3>
+        <p id="coupling-empty" class="findings-empty" role="status" hidden>No direct relationships match the active scope and filters.</p>
+        <ol id="coupling-results" class="diagnostic-results"></ol>
+      </section>
+      <section id="coupling-cycles-section" class="coupling-section" hidden>
+        <h3>Dependency cycles</h3>
+        <ol id="coupling-cycles" class="diagnostic-results"></ol>
+      </section>
     </section>
     <section id="coverage-panel" class="diagnostic-panel coverage-panel" role="tabpanel" aria-labelledby="coverage-tab" hidden>
       <h2>Coverage</h2>
@@ -98,6 +123,7 @@ export function buildHtmlReport(analysis: ProjectAnalysis, browserBundle: string
           <option value="overview" selected>Overview</option>
           <option value="structure">Structure</option>
           <option value="coverage">Coverage</option>
+          <option value="coupling">Coupling</option>
           <option value="custom" hidden disabled>Custom</option>
         </select>
       </label>
@@ -131,6 +157,7 @@ export function buildHtmlReport(analysis: ProjectAnalysis, browserBundle: string
               </select>
             </label>
             <label><input id="structure-edges-toggle" type="checkbox" checked>Structure edges</label>
+            <label><input id="runtime-dependencies-toggle" type="checkbox" checked>Runtime dependencies</label>
             <label><input id="type-only-dependencies-toggle" type="checkbox" checked>Type-only dependencies</label>
             <label><input id="external-packages-toggle" type="checkbox">External packages</label>
           </fieldset>
@@ -144,6 +171,13 @@ export function buildHtmlReport(analysis: ProjectAnalysis, browserBundle: string
       </div>
       <div id="coverage-legend" class="coverage-legend" aria-label="Project-file coverage colors"></div>
       <span id="active-size-key" class="active-size-key">Size: code lines</span>
+      <div id="focus-legend" class="focus-legend" aria-label="Focused relationship directions" hidden>
+        <span><i class="focus-swatch selected-focus-swatch" aria-hidden="true"></i>Selected</span>
+        <span><i class="focus-swatch dependency-focus-swatch" aria-hidden="true"></i>Dependency</span>
+        <span><i class="focus-swatch consumer-focus-swatch" aria-hidden="true"></i>Consumer</span>
+        <span><i class="graph-edge-swatch dependency-edge-swatch" aria-hidden="true"></i>Runtime arrow</span>
+        <span><i class="graph-edge-swatch type-only-dependency-edge-swatch" aria-hidden="true"></i>Type-only arrow</span>
+      </div>
     </div>
   </section>
   <aside id="details" aria-label="Graph node details">
@@ -165,6 +199,11 @@ export function buildHtmlReport(analysis: ProjectAnalysis, browserBundle: string
         <dt data-dependency-detail>Dependencies</dt><dd id="selected-dependencies" data-dependency-detail></dd>
         <dt data-dependency-detail>Consumers</dt><dd id="selected-consumers" data-dependency-detail></dd>
         <dt data-project-file-detail>Coverage</dt><dd id="selected-coverage" data-project-file-detail></dd>
+        <dt data-coupling-detail>Fan-out</dt><dd id="selected-fan-out" data-coupling-detail></dd>
+        <dt data-coupling-detail>Fan-in</dt><dd id="selected-fan-in" data-coupling-detail></dd>
+        <dt data-coupling-detail>Runtime relationships</dt><dd id="selected-runtime-relationships" data-coupling-detail></dd>
+        <dt data-coupling-detail>Type-only relationships</dt><dd id="selected-type-only-relationships" data-coupling-detail></dd>
+        <dt data-coupling-detail>Cycles</dt><dd id="selected-cycle-membership" data-coupling-detail></dd>
       </dl>
       <h3 data-dependency-detail>Dependencies</h3>
       <ol id="selected-dependency-nodes" class="file-list relationship-list" data-dependency-detail></ol>
@@ -174,6 +213,16 @@ export function buildHtmlReport(analysis: ProjectAnalysis, browserBundle: string
       <ol id="selected-parent-directory" class="file-list relationship-list" data-directory-detail></ol>
       <h3 data-directory-detail>Child directories and files</h3>
       <ol id="selected-directory-children" class="file-list relationship-list" data-directory-detail></ol>
+    </section>
+    <section id="selected-cycle-details" hidden>
+      <div class="node-type">Dependency cycle</div>
+      <div id="selected-cycle-kind" class="detail-path"></div>
+      <dl>
+        <dt>Members</dt><dd id="selected-cycle-member-count"></dd>
+        <dt>Internal relationships</dt><dd id="selected-cycle-relationship-count"></dd>
+      </dl>
+      <h3>Cycle members</h3>
+      <ol id="selected-cycle-members" class="file-list relationship-list"></ol>
     </section>
   </aside>
 </main>

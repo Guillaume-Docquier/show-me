@@ -3,6 +3,7 @@ import { Sigma } from "sigma"
 import { createEdgeArrowProgram } from "sigma/rendering"
 import type { EdgeDisplayData, NodeDisplayData } from "sigma/types"
 import type { PerformanceProfiler } from "../../performance/performance-profiler.js"
+import type { CouplingCycle } from "./report-coupling.js"
 import { ReportGraphDiagnostics } from "./report-graph-diagnostics.js"
 import { ReportGraphLabelVisibility } from "./report-graph-label-visibility.js"
 import { drawNodeHover, drawNodeLabel, LABEL_COLOR, LABEL_FONT, LABEL_SIZE, LABEL_WEIGHT } from "./report-graph-labels.js"
@@ -66,6 +67,7 @@ export class ReportGraph {
   #lensSettings: ReportLensSettings
   #dependencyFocus: DependencyFocus | undefined
   #diagnosticEmphasisNodeIds: ReadonlySet<string> | undefined
+  #couplingCycleFocus: CouplingCycle | undefined
   #structureFocusNodeId: string | undefined
   #cameraResetAwaitingSettledRender = false
   #cameraAnimationGeneration = 0
@@ -205,6 +207,19 @@ export class ReportGraph {
     this.#renderer.scheduleRender()
   }
 
+  /** Focus every member and internal edge of one selected Coupling cycle. */
+  public setCouplingCycleFocus(cycle: CouplingCycle | undefined): void {
+    this.#couplingCycleFocus = cycle
+    if (cycle === undefined) {
+      delete this.#root.dataset.selectedCouplingCycle
+    } else {
+      this.#root.dataset.selectedCouplingCycle = cycle.id
+    }
+    this.#synchronizeEdgeFocus()
+    this.#refreshDependencyEdges()
+    this.#renderer.scheduleRender()
+  }
+
   /** Render browser-owned selection and hover state without changing navigation. */
   public renderInteraction(interaction: ReportInteractionState): void {
     const previousHoveredNodeId = this.#interaction.hoveredNodeId
@@ -273,7 +288,9 @@ export class ReportGraph {
         this.#hasEdgeFocus(),
         this.#structureFocusNodeId,
       )
-      this.#overlays.renderDiagnosticEmphasis(this.#diagnosticEmphasisNodeIds)
+      this.#overlays.renderDiagnosticEmphasis(
+        new Set([...(this.#diagnosticEmphasisNodeIds ?? []), ...(this.#couplingCycleFocus?.memberNodeIds ?? [])]),
+      )
       this.#overlays.renderDependencyFocus(this.#dependencyFocus)
       this.#overlays.renderHoveredNodeLabel(this.#interaction.hoveredNodeId)
       this.#diagnostics.writeDependencyEdges(this.#dependencyEdgeIds(), this.#lensSettings.dependencyDisplay)
@@ -315,6 +332,12 @@ export class ReportGraph {
       return { ...attributes, hidden: true }
     }
 
+    if (this.#couplingCycleFocus !== undefined) {
+      return this.#couplingCycleFocus.internalEdgeIds.includes(edge)
+        ? { ...attributes, hidden: false, color: DEPENDENCY_FOCUS_COLOR, size: CONSUMER_FOCUS_EDGE_SIZE, zIndex: 1 }
+        : { ...attributes, hidden: true }
+    }
+
     const relationship = this.#focusedDependencyEdgeRelationship(edge)
     if (this.#lensSettings.dependencyDisplay === "focused" && relationship === undefined) {
       return { ...attributes, hidden: true }
@@ -347,9 +370,14 @@ export class ReportGraph {
             (attributes.nodeKind === "report-node" && !this.#labelVisibility.reportNodeLabelsAreVisible)
           ? { label: null, forceLabel: false }
           : {}
-    return node === this.#interaction.selectedNodeId
-      ? { ...attributes, ...label, color: "#f4c66a", highlighted: true, zIndex: 1 }
-      : { ...attributes, ...label }
+    if (node !== this.#interaction.selectedNodeId) {
+      return { ...attributes, ...label }
+    }
+    return this.#lensSettings.projectFileSize === "visible-degree" &&
+      attributes.nodeKind === "report-node" &&
+      attributes.reportNodeKind === "project-file"
+      ? { ...attributes, ...label, highlighted: true, zIndex: 1 }
+      : { ...attributes, ...label, color: "#f4c66a", highlighted: true, zIndex: 1 }
   }
 
   #writeInteractionDiagnostics(): void {
@@ -374,9 +402,11 @@ export class ReportGraph {
     this.#root.dataset.activeLineCategories = view.settings.lineCategories.join(",")
     this.#root.dataset.externalPackages = view.settings.externalPackages ? "visible" : "hidden"
     this.#root.dataset.typeOnlyDependencies = view.settings.typeOnlyDependencies ? "visible" : "hidden"
+    this.#root.dataset.runtimeDependencies = view.settings.runtimeDependencies ? "visible" : "hidden"
     this.#root.dataset.workspacePackages = JSON.stringify([...view.scope.workspacePackages])
     this.#root.dataset.dependencyDisplay = view.settings.dependencyDisplay
     this.#root.dataset.projectFileColor = view.settings.projectFileColor
+    this.#root.dataset.projectFileSize = view.settings.projectFileSize
     this.#diagnostics.writeView(view)
     this.#diagnostics.writeGraphWeights({
       structure: STRUCTURE_EDGE_WEIGHT,
@@ -470,6 +500,12 @@ export class ReportGraph {
   }
 
   #synchronizeEdgeFocus(): void {
+    if (this.#couplingCycleFocus !== undefined) {
+      this.#structureFocusNodeId = undefined
+      this.#dependencyFocus = undefined
+      this.#diagnostics.writeDependencyFocus(undefined)
+      return
+    }
     const focusedNodeId = this.#interaction.hoveredNodeId ?? this.#interaction.selectedNodeId
     this.#structureFocusNodeId =
       focusedNodeId !== undefined &&

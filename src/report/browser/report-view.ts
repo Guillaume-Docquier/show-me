@@ -1,8 +1,10 @@
 import { buildProjectStructure, type ProjectDirectoryNode, type ProjectStructureEdge } from "./project-structure.js"
+import { deriveCouplingFacts } from "./report-coupling.js"
 import type { ReportLensSettings, ReportScopeState } from "./report-lens.js"
 import {
   activeLineCount,
   coverageColor,
+  nodeSizeForDegree,
   nodeSizeForLines,
   type BrowserPresentation,
   type ReportEdge,
@@ -50,8 +52,8 @@ export function buildReportView(presentation: BrowserPresentation, scope: Report
       )
       .map(({ id }) => id),
   )
-  const visiblePresentationEdges = presentation.edges.filter(
-    ({ dependencyKind }) => dependencyKind === "runtime" || settings.typeOnlyDependencies,
+  const visiblePresentationEdges = presentation.edges.filter(({ dependencyKind }) =>
+    dependencyKind === "runtime" ? settings.runtimeDependencies : settings.typeOnlyDependencies,
   )
   const visibleExternalPackageNodeIds = new Set(
     settings.externalPackages
@@ -60,25 +62,31 @@ export function buildReportView(presentation: BrowserPresentation, scope: Report
           .map(({ target }) => target)
       : [],
   )
-  const nodes = presentation.nodes
-    .filter(
-      (node) =>
-        (node.kind === "project-file" && visibleProjectNodeIds.has(node.id)) ||
-        (node.kind === "external-package" && visibleExternalPackageNodeIds.has(node.id)),
-    )
-    .map(
-      (reportNode): ReportViewNode => ({
-        id: reportNode.id,
-        color: reportNode.kind === "project-file" && settings.projectFileColor === "neutral" ? coverageColor(undefined) : reportNode.color,
-        size:
-          reportNode.kind === "project-file"
-            ? nodeSizeForLines(activeLineCount(reportNode.lineMetrics, settings.lineCategories))
-            : reportNode.size,
-        reportNode,
-      }),
-    )
-  const nodeIds = new Set(nodes.map(({ id }) => id))
+  const visibleReportNodes = presentation.nodes.filter(
+    (node) =>
+      (node.kind === "project-file" && visibleProjectNodeIds.has(node.id)) ||
+      (node.kind === "external-package" && visibleExternalPackageNodeIds.has(node.id)),
+  )
+  const nodeIds = new Set(visibleReportNodes.map(({ id }) => id))
   const dependencyEdges = visiblePresentationEdges.filter(({ source, target }) => nodeIds.has(source) && nodeIds.has(target))
+  const visibleProjectFileNodes = visibleReportNodes.filter((node) => node.kind === "project-file")
+  const coupling = deriveCouplingFacts(
+    visibleProjectFileNodes,
+    dependencyEdges.filter(({ targetKind }) => targetKind === "project-file"),
+  )
+  const nodes = visibleReportNodes.map(
+    (reportNode): ReportViewNode => ({
+      id: reportNode.id,
+      color: reportNode.kind === "project-file" && settings.projectFileColor === "neutral" ? coverageColor(undefined) : reportNode.color,
+      size:
+        reportNode.kind === "project-file"
+          ? settings.projectFileSize === "visible-degree"
+            ? nodeSizeForDegree(coupling.metricByNodeId.get(reportNode.id)?.totalDegree ?? 0)
+            : nodeSizeForLines(activeLineCount(reportNode.lineMetrics, settings.lineCategories))
+          : reportNode.size,
+      reportNode,
+    }),
+  )
   const visibleProjectFiles = nodes.flatMap(({ id, reportNode }) =>
     reportNode.kind === "project-file" ? [{ id, path: reportNode.path }] : [],
   )

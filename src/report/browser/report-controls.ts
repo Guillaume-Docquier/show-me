@@ -76,28 +76,40 @@ export class ReportControls {
       control.input.disabled = settings.lineCategories.length === 1 && control.input.checked
     }
     this.#elements.externalPackageToggle.checked = settings.externalPackages
+    this.#elements.runtimeDependencyToggle.checked = settings.runtimeDependencies
     this.#elements.typeOnlyDependencyToggle.checked = settings.typeOnlyDependencies
+    this.#elements.runtimeDependencyToggle.disabled = settings.runtimeDependencies && !settings.typeOnlyDependencies
+    this.#elements.typeOnlyDependencyToggle.disabled = settings.typeOnlyDependencies && !settings.runtimeDependencies
     this.#elements.structureEdgesToggle.checked = settings.structureEdges
     this.#elements.dependencyDisplay.value = settings.dependencyDisplay
     this.#elements.projectFileColor.value = settings.projectFileColor
+    this.#elements.lineCategoryControls.hidden = settings.projectFileSize === "visible-degree"
     for (const input of this.#workspacePackageInputs) {
       input.checked = presentationState.scope.workspacePackages.has(input.dataset.workspacePackage ?? "")
     }
 
     const dependencyLegendVisible = settings.dependencyDisplay !== "hidden"
     this.#elements.structureEdgeKey.hidden = !settings.structureEdges
-    this.#elements.runtimeDependencyEdgeKey.hidden = !dependencyLegendVisible
+    this.#elements.runtimeDependencyEdgeKey.hidden = !dependencyLegendVisible || !settings.runtimeDependencies
     this.#elements.typeOnlyDependencyEdgeKey.hidden = !dependencyLegendVisible || !settings.typeOnlyDependencies
     this.#elements.externalDependencyEdgeKey.hidden = !dependencyLegendVisible || !settings.externalPackages
     this.#elements.graphKey.hidden = !settings.structureEdges && !dependencyLegendVisible
     this.#elements.coverageLegend.hidden = settings.projectFileColor !== "coverage"
-    this.#elements.activeSizeKey.textContent = `Size: ${settings.lineCategories.map(lineCategoryLabel).join(" + ")} lines`
+    this.#elements.activeSizeKey.textContent =
+      settings.projectFileSize === "visible-degree"
+        ? "Size: visible direct degree"
+        : `Size: ${settings.lineCategories.map(lineCategoryLabel).join(" + ")} lines`
+  }
+
+  /** Show the relationship-direction legend only while Coupling focus is active. */
+  public renderFocusLegend(visible: boolean): void {
+    this.#elements.focusLegend.hidden = !visible
   }
 
   #bindEvents(): void {
     this.#elements.lensSelector.addEventListener("change", () => {
       const lens = this.#elements.lensSelector.value
-      if (lens === "overview" || lens === "structure" || lens === "coverage") {
+      if (lens === "overview" || lens === "structure" || lens === "coverage" || lens === "coupling") {
         this.#events.onPresentationStateChange(selectReportLens(this.#presentationState, lens))
       }
     })
@@ -121,6 +133,12 @@ export class ReportControls {
       this.#applyAdvancedSettings({
         ...reportLensSettings(this.#presentationState),
         typeOnlyDependencies: this.#elements.typeOnlyDependencyToggle.checked,
+      })
+    })
+    this.#elements.runtimeDependencyToggle.addEventListener("change", () => {
+      this.#applyAdvancedSettings({
+        ...reportLensSettings(this.#presentationState),
+        runtimeDependencies: this.#elements.runtimeDependencyToggle.checked,
       })
     })
     this.#elements.structureEdgesToggle.addEventListener("change", () => {

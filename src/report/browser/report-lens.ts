@@ -2,7 +2,7 @@ import { DEFAULT_COVERAGE_FILTERS, type CoverageFilterState } from "./report-cov
 import type { ReportLineCategory } from "./report-presentation.js"
 
 /** Named report lenses with complete browser behavior. */
-export const REPORT_LENSES = ["overview", "structure", "coverage"] as const
+export const REPORT_LENSES = ["overview", "structure", "coverage", "coupling"] as const
 
 /** One named task-oriented report presentation. */
 export type ReportLens = (typeof REPORT_LENSES)[number]
@@ -16,6 +16,9 @@ export type DependencyDisplay = "all" | "focused" | "hidden"
 /** How project-file nodes are colored. */
 export type ProjectFileColor = "coverage" | "neutral"
 
+/** Metric used to derive project-file node size. */
+export type ProjectFileSize = "line-categories" | "visible-degree"
+
 /** Complete deterministic visual inputs selected by a lens or advanced customization. */
 export type ReportLensSettings = {
   /** Always non-empty; these categories determine project-file sizes. */
@@ -24,12 +27,16 @@ export type ReportLensSettings = {
   readonly externalPackages: boolean
   /** Whether explicitly type-only relationships participate in the visible graph. */
   readonly typeOnlyDependencies: boolean
+  /** Whether runtime relationships participate in the visible graph. */
+  readonly runtimeDependencies: boolean
   /** Whether directory containment edges are drawn. */
   readonly structureEdges: boolean
   /** Whether dependency edges are all drawn, focused only, or entirely hidden. */
   readonly dependencyDisplay: DependencyDisplay
   /** Whether project-file color represents coverage or uses one neutral color. */
   readonly projectFileColor: ProjectFileColor
+  /** Whether project files are sized by physical lines or visible direct degree. */
+  readonly projectFileSize: ProjectFileSize
 }
 
 /** Codebase scope preserved independently from lens selection and customization. */
@@ -43,9 +50,11 @@ export type ReportAdvancedOverrides = {
   readonly lineCategories?: readonly ReportLineCategory[]
   readonly externalPackages?: boolean
   readonly typeOnlyDependencies?: boolean
+  readonly runtimeDependencies?: boolean
   readonly structureEdges?: boolean
   readonly dependencyDisplay?: DependencyDisplay
   readonly projectFileColor?: ProjectFileColor
+  readonly projectFileSize?: ProjectFileSize
 }
 
 /** Browser-owned persistent presentation state, excluding transient navigation and hover. */
@@ -60,27 +69,44 @@ const OVERVIEW_SETTINGS: ReportLensSettings = {
   lineCategories: ["code"],
   externalPackages: false,
   typeOnlyDependencies: true,
+  runtimeDependencies: true,
   structureEdges: true,
   dependencyDisplay: "focused",
   projectFileColor: "coverage",
+  projectFileSize: "line-categories",
 }
 
 const STRUCTURE_SETTINGS: ReportLensSettings = {
   lineCategories: ["code"],
   externalPackages: false,
   typeOnlyDependencies: true,
+  runtimeDependencies: true,
   structureEdges: true,
   dependencyDisplay: "hidden",
   projectFileColor: "neutral",
+  projectFileSize: "line-categories",
 }
 
 const COVERAGE_SETTINGS: ReportLensSettings = {
   lineCategories: ["code"],
   externalPackages: false,
   typeOnlyDependencies: true,
+  runtimeDependencies: true,
   structureEdges: true,
   dependencyDisplay: "hidden",
   projectFileColor: "coverage",
+  projectFileSize: "line-categories",
+}
+
+const COUPLING_SETTINGS: ReportLensSettings = {
+  lineCategories: ["code"],
+  externalPackages: false,
+  typeOnlyDependencies: true,
+  runtimeDependencies: true,
+  structureEdges: false,
+  dependencyDisplay: "focused",
+  projectFileColor: "coverage",
+  projectFileSize: "visible-degree",
 }
 
 /** Create the initial Overview state over every discovered workspace package. */
@@ -95,7 +121,14 @@ export function initialReportPresentationState(workspacePackagePaths: readonly s
 
 /** Return a fresh copy of one named lens's deterministic settings. */
 export function reportLensPreset(lens: ReportLens): ReportLensSettings {
-  const preset = lens === "overview" ? OVERVIEW_SETTINGS : lens === "structure" ? STRUCTURE_SETTINGS : COVERAGE_SETTINGS
+  const preset =
+    lens === "overview"
+      ? OVERVIEW_SETTINGS
+      : lens === "structure"
+        ? STRUCTURE_SETTINGS
+        : lens === "coverage"
+          ? COVERAGE_SETTINGS
+          : COUPLING_SETTINGS
   return { ...preset, lineCategories: [...preset.lineCategories] }
 }
 
@@ -106,9 +139,11 @@ export function reportLensSettings(state: ReportPresentationState): ReportLensSe
     lineCategories: state.advancedOverrides.lineCategories ?? preset.lineCategories,
     externalPackages: state.advancedOverrides.externalPackages ?? preset.externalPackages,
     typeOnlyDependencies: state.advancedOverrides.typeOnlyDependencies ?? preset.typeOnlyDependencies,
+    runtimeDependencies: state.advancedOverrides.runtimeDependencies ?? preset.runtimeDependencies,
     structureEdges: state.advancedOverrides.structureEdges ?? preset.structureEdges,
     dependencyDisplay: state.advancedOverrides.dependencyDisplay ?? preset.dependencyDisplay,
     projectFileColor: state.advancedOverrides.projectFileColor ?? preset.projectFileColor,
+    projectFileSize: state.advancedOverrides.projectFileSize ?? preset.projectFileSize,
   }
 }
 
@@ -148,9 +183,11 @@ export function customizeReportLens(state: ReportPresentationState, settings: Re
     ...(sameLineCategories(settings.lineCategories, preset.lineCategories) ? {} : { lineCategories: [...settings.lineCategories] }),
     ...(settings.externalPackages === preset.externalPackages ? {} : { externalPackages: settings.externalPackages }),
     ...(settings.typeOnlyDependencies === preset.typeOnlyDependencies ? {} : { typeOnlyDependencies: settings.typeOnlyDependencies }),
+    ...(settings.runtimeDependencies === preset.runtimeDependencies ? {} : { runtimeDependencies: settings.runtimeDependencies }),
     ...(settings.structureEdges === preset.structureEdges ? {} : { structureEdges: settings.structureEdges }),
     ...(settings.dependencyDisplay === preset.dependencyDisplay ? {} : { dependencyDisplay: settings.dependencyDisplay }),
     ...(settings.projectFileColor === preset.projectFileColor ? {} : { projectFileColor: settings.projectFileColor }),
+    ...(settings.projectFileSize === preset.projectFileSize ? {} : { projectFileSize: settings.projectFileSize }),
   }
   return { ...state, advancedOverrides }
 }
@@ -160,9 +197,11 @@ function hasAdvancedOverrides(overrides: ReportAdvancedOverrides): boolean {
     overrides.lineCategories !== undefined ||
     overrides.externalPackages !== undefined ||
     overrides.typeOnlyDependencies !== undefined ||
+    overrides.runtimeDependencies !== undefined ||
     overrides.structureEdges !== undefined ||
     overrides.dependencyDisplay !== undefined ||
-    overrides.projectFileColor !== undefined
+    overrides.projectFileColor !== undefined ||
+    overrides.projectFileSize !== undefined
   )
 }
 

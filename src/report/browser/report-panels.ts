@@ -1,4 +1,5 @@
 import { buildProjectFileTree, type ProjectFileTreeEntry, type ProjectFileTreeFile } from "./project-file-tree.js"
+import type { CouplingCycle, CouplingLensResults, CouplingMetric } from "./report-coupling.js"
 import type { ReportPanelElements } from "./report-elements.js"
 import type { ReportNavigationState } from "./report-navigation.js"
 import type { BrowserPresentation, ReportNode, ReportProjectFileNode } from "./report-presentation.js"
@@ -23,6 +24,7 @@ export class ReportPanels {
   #directoryById = new Map<string, ReportViewDirectory>()
   #directoryByPath = new Map<string, ReportViewDirectory>()
   #view: ReportView | undefined
+  #couplingMetricByNodeId: ReadonlyMap<string, CouplingMetric> | undefined
   #navigation: ReportNavigationState = {
     selectedNodeId: undefined,
     hoveredNodeId: undefined,
@@ -77,6 +79,31 @@ export class ReportPanels {
     this.#renderSelection()
     this.#renderNavigation()
     this.#renderSelectedTreeItem()
+  }
+
+  /** Make filtered Coupling metrics available to the ordinary node inspector. */
+  public renderCoupling(results: CouplingLensResults | undefined): void {
+    this.#couplingMetricByNodeId = results?.metricByNodeId
+    this.#renderSelection()
+  }
+
+  /** Replace ordinary node details with one selected Coupling cycle group. */
+  public showCouplingCycle(cycle: CouplingCycle): void {
+    this.#elements.selectedEmpty.hidden = true
+    this.#elements.selectedDetails.hidden = true
+    this.#elements.selectedCycleDetails.hidden = false
+    this.#elements.selectedCycleKind.textContent = cycle.kind === "runtime" ? "Runtime cycle" : "Cycle includes type-only dependencies"
+    this.#elements.selectedCycleMemberCount.textContent = String(cycle.memberNodeIds.length)
+    this.#elements.selectedCycleRelationshipCount.textContent = String(cycle.internalEdgeIds.length)
+    this.#elements.selectedCycleMembers.replaceChildren(
+      ...cycle.memberNodeIds.map((nodeId) => {
+        const node = this.#nodeById.get(nodeId)
+        if (node === undefined) {
+          throw new Error(`Coupling cycle references unavailable project file ${nodeId}.`)
+        }
+        return this.#nodeListItem(node, node.displayName, "Project file")
+      }),
+    )
   }
 
   /** Announce that the prior selection is unavailable in the new presentation. */
@@ -207,6 +234,7 @@ export class ReportPanels {
     if (view === undefined) {
       return
     }
+    this.#elements.selectedCycleDetails.hidden = true
     for (const button of this.#elements.fileList.ownerDocument.querySelectorAll<HTMLElement>(".node-list button[data-node-id]")) {
       button.setAttribute("aria-current", button.dataset.nodeId === this.#navigation.selectedNodeId ? "true" : "false")
     }
@@ -233,6 +261,10 @@ export class ReportPanels {
     for (const element of this.#elements.directoryDetails) {
       element.hidden = directory === undefined
     }
+    const couplingMetric = projectFile && node !== undefined ? this.#couplingMetricByNodeId?.get(node.id) : undefined
+    for (const element of this.#elements.couplingDetails) {
+      element.hidden = couplingMetric === undefined
+    }
     if (directory !== undefined) {
       this.#showDirectoryDetails(directory)
       return
@@ -242,6 +274,9 @@ export class ReportPanels {
     }
     if (projectFile) {
       this.#showProjectFileDetails(node)
+      if (couplingMetric !== undefined) {
+        this.#showCouplingDetails(couplingMetric)
+      }
     }
     const dependencies = visibleRelationships(view, node.id, "dependency")
     const consumers = visibleRelationships(view, node.id, "consumer")
@@ -335,6 +370,14 @@ export class ReportPanels {
     this.#elements.selectedCommentLines.textContent = String(node.lineMetrics.comment)
     this.#elements.selectedBlankLines.textContent = String(node.lineMetrics.blank)
     this.#elements.selectedCoverage.textContent = node.coverage === undefined ? "Not available" : `${node.coverage}%`
+  }
+
+  #showCouplingDetails(metric: CouplingMetric): void {
+    this.#elements.selectedFanOut.textContent = String(metric.fanOut)
+    this.#elements.selectedFanIn.textContent = String(metric.fanIn)
+    this.#elements.selectedRuntimeRelationships.textContent = String(metric.runtimeFanOut + metric.runtimeFanIn)
+    this.#elements.selectedTypeOnlyRelationships.textContent = String(metric.typeOnlyFanOut + metric.typeOnlyFanIn)
+    this.#elements.selectedCycleMembership.textContent = String(metric.cycleIds.length)
   }
 
   #showDirectoryDetails(directory: ReportViewDirectory): void {

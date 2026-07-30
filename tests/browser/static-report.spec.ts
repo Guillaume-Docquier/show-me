@@ -633,9 +633,11 @@ test("applies deterministic diagnostic lenses without losing compatible scope or
         lineCategories: ["code"],
         externalPackages: false,
         typeOnlyDependencies: true,
+        runtimeDependencies: true,
         structureEdges: true,
         dependencyDisplay: "focused",
         projectFileColor: "coverage",
+        projectFileSize: "line-categories",
       })
       await expect(page.locator("#workspace-package-controls input:checked")).toHaveCount(1)
       await expect(page.locator("html")).toHaveAttribute("data-selected-node", "project-file:apps/backend/src/api.ts")
@@ -827,6 +829,119 @@ test("filters coverage risk without removing project files from navigation", asy
   })
 })
 
+test("explores direct coupling and selectable dependency cycles without background noise", async ({ page }) => {
+  await withTemporaryDirectory(async (temporaryDirectory) => {
+    const reportPath = await test.step("Generate a report with overlapping roles and both cycle kinds", async () => {
+      const browserBundle = await readFile(join(process.cwd(), "dist", "report", "browser.js"), "utf8")
+      const path = join(temporaryDirectory, "coupling-lens.html")
+      await writeFile(path, buildHtmlReport(couplingLensAnalysis(), browserBundle), "utf8")
+      return path
+    })
+
+    await test.step("Open a degree-sized Coupling preset without structure or background dependency noise", async () => {
+      await page.goto(pathToFileURL(reportPath).href)
+      await page.locator("#lens-selector").selectOption("coupling")
+      await expect(page.locator("html")).toHaveAttribute("data-active-lens", "coupling")
+      await expect(page.locator("html")).toHaveAttribute("data-project-file-size", "visible-degree")
+      await expect(page.locator("#active-size-key")).toHaveText("Size: visible direct degree")
+      await expect(page.locator("#coupling-panel")).toBeVisible()
+      await expect(page.locator("#coupling-panel")).toHaveAttribute("data-coupling-file-count", "4")
+      await expect(page.locator("#coupling-panel")).toHaveAttribute("data-coupling-relationship-count", "5")
+      await expect(page.locator("#coupling-panel")).toHaveAttribute("data-coupling-cycle-count", "2")
+      await expect(page.locator("#graph")).toHaveAttribute("data-rendered-structure-edge-count", "0")
+      await expect(page.locator("#graph")).toHaveAttribute("data-rendered-dependency-edge-count", "0")
+      await expect(page.locator(".coupling-result strong")).toHaveText(["src/a.ts", "src/c.ts", "src/b.ts", "src/d.ts"])
+      const colors = await readJsonAttribute<readonly NodeColorDiagnostic[]>(page.locator("#graph"), "data-visible-node-colors")
+      expect(colors).toContainEqual({ id: "project-file:src/a.ts", color: "#dc2626" })
+      const measurements = await readJsonAttribute<readonly PerformanceMeasurementDiagnostic[]>(
+        page.locator("html"),
+        "data-performance-measurements",
+      )
+      expect(measurements.map(({ phase }) => phase)).toContain("browser-coupling")
+    })
+
+    await test.step("Show all background dependencies without changing deterministic node positions", async () => {
+      const graph = page.locator("#graph")
+      const layoutSignature = await graph.getAttribute("data-layout-signature")
+      await page.locator("#coupling-background-dependencies").check()
+      await expect(page.locator("html")).toHaveAttribute("data-active-lens", "custom")
+      await expect(graph).toHaveAttribute("data-rendered-dependency-edge-count", "5")
+      await expect(graph).toHaveAttribute("data-layout-signature", layoutSignature ?? "")
+      await page.locator("#coupling-background-dependencies").uncheck()
+      await expect(page.locator("html")).toHaveAttribute("data-active-lens", "coupling")
+      await expect(graph).toHaveAttribute("data-rendered-dependency-edge-count", "0")
+    })
+
+    await test.step("Explain overlapping dependency and consumer roles while preserving coverage fill", async () => {
+      const graph = page.locator("#graph")
+      const nodeCircles = await readJsonAttribute<readonly NodeCircleDiagnostic[]>(graph, "data-visible-node-positions")
+      const a = nodeCircles.find(({ id }) => id === "project-file:src/a.ts")
+      const b = nodeCircles.find(({ id }) => id === "project-file:src/b.ts")
+      const c = nodeCircles.find(({ id }) => id === "project-file:src/c.ts")
+      Assert.isDefined(a)
+      Assert.isDefined(b)
+      Assert.isDefined(c)
+      const baselineScreenshot = await graph.screenshot()
+      const graphBounds = await graph.boundingBox()
+      Assert.isDefined(graphBounds)
+      await page.mouse.move(graphBounds.x + a.x, graphBounds.y + a.y)
+      await expect(page.locator("html")).toHaveAttribute("data-hovered-node", a.id)
+      await expect(graph).toHaveAttribute("data-rendered-dependency-edge-count", "3")
+      await expect(graph).toHaveAttribute("data-rendered-dependency-focus-ring-count", "4")
+      await expect(page.locator("#focus-legend")).toBeVisible()
+      await expect(page.locator("#selected-fan-out")).toHaveText("2")
+      await expect(page.locator("#selected-fan-in")).toHaveText("1")
+      await expect(page.locator("#selected-runtime-relationships")).toHaveText("3")
+      await expect(page.locator("#selected-type-only-relationships")).toHaveText("0")
+      await expect(page.locator("#selected-cycle-membership")).toHaveText("1")
+      expect(await maximumCanvasAlpha(graph.locator("canvas.sigma-dependency-focus"))).toBeGreaterThan(0)
+      const focusedScreenshot = await graph.screenshot()
+      const pixels = await sampleDependencyFocusPixels(graph, [a, b, c], [], baselineScreenshot, focusedScreenshot, focusedScreenshot)
+      const pixelsById = new Map(pixels.nodes.map((node) => [node.id, node]))
+      const selectedPixels = pixelsById.get(a.id)
+      const overlappingPixels = pixelsById.get(b.id)
+      const dependencyPixels = pixelsById.get(c.id)
+      Assert.isDefined(selectedPixels)
+      Assert.isDefined(overlappingPixels)
+      Assert.isDefined(dependencyPixels)
+      expectRgbNear(selectedPixels.focusedCenter, "#dc2626")
+      expect(overlappingPixels.focusRingPixelCounts.dependency).toBeGreaterThan(0)
+      expect(overlappingPixels.focusRingPixelCounts.consumer).toBeGreaterThan(0)
+      expect(dependencyPixels.focusRingPixelCounts.dependency).toBeGreaterThan(0)
+      const colors = await readJsonAttribute<readonly NodeColorDiagnostic[]>(graph, "data-visible-node-colors")
+      expect(colors).toContainEqual({ id: "project-file:src/a.ts", color: "#dc2626" })
+    })
+
+    await test.step("Select a cycle as a group, then return to ordinary member focus", async () => {
+      const runtimeCycle = page.locator('.coupling-cycle[data-coupling-cycle-kind="runtime"]')
+      await expect(runtimeCycle).toHaveCount(1)
+      await runtimeCycle.click()
+      await expect(page.locator("html")).toHaveAttribute("data-selected-coupling-cycle", /coupling-cycle:runtime/u)
+      await expect(page.locator("#graph")).toHaveAttribute("data-rendered-dependency-edge-count", "2")
+      await expect(page.locator("#graph")).toHaveAttribute("data-rendered-diagnostic-emphasis-count", "2")
+      await expect(page.locator("#selected-cycle-kind")).toHaveText("Runtime cycle")
+      await expect(page.locator("#selected-cycle-member-count")).toHaveText("2")
+      await page.locator('#selected-cycle-members button[data-node-id="project-file:src/a.ts"]').click()
+      await expect(page.locator("html")).not.toHaveAttribute("data-selected-coupling-cycle", /.+/u)
+      await expect(page.locator("html")).toHaveAttribute("data-selected-node", "project-file:src/a.ts")
+      await expect(page.locator("#selected-details")).toBeVisible()
+      await expect(page.locator("#selected-cycle-details")).toBeHidden()
+    })
+
+    await test.step("Update rankings, metrics, cycles, and graph focus with relationship-kind filters", async () => {
+      await page.locator("#coupling-type-only-dependencies").uncheck()
+      await expect(page.locator("html")).toHaveAttribute("data-type-only-dependencies", "hidden")
+      await expect(page.locator("#coupling-panel")).toHaveAttribute("data-coupling-file-count", "3")
+      await expect(page.locator("#coupling-panel")).toHaveAttribute("data-coupling-relationship-count", "3")
+      await expect(page.locator("#coupling-panel")).toHaveAttribute("data-coupling-cycle-count", "1")
+      await expect(page.locator(".coupling-result strong")).toHaveText(["src/a.ts", "src/b.ts", "src/c.ts"])
+      await expect(page.locator("#graph")).toHaveAttribute("data-rendered-dependency-edge-count", "3")
+      await page.locator("#coupling-type-only-dependencies").check()
+      await expect(page.locator("#coupling-panel")).toHaveAttribute("data-coupling-cycle-count", "2")
+    })
+  })
+})
+
 test("derives project-file edges and relationships in the browser", async ({ page }) => {
   await withTemporaryDirectory(async (temporaryDirectory) => {
     const reportPath = await test.step("Generate the static-ESM report", async () => {
@@ -892,7 +1007,7 @@ test("shows, distinguishes, filters, and deterministically restores type-only de
       await expect(page.locator(".graph-key")).toContainText("Runtime")
       await expect(page.locator(".graph-key")).toContainText("Type only")
       await expect(page.locator("#external-dependency-edge-key")).toBeHidden()
-      await expect(page.locator(".type-only-dependency-edge-swatch")).toBeVisible()
+      await expect(page.locator("#type-only-dependency-edge-key .type-only-dependency-edge-swatch")).toBeVisible()
 
       const renderedEdges = await readJsonAttribute<readonly DependencyEdgeDiagnostic[]>(graph, "data-rendered-dependency-edges")
       expect(new Set(renderedEdges.map(({ color }) => color))).toEqual(new Set(["#628bb5", "#a3e635"]))
@@ -1980,6 +2095,46 @@ function coverageLensAnalysis(): ProjectAnalysis {
     dependencies: [
       { source: zero, target: partial, kind: "runtime" },
       { source: unavailable, target: zero, kind: "type-only" },
+    ],
+    externalPackages: [],
+    externalPackageDependencies: [],
+    diagnostics: [],
+  }
+}
+
+function couplingLensAnalysis(): ProjectAnalysis {
+  const a = branded<ProjectFilePath>("src/a.ts")
+  const b = branded<ProjectFilePath>("src/b.ts")
+  const c = branded<ProjectFilePath>("src/c.ts")
+  const d = branded<ProjectFilePath>("src/d.ts")
+  const isolated = branded<ProjectFilePath>("src/isolated.ts")
+  return {
+    schemaVersion: 5,
+    project: { name: "coupling-lens" },
+    workspacePackages: [],
+    files: [
+      { path: a, language: "typescript", lines: { code: 100, comment: 0, blank: 0 }, coverage: { lines: 0 } },
+      { path: b, language: "typescript", lines: { code: 100, comment: 0, blank: 0 }, coverage: { lines: 50 } },
+      {
+        path: c,
+        language: "typescript",
+        lines: { code: 100, comment: 0, blank: 0 },
+        coverage: { lines: 100 },
+      },
+      { path: d, language: "typescript", lines: { code: 100, comment: 0, blank: 0 }, coverage: undefined },
+      {
+        path: isolated,
+        language: "typescript",
+        lines: { code: 100, comment: 0, blank: 0 },
+        coverage: { lines: 75 },
+      },
+    ],
+    dependencies: [
+      { source: a, target: b, kind: "runtime" },
+      { source: b, target: a, kind: "runtime" },
+      { source: a, target: c, kind: "runtime" },
+      { source: c, target: d, kind: "type-only" },
+      { source: d, target: c, kind: "type-only" },
     ],
     externalPackages: [],
     externalPackageDependencies: [],

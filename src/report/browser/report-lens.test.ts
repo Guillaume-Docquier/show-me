@@ -23,9 +23,11 @@ it("starts in the deterministic Overview preset over every workspace package", (
     lineCategories: ["code"],
     externalPackages: false,
     typeOnlyDependencies: true,
+    runtimeDependencies: true,
     structureEdges: true,
     dependencyDisplay: "focused",
     projectFileColor: "coverage",
+    projectFileSize: "line-categories",
   })
 })
 
@@ -42,7 +44,8 @@ it("preserves scope and deterministically restores each named lens", () => {
   // Act
   const structure = selectReportLens(customized, "structure")
   const coverage = selectReportLens(structure, "coverage")
-  const overview = selectReportLens(coverage, "overview")
+  const coupling = selectReportLens(coverage, "coupling")
+  const overview = selectReportLens(coupling, "overview")
 
   // Assert
   expect(structure.scope.workspacePackages).toEqual(new Set(["apps/frontend"]))
@@ -54,9 +57,23 @@ it("preserves scope and deterministically restores each named lens", () => {
     lineCategories: ["code"],
     externalPackages: false,
     typeOnlyDependencies: true,
+    runtimeDependencies: true,
     structureEdges: true,
     dependencyDisplay: "hidden",
     projectFileColor: "coverage",
+    projectFileSize: "line-categories",
+  })
+  expect(coupling.scope.workspacePackages).toEqual(new Set(["apps/frontend"]))
+  expect(activeReportLens(coupling)).toBe("coupling")
+  expect(reportLensSettings(coupling)).toEqual({
+    lineCategories: ["code"],
+    externalPackages: false,
+    typeOnlyDependencies: true,
+    runtimeDependencies: true,
+    structureEdges: false,
+    dependencyDisplay: "focused",
+    projectFileColor: "coverage",
+    projectFileSize: "visible-degree",
   })
   expect(overview.scope.workspacePackages).toEqual(new Set(["apps/frontend"]))
   expect(activeReportLens(overview)).toBe("overview")

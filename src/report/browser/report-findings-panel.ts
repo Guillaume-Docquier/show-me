@@ -1,3 +1,5 @@
+import { ReportCouplingPanel } from "./report-coupling-panel.js"
+import type { CouplingCycle, CouplingFilterState, CouplingLensResults } from "./report-coupling.js"
 import type { CoverageFilterState, CoverageLensResults } from "./report-coverage.js"
 import type { ReportFindingPanelElements } from "./report-elements.js"
 import type { ReportFinding, ReportFindingGroup } from "./report-findings.js"
@@ -10,7 +12,8 @@ export class ReportFindingsPanel {
   readonly #elements: ReportFindingPanelElements
   readonly #activateNode: (nodeId: string) => void
   readonly #updateCoverageFilters: (filters: CoverageFilterState) => void
-  #activePanel: "findings" | "coverage" | "project-files" = "findings"
+  readonly #couplingPanel: ReportCouplingPanel
+  #activePanel: "findings" | "coverage" | "coupling" | "project-files" = "findings"
   #selectedNodeId: string | undefined
   #selectedLens: ReportLens = "overview"
 
@@ -24,15 +27,25 @@ export class ReportFindingsPanel {
     activateNode,
     initialCoverageFilters,
     updateCoverageFilters,
+    activateCycle,
+    updateCouplingFilters,
   }: {
     readonly elements: ReportFindingPanelElements
     readonly activateNode: (nodeId: string) => void
     readonly initialCoverageFilters: CoverageFilterState
     readonly updateCoverageFilters: (filters: CoverageFilterState) => void
+    readonly activateCycle: (cycle: CouplingCycle) => void
+    readonly updateCouplingFilters: (filters: CouplingFilterState) => void
   }) {
     this.#elements = elements
     this.#activateNode = activateNode
     this.#updateCoverageFilters = updateCoverageFilters
+    this.#couplingPanel = new ReportCouplingPanel({
+      elements,
+      activateNode,
+      activateCycle,
+      updateFilters: updateCouplingFilters,
+    })
     this.#elements.coverageMinimumCodeLines.value = String(initialCoverageFilters.minimumCodeLines)
     this.#elements.coverageMaximumPercentage.value = String(initialCoverageFilters.maximumCoverage)
     this.#elements.coverageIncludeUnavailable.checked = initialCoverageFilters.includeUnavailableCoverage
@@ -41,6 +54,9 @@ export class ReportFindingsPanel {
     })
     elements.coverageTab.addEventListener("click", () => {
       this.#selectPanel("coverage")
+    })
+    elements.couplingTab.addEventListener("click", () => {
+      this.#selectPanel("coupling")
     })
     elements.projectFilesTab.addEventListener("click", () => {
       this.#selectPanel("project-files")
@@ -83,7 +99,8 @@ export class ReportFindingsPanel {
    */
   public renderLens(lens: ReportLens): void {
     if (lens !== this.#selectedLens) {
-      this.#activePanel = lens === "overview" ? "findings" : lens === "coverage" ? "coverage" : "project-files"
+      this.#activePanel =
+        lens === "overview" ? "findings" : lens === "coverage" ? "coverage" : lens === "coupling" ? "coupling" : "project-files"
       this.#selectedLens = lens
     }
     this.#renderPanelVisibility()
@@ -94,9 +111,10 @@ export class ReportFindingsPanel {
    *
    * @param selectedNodeId - Current persistent graph entity selection.
    */
-  public renderSelection(selectedNodeId: string | undefined): void {
+  public renderSelection(selectedNodeId: string | undefined, selectedCycleId?: string): void {
     this.#selectedNodeId = selectedNodeId
     this.#renderSelection()
+    this.#couplingPanel.renderSelection(selectedNodeId, selectedCycleId)
   }
 
   /** Render Coverage lens controls, scoped counts, and stable matching rows. */
@@ -141,6 +159,11 @@ export class ReportFindingsPanel {
         return item
       }),
     )
+  }
+
+  /** Render Coupling lens metrics, filters, and selectable cycles. */
+  public renderCoupling(results: CouplingLensResults, filters: CouplingFilterState): void {
+    this.#couplingPanel.render(results, filters)
   }
 
   #category(group: ReportFindingGroup): HTMLElement {
@@ -216,7 +239,7 @@ export class ReportFindingsPanel {
     return button
   }
 
-  #selectPanel(panel: "findings" | "coverage" | "project-files"): void {
+  #selectPanel(panel: "findings" | "coverage" | "coupling" | "project-files"): void {
     this.#activePanel = panel
     this.#renderPanelVisibility()
   }
@@ -224,20 +247,26 @@ export class ReportFindingsPanel {
   #renderPanelVisibility(): void {
     const overview = this.#selectedLens === "overview"
     const coverage = this.#selectedLens === "coverage"
+    const coupling = this.#selectedLens === "coupling"
     const showFindings = overview && this.#activePanel === "findings"
     const showCoverage = coverage && this.#activePanel === "coverage"
-    const showProjectFiles = !showFindings && !showCoverage
-    this.#elements.tabs.hidden = !overview && !coverage
+    const showCoupling = coupling && this.#activePanel === "coupling"
+    const showProjectFiles = !showFindings && !showCoverage && !showCoupling
+    this.#elements.tabs.hidden = !overview && !coverage && !coupling
     this.#elements.findingsTab.hidden = !overview
     this.#elements.coverageTab.hidden = !coverage
+    this.#elements.couplingTab.hidden = !coupling
     this.#elements.findingsTab.setAttribute("aria-selected", String(showFindings))
     this.#elements.coverageTab.setAttribute("aria-selected", String(showCoverage))
+    this.#elements.couplingTab.setAttribute("aria-selected", String(showCoupling))
     this.#elements.projectFilesTab.setAttribute("aria-selected", String(showProjectFiles))
     this.#elements.findingsTab.tabIndex = showFindings ? 0 : -1
     this.#elements.coverageTab.tabIndex = showCoverage ? 0 : -1
+    this.#elements.couplingTab.tabIndex = showCoupling ? 0 : -1
     this.#elements.projectFilesTab.tabIndex = showProjectFiles ? 0 : -1
     this.#elements.panel.hidden = !showFindings
     this.#elements.coveragePanel.hidden = !showCoverage
+    this.#elements.couplingPanel.hidden = !showCoupling
     this.#elements.projectFilesPanel.hidden = !showProjectFiles
   }
 

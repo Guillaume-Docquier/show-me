@@ -1,6 +1,6 @@
 import { expect, it } from "vitest"
 import { reportLensPreset, type ReportLensSettings, type ReportScopeState } from "./report-lens.js"
-import { nodeSizeForLines, type BrowserPresentation } from "./report-presentation.js"
+import { nodeSizeForDegree, nodeSizeForLines, type BrowserPresentation } from "./report-presentation.js"
 import { buildReportView, reportViewLayoutSignature, visibleRelationships } from "./report-view.js"
 
 const presentation: BrowserPresentation = {
@@ -118,9 +118,11 @@ it("composes workspace filtering, external-package visibility, and line sizing i
     lineCategories: ["code", "comment"],
     externalPackages: true,
     typeOnlyDependencies: true,
+    runtimeDependencies: true,
     structureEdges: true,
     dependencyDisplay: "all",
     projectFileColor: "coverage",
+    projectFileSize: "line-categories",
   }
 
   // Act
@@ -160,6 +162,26 @@ it("hides type-only relationships independently and removes type-only-only exter
     { nodeId: "project-file:apps/frontend/main.ts", kind: "runtime" },
   ])
   expect(reportViewLayoutSignature(restored)).toBe(reportViewLayoutSignature(visible))
+})
+
+it("sizes the Coupling lens by visible direct degree with an isolate minimum", () => {
+  // Arrange
+  const scope = allWorkspaceScope()
+
+  // Act
+  const coupling = buildReportView(presentation, scope, reportLensPreset("coupling"))
+  const runtimeHidden = buildReportView(presentation, scope, {
+    ...reportLensPreset("coupling"),
+    runtimeDependencies: false,
+  })
+
+  // Assert
+  expect(coupling.nodes.map(({ id, size }) => ({ id, size }))).toEqual([
+    { id: "project-file:root.ts", size: nodeSizeForDegree(1) },
+    { id: "project-file:apps/frontend/main.ts", size: nodeSizeForDegree(1) },
+    { id: "project-file:apps/backend/server.ts", size: nodeSizeForDegree(0) },
+  ])
+  expect(runtimeHidden.nodes.map(({ size }) => size)).toEqual([nodeSizeForDegree(0), nodeSizeForDegree(0), nodeSizeForDegree(0)])
 })
 
 it("produces a stable layout-input signature that changes with node sizing", () => {

@@ -1,6 +1,7 @@
 import type { ProjectAnalysis } from "../../analysis/project-analysis.js"
 
 const NODE_SIZE_SCALE = 3
+const MINIMUM_DEGREE_NODE_SIZE = 6
 const DEFAULT_NODE_COLOR = "#8fa3b8"
 const UNCOVERED_NODE_COLOR = "#dc2626"
 const PARTIALLY_COVERED_NODE_COLOR = "#eab308"
@@ -153,6 +154,11 @@ export function browserPresentationSignature(presentation: BrowserPresentation):
  */
 export function nodeSizeForLines(lines: number): number {
   return Math.log2(Math.max(lines, 1) + 1) * NODE_SIZE_SCALE
+}
+
+/** Calculate a Coupling lens size from visible direct fan-in plus fan-out. */
+export function nodeSizeForDegree(degree: number): number {
+  return MINIMUM_DEGREE_NODE_SIZE + Math.log2(Math.max(0, degree) + 1) * NODE_SIZE_SCALE
 }
 
 /**

@@ -1,4 +1,5 @@
 import type { DependencyKind } from "../../analysis/project-analysis.js"
+import { deriveCouplingFacts, type CouplingLensResults, type CouplingMetric } from "./report-coupling.js"
 import type { ReportScopeState } from "./report-lens.js"
 import type { BrowserPresentation, ReportEdge, ReportProjectFileNode } from "./report-presentation.js"
 
@@ -76,11 +77,6 @@ export type ReportFindingGroup = {
   readonly findings: readonly ReportFinding[]
 }
 
-type RelationshipCounts = {
-  readonly runtime: Set<string>
-  readonly typeOnly: Set<string>
-}
-
 const CATEGORY_LABELS: Readonly<Record<ReportFindingCategory, string>> = {
   "large-low-coverage": "Large files with low known coverage",
   "large-unavailable-coverage": "Large files with unavailable coverage",
@@ -106,10 +102,11 @@ export function deriveReportFindings(presentation: BrowserPresentation, scope: R
   const projectEdges = presentation.edges.filter(
     (edge) => edge.targetKind === "project-file" && visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target),
   )
+  const coupling = deriveCouplingFacts(files, projectEdges)
   const findingsByCategory: Readonly<Record<ReportFindingCategory, readonly ReportFinding[]>> = {
     ...deriveLargeFileFindings(files),
-    ...deriveFanFindings(files, projectEdges),
-    "dependency-cycles": deriveDependencyCycleFindings(files, projectEdges),
+    ...deriveFanFindings(coupling),
+    "dependency-cycles": deriveDependencyCycleFindings(coupling),
     "cross-workspace-relationships": deriveCrossWorkspaceFindings(presentation, files, projectEdges),
   }
 
@@ -186,70 +183,32 @@ function deriveLargeFileFindings(files: readonly ReportProjectFileNode[]): {
   }
 }
 
-function deriveFanFindings(
-  files: readonly ReportProjectFileNode[],
-  edges: readonly ReportEdge[],
-): {
+function deriveFanFindings(coupling: CouplingLensResults): {
   readonly "highest-fan-out": readonly FanFinding[]
   readonly "highest-fan-in": readonly FanFinding[]
 } {
-  const outgoing = relationshipCounts(files)
-  const incoming = relationshipCounts(files)
-  for (const edge of edges) {
-    relationshipSet(outgoing, edge.source, edge.dependencyKind).add(edge.target)
-    relationshipSet(incoming, edge.target, edge.dependencyKind).add(edge.source)
-  }
-
   return {
-    "highest-fan-out": fanFindings(files, outgoing, "highest-fan-out"),
-    "highest-fan-in": fanFindings(files, incoming, "highest-fan-in"),
+    "highest-fan-out": fanFindings(coupling.metrics, "highest-fan-out"),
+    "highest-fan-in": fanFindings(coupling.metrics, "highest-fan-in"),
   }
 }
 
-function relationshipCounts(files: readonly ReportProjectFileNode[]): Map<string, RelationshipCounts> {
-  return new Map(
-    files.map(({ id }) => [
-      id,
-      {
-        runtime: new Set<string>(),
-        typeOnly: new Set<string>(),
-      },
-    ]),
-  )
-}
-
-function relationshipSet(countsByNodeId: ReadonlyMap<string, RelationshipCounts>, nodeId: string, kind: DependencyKind): Set<string> {
-  const counts = countsByNodeId.get(nodeId)
-  if (counts === undefined) {
-    throw new Error(`Finding derivation references unavailable project file ${nodeId}.`)
-  }
-  return kind === "runtime" ? counts.runtime : counts.typeOnly
-}
-
-function fanFindings(
-  files: readonly ReportProjectFileNode[],
-  countsByNodeId: ReadonlyMap<string, RelationshipCounts>,
-  category: "highest-fan-out" | "highest-fan-in",
-): readonly FanFinding[] {
-  return files
-    .flatMap((file): readonly FanFinding[] => {
-      const counts = countsByNodeId.get(file.id)
-      if (counts === undefined) {
-        throw new Error(`Finding derivation is missing relationship counts for ${file.id}.`)
-      }
-      const runtimeCount = counts.runtime.size
-      const typeOnlyCount = counts.typeOnly.size
-      const totalCount = runtimeCount + typeOnlyCount
+function fanFindings(metrics: readonly CouplingMetric[], category: "highest-fan-out" | "highest-fan-in"): readonly FanFinding[] {
+  return metrics
+    .flatMap((metric): readonly FanFinding[] => {
+      const runtimeCount = category === "highest-fan-out" ? metric.runtimeFanOut : metric.runtimeFanIn
+      const typeOnlyCount = category === "highest-fan-out" ? metric.typeOnlyFanOut : metric.typeOnlyFanIn
+      const totalCount = category === "highest-fan-out" ? metric.fanOut : metric.fanIn
       if (totalCount === 0) {
         return []
       }
       const relationshipLabel = category === "highest-fan-out" ? "direct dependencies" : "project-file consumers"
       return [
         {
-          id: `${category}:${file.id}`,
+          id: `${category}:${metric.nodeId}`,
           category,
-          nodeId: file.id,
-          entityName: file.path,
+          nodeId: metric.nodeId,
+          entityName: metric.path,
           totalCount,
           runtimeCount,
           typeOnlyCount,
@@ -266,143 +225,24 @@ function fanFindings(
     )
 }
 
-function deriveDependencyCycleFindings(
-  files: readonly ReportProjectFileNode[],
-  edges: readonly ReportEdge[],
-): readonly DependencyCycleFinding[] {
-  const fileById = new Map(files.map((file) => [file.id, file]))
-  const runtimeComponents = cyclicStronglyConnectedComponents(
-    files,
-    edges.filter(({ dependencyKind }) => dependencyKind === "runtime"),
-  )
-  const runtimeSignatures = new Set(runtimeComponents.map(componentSignature))
-  const combinedComponents = cyclicStronglyConnectedComponents(files, edges).filter(
-    (component) => !runtimeSignatures.has(componentSignature(component)),
-  )
-
-  return [
-    ...runtimeComponents.map((memberNodeIds) => cycleFinding(memberNodeIds, "runtime", fileById)),
-    ...combinedComponents.map((memberNodeIds) => cycleFinding(memberNodeIds, "includes-type-only", fileById)),
-  ].toSorted((left, right) =>
-    firstComparison(
-      compareNumbers(cycleKindRank(left.cycleKind), cycleKindRank(right.cycleKind)),
-      compareNumbers(right.memberNodeIds.length, left.memberNodeIds.length),
-      compareTextArrays(left.memberPaths, right.memberPaths),
-    ),
-  )
-}
-
-function cyclicStronglyConnectedComponents(
-  files: readonly ReportProjectFileNode[],
-  edges: readonly ReportEdge[],
-): ReadonlyArray<readonly string[]> {
-  const sortedNodeIds = files.map(({ id }) => id).toSorted(compareText)
-  const adjacency = new Map(sortedNodeIds.map((nodeId) => [nodeId, new Set<string>()]))
-  for (const edge of edges) {
-    adjacency.get(edge.source)?.add(edge.target)
-  }
-
-  let nextIndex = 0
-  const nodeIndex = new Map<string, number>()
-  const lowLink = new Map<string, number>()
-  const stack: string[] = []
-  const onStack = new Set<string>()
-  const components: string[][] = []
-
-  const visit = (nodeId: string): void => {
-    const currentIndex = nextIndex
-    nextIndex += 1
-    nodeIndex.set(nodeId, currentIndex)
-    lowLink.set(nodeId, currentIndex)
-    stack.push(nodeId)
-    onStack.add(nodeId)
-
-    for (const targetId of [...(adjacency.get(nodeId) ?? [])].toSorted(compareText)) {
-      if (!nodeIndex.has(targetId)) {
-        visit(targetId)
-        lowLink.set(nodeId, Math.min(requiredNumber(lowLink, nodeId), requiredNumber(lowLink, targetId)))
-      } else if (onStack.has(targetId)) {
-        lowLink.set(nodeId, Math.min(requiredNumber(lowLink, nodeId), requiredNumber(nodeIndex, targetId)))
-      }
+function deriveDependencyCycleFindings(coupling: CouplingLensResults): readonly DependencyCycleFinding[] {
+  return coupling.cycles.map((cycle): DependencyCycleFinding => {
+    const representativeNodeId = cycle.memberNodeIds[0]
+    if (representativeNodeId === undefined) {
+      throw new Error("A dependency cycle cannot be empty.")
     }
-
-    if (requiredNumber(lowLink, nodeId) !== requiredNumber(nodeIndex, nodeId)) {
-      return
+    const kindLabel = cycle.kind === "runtime" ? "Runtime" : "Includes type-only dependencies"
+    return {
+      id: cycle.id.replace("coupling-cycle:", "dependency-cycle:"),
+      category: "dependency-cycles",
+      nodeId: representativeNodeId,
+      entityName: cycle.memberPaths[0] ?? representativeNodeId,
+      cycleKind: cycle.kind,
+      memberNodeIds: cycle.memberNodeIds,
+      memberPaths: cycle.memberPaths,
+      explanation: `${kindLabel} cycle with ${cycle.memberPaths.length} ${cycle.memberPaths.length === 1 ? "member" : "members"}: ${cycle.memberPaths.join(", ")}.`,
     }
-
-    const component: string[] = []
-    while (stack.length > 0) {
-      const member = stack.pop()
-      if (member === undefined) {
-        break
-      }
-      onStack.delete(member)
-      component.push(member)
-      if (member === nodeId) {
-        break
-      }
-    }
-    components.push(component.toSorted(compareText))
-  }
-
-  for (const nodeId of sortedNodeIds) {
-    if (!nodeIndex.has(nodeId)) {
-      visit(nodeId)
-    }
-  }
-
-  return components.filter(
-    (component) => component.length > 1 || (component[0] !== undefined && adjacency.get(component[0])?.has(component[0]) === true),
-  )
-}
-
-function requiredNumber(values: ReadonlyMap<string, number>, key: string): number {
-  const value = values.get(key)
-  if (value === undefined) {
-    throw new Error(`Strongly connected component derivation is missing ${key}.`)
-  }
-  return value
-}
-
-function componentSignature(memberNodeIds: readonly string[]): string {
-  return JSON.stringify(memberNodeIds)
-}
-
-function cycleFinding(
-  memberNodeIds: readonly string[],
-  cycleKind: DependencyCycleFinding["cycleKind"],
-  fileById: ReadonlyMap<string, ReportProjectFileNode>,
-): DependencyCycleFinding {
-  const memberPaths = memberNodeIds
-    .map((nodeId) => {
-      const file = fileById.get(nodeId)
-      if (file === undefined) {
-        throw new Error(`Dependency cycle references unavailable project file ${nodeId}.`)
-      }
-      return file.path
-    })
-    .toSorted(compareText)
-  const representativeNodeId = memberNodeIds.toSorted((left, right) =>
-    compareText(fileById.get(left)?.path ?? left, fileById.get(right)?.path ?? right),
-  )[0]
-  if (representativeNodeId === undefined) {
-    throw new Error("A dependency cycle cannot be empty.")
-  }
-  const kindLabel = cycleKind === "runtime" ? "Runtime" : "Includes type-only dependencies"
-  return {
-    id: `dependency-cycle:${cycleKind}:${memberNodeIds.join("|")}`,
-    category: "dependency-cycles",
-    nodeId: representativeNodeId,
-    entityName: memberPaths[0] ?? representativeNodeId,
-    cycleKind,
-    memberNodeIds,
-    memberPaths,
-    explanation: `${kindLabel} cycle with ${memberPaths.length} ${memberPaths.length === 1 ? "member" : "members"}: ${memberPaths.join(", ")}.`,
-  }
-}
-
-function cycleKindRank(kind: DependencyCycleFinding["cycleKind"]): number {
-  return kind === "runtime" ? 0 : 1
+  })
 }
 
 function deriveCrossWorkspaceFindings(
@@ -506,22 +346,4 @@ function firstComparison(...comparisons: readonly number[]): number {
 
 function compareText(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0
-}
-
-function compareTextArrays(left: readonly string[], right: readonly string[]): number {
-  for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
-    const leftValue = left[index]
-    const rightValue = right[index]
-    if (leftValue === undefined) {
-      return -1
-    }
-    if (rightValue === undefined) {
-      return 1
-    }
-    const comparison = compareText(leftValue, rightValue)
-    if (comparison !== 0) {
-      return comparison
-    }
-  }
-  return 0
 }

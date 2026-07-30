@@ -9,6 +9,7 @@ export type ReportFindingPanelElements = {
   readonly tabs: HTMLElement
   readonly findingsTab: HTMLButtonElement
   readonly coverageTab: HTMLButtonElement
+  readonly couplingTab: HTMLButtonElement
   readonly projectFilesTab: HTMLButtonElement
   readonly panel: HTMLElement
   readonly categories: HTMLElement
@@ -23,6 +24,17 @@ export type ReportFindingPanelElements = {
   readonly coverageUnavailableCount: HTMLElement
   readonly coverageEmpty: HTMLElement
   readonly coverageResults: HTMLOListElement
+  readonly couplingPanel: HTMLElement
+  readonly couplingRuntimeDependencies: HTMLInputElement
+  readonly couplingTypeOnlyDependencies: HTMLInputElement
+  readonly couplingBackgroundDependencies: HTMLInputElement
+  readonly couplingFileCount: HTMLElement
+  readonly couplingRelationshipCount: HTMLElement
+  readonly couplingCycleCount: HTMLElement
+  readonly couplingEmpty: HTMLElement
+  readonly couplingResults: HTMLOListElement
+  readonly couplingCyclesSection: HTMLElement
+  readonly couplingCycles: HTMLOListElement
 }
 
 /** DOM owned by report controls. */
@@ -32,6 +44,7 @@ export type ReportControlElements = {
   readonly resetCameraButton: HTMLButtonElement
   readonly externalPackageToggle: HTMLInputElement
   readonly typeOnlyDependencyToggle: HTMLInputElement
+  readonly runtimeDependencyToggle: HTMLInputElement
   readonly structureEdgesToggle: HTMLInputElement
   readonly dependencyDisplay: HTMLSelectElement
   readonly projectFileColor: HTMLSelectElement
@@ -40,6 +53,7 @@ export type ReportControlElements = {
   readonly lineCategoryCode: HTMLInputElement
   readonly lineCategoryComment: HTMLInputElement
   readonly lineCategoryBlank: HTMLInputElement
+  readonly lineCategoryControls: HTMLElement
   readonly graphKey: HTMLElement
   readonly structureEdgeKey: HTMLElement
   readonly runtimeDependencyEdgeKey: HTMLElement
@@ -47,6 +61,7 @@ export type ReportControlElements = {
   readonly externalDependencyEdgeKey: HTMLElement
   readonly coverageLegend: HTMLElement
   readonly activeSizeKey: HTMLElement
+  readonly focusLegend: HTMLElement
 }
 
 /** DOM owned by the files and selected-node panels. */
@@ -72,6 +87,11 @@ export type ReportPanelElements = {
   readonly selectedDependencies: HTMLElement
   readonly selectedConsumers: HTMLElement
   readonly selectedCoverage: HTMLElement
+  readonly selectedFanOut: HTMLElement
+  readonly selectedFanIn: HTMLElement
+  readonly selectedRuntimeRelationships: HTMLElement
+  readonly selectedTypeOnlyRelationships: HTMLElement
+  readonly selectedCycleMembership: HTMLElement
   readonly selectedDependencyNodes: HTMLElement
   readonly selectedConsumerNodes: HTMLElement
   readonly selectedParentDirectory: HTMLElement
@@ -79,6 +99,12 @@ export type ReportPanelElements = {
   readonly projectFileDetails: NodeListOf<HTMLElement>
   readonly dependencyDetails: NodeListOf<HTMLElement>
   readonly directoryDetails: NodeListOf<HTMLElement>
+  readonly couplingDetails: NodeListOf<HTMLElement>
+  readonly selectedCycleDetails: HTMLElement
+  readonly selectedCycleKind: HTMLElement
+  readonly selectedCycleMemberCount: HTMLElement
+  readonly selectedCycleRelationshipCount: HTMLElement
+  readonly selectedCycleMembers: HTMLOListElement
 }
 
 /** Complete generated-report DOM organized by the module that owns it. */
@@ -109,6 +135,7 @@ export function getReportElements(reportDocument: Document): ReportElements {
       tabs: requiredElement(reportDocument, "sidebar-tabs"),
       findingsTab: requiredButton(reportDocument, "findings-tab"),
       coverageTab: requiredButton(reportDocument, "coverage-tab"),
+      couplingTab: requiredButton(reportDocument, "coupling-tab"),
       projectFilesTab: requiredButton(reportDocument, "project-files-tab"),
       panel: requiredElement(reportDocument, "findings-panel"),
       categories: requiredElement(reportDocument, "findings-categories"),
@@ -123,6 +150,17 @@ export function getReportElements(reportDocument: Document): ReportElements {
       coverageUnavailableCount: requiredElement(reportDocument, "coverage-unavailable-count"),
       coverageEmpty: requiredElement(reportDocument, "coverage-empty"),
       coverageResults: requiredOrderedList(reportDocument, "coverage-results"),
+      couplingPanel: requiredElement(reportDocument, "coupling-panel"),
+      couplingRuntimeDependencies: requiredCheckbox(reportDocument, "coupling-runtime-dependencies"),
+      couplingTypeOnlyDependencies: requiredCheckbox(reportDocument, "coupling-type-only-dependencies"),
+      couplingBackgroundDependencies: requiredCheckbox(reportDocument, "coupling-background-dependencies"),
+      couplingFileCount: requiredElement(reportDocument, "coupling-file-count"),
+      couplingRelationshipCount: requiredElement(reportDocument, "coupling-relationship-count"),
+      couplingCycleCount: requiredElement(reportDocument, "coupling-cycle-count"),
+      couplingEmpty: requiredElement(reportDocument, "coupling-empty"),
+      couplingResults: requiredOrderedList(reportDocument, "coupling-results"),
+      couplingCyclesSection: requiredElement(reportDocument, "coupling-cycles-section"),
+      couplingCycles: requiredOrderedList(reportDocument, "coupling-cycles"),
     },
     controls: {
       lensSelector: requiredSelect(reportDocument, "lens-selector"),
@@ -130,6 +168,7 @@ export function getReportElements(reportDocument: Document): ReportElements {
       resetCameraButton: requiredButton(reportDocument, "reset-camera"),
       externalPackageToggle: requiredCheckbox(reportDocument, "external-packages-toggle"),
       typeOnlyDependencyToggle: requiredCheckbox(reportDocument, "type-only-dependencies-toggle"),
+      runtimeDependencyToggle: requiredCheckbox(reportDocument, "runtime-dependencies-toggle"),
       structureEdgesToggle: requiredCheckbox(reportDocument, "structure-edges-toggle"),
       dependencyDisplay: requiredSelect(reportDocument, "dependency-display"),
       projectFileColor: requiredSelect(reportDocument, "project-file-color"),
@@ -138,6 +177,7 @@ export function getReportElements(reportDocument: Document): ReportElements {
       lineCategoryCode: requiredCheckbox(reportDocument, "line-category-code"),
       lineCategoryComment: requiredCheckbox(reportDocument, "line-category-comment"),
       lineCategoryBlank: requiredCheckbox(reportDocument, "line-category-blank"),
+      lineCategoryControls: requiredElement(reportDocument, "line-category-controls"),
       graphKey: requiredElement(reportDocument, "controls").querySelector<HTMLElement>(".graph-key") ?? missingElement(".graph-key"),
       structureEdgeKey: requiredElement(reportDocument, "structure-edge-key"),
       runtimeDependencyEdgeKey: requiredElement(reportDocument, "runtime-dependency-edge-key"),
@@ -145,6 +185,7 @@ export function getReportElements(reportDocument: Document): ReportElements {
       externalDependencyEdgeKey: requiredElement(reportDocument, "external-dependency-edge-key"),
       coverageLegend: requiredElement(reportDocument, "coverage-legend"),
       activeSizeKey: requiredElement(reportDocument, "active-size-key"),
+      focusLegend: requiredElement(reportDocument, "focus-legend"),
     },
     panels: {
       fileSearch: requiredSearchInput(reportDocument, "file-search"),
@@ -168,6 +209,11 @@ export function getReportElements(reportDocument: Document): ReportElements {
       selectedDependencies: requiredElement(reportDocument, "selected-dependencies"),
       selectedConsumers: requiredElement(reportDocument, "selected-consumers"),
       selectedCoverage: requiredElement(reportDocument, "selected-coverage"),
+      selectedFanOut: requiredElement(reportDocument, "selected-fan-out"),
+      selectedFanIn: requiredElement(reportDocument, "selected-fan-in"),
+      selectedRuntimeRelationships: requiredElement(reportDocument, "selected-runtime-relationships"),
+      selectedTypeOnlyRelationships: requiredElement(reportDocument, "selected-type-only-relationships"),
+      selectedCycleMembership: requiredElement(reportDocument, "selected-cycle-membership"),
       selectedDependencyNodes: requiredElement(reportDocument, "selected-dependency-nodes"),
       selectedConsumerNodes: requiredElement(reportDocument, "selected-consumer-files"),
       selectedParentDirectory: requiredElement(reportDocument, "selected-parent-directory"),
@@ -175,6 +221,12 @@ export function getReportElements(reportDocument: Document): ReportElements {
       projectFileDetails: reportDocument.querySelectorAll<HTMLElement>("[data-project-file-detail]"),
       dependencyDetails: reportDocument.querySelectorAll<HTMLElement>("[data-dependency-detail]"),
       directoryDetails: reportDocument.querySelectorAll<HTMLElement>("[data-directory-detail]"),
+      couplingDetails: reportDocument.querySelectorAll<HTMLElement>("[data-coupling-detail]"),
+      selectedCycleDetails: requiredElement(reportDocument, "selected-cycle-details"),
+      selectedCycleKind: requiredElement(reportDocument, "selected-cycle-kind"),
+      selectedCycleMemberCount: requiredElement(reportDocument, "selected-cycle-member-count"),
+      selectedCycleRelationshipCount: requiredElement(reportDocument, "selected-cycle-relationship-count"),
+      selectedCycleMembers: requiredOrderedList(reportDocument, "selected-cycle-members"),
     },
   }
 }

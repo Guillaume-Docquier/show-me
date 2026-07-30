@@ -9,6 +9,7 @@ import type { ProjectAnalysis } from "../../analysis/project-analysis.js"
 import { PerformanceProfiler } from "../../performance/performance-profiler.js"
 import { renderCoverageLegend } from "./coverage-legend.js"
 import { ReportControls } from "./report-controls.js"
+import { deriveCouplingLensResults, type CouplingCycle, type CouplingFilterState } from "./report-coupling.js"
 import { deriveCoverageLensResults, normalizeCoverageFilters } from "./report-coverage.js"
 import { getReportElements } from "./report-elements.js"
 import { ReportFindingsPanel } from "./report-findings-panel.js"
@@ -16,6 +17,7 @@ import { deriveReportFindings } from "./report-findings.js"
 import { ReportGraph } from "./report-graph.js"
 import {
   activeReportLens,
+  customizeReportLens,
   initialReportPresentationState,
   reportLensSettings,
   updateCoverageFilters,
@@ -41,6 +43,8 @@ const elements = getReportElements(document)
 let presentationState = initialReportPresentationState(presentation.workspacePackages.map(({ path }) => path))
 let renderedViewSignature: string | undefined
 let renderedFindingsScopeSignature: string | undefined
+let selectedCouplingCycle: CouplingCycle | undefined
+let currentNavigationState: ReportNavigationState | undefined
 
 document.title = `Show me ${presentation.projectName}`
 elements.heading.projectName.textContent = presentation.projectName
@@ -56,9 +60,10 @@ const graph = new ReportGraph({
   performanceProfiler,
   events: {
     onActivateNode: (nodeId): void => {
-      navigation.activate(nodeId)
+      activateNode(nodeId)
     },
     onClearSelection: (): void => {
+      clearCouplingCycle()
       navigation.clearSelection()
       panels.showDefaultSelectionPrompt()
     },
@@ -76,7 +81,7 @@ const panels = new ReportPanels({
   presentation,
   actions: {
     activateNode: (nodeId): void => {
-      navigation.activate(nodeId)
+      activateNode(nodeId)
     },
     previewNode: (nodeId): void => {
       navigation.preview(nodeId)
@@ -97,10 +102,16 @@ const findingsPanel = new ReportFindingsPanel({
   elements: elements.findings,
   initialCoverageFilters: presentationState.coverageFilters,
   activateNode: (nodeId): void => {
-    navigation.activate(nodeId)
+    activateNode(nodeId)
   },
   updateCoverageFilters: (filters): void => {
     applyPresentationState(updateCoverageFilters(presentationState, normalizeCoverageFilters(filters)))
+  },
+  activateCycle: (cycle): void => {
+    activateCouplingCycle(cycle)
+  },
+  updateCouplingFilters: (filters): void => {
+    applyCouplingFilters(filters)
   },
 })
 
@@ -125,9 +136,13 @@ elements.root.dataset.browserLoadMilliseconds = String(performance.now() - brows
 elements.root.dataset.presentationSignature = browserPresentationSignature(presentation)
 
 function renderNavigation(state: ReportNavigationState, centeredNodeId: string | undefined): void {
+  currentNavigationState = state
   graph.renderInteraction(state)
   panels.renderNavigation(state)
-  findingsPanel.renderSelection(state.selectedNodeId)
+  findingsPanel.renderSelection(state.selectedNodeId, selectedCouplingCycle?.id)
+  controls.renderFocusLegend(
+    presentationState.lens === "coupling" && (state.hoveredNodeId !== undefined || state.selectedNodeId !== undefined),
+  )
   elements.root.dataset.navigationHistory = JSON.stringify({ entries: state.history, index: state.historyIndex })
   if (centeredNodeId !== undefined) {
     graph.centerNode(centeredNodeId)
@@ -144,6 +159,16 @@ function applyPresentationState(nextPresentationState: ReportPresentationState):
   const coverageResults = deriveCoverageLensResults(presentation, presentationState.scope, presentationState.coverageFilters)
   findingsPanel.renderCoverage(coverageResults, presentationState.coverageFilters)
   graph.setDiagnosticEmphasis(presentationState.lens === "coverage" ? coverageResults.matchingNodeIds : undefined)
+  const couplingFilters: CouplingFilterState = {
+    runtimeDependencies: settings.runtimeDependencies,
+    typeOnlyDependencies: settings.typeOnlyDependencies,
+    showBackgroundDependencies: settings.dependencyDisplay === "all",
+  }
+  const couplingResults = performanceProfiler.measure("browser-coupling", () =>
+    deriveCouplingLensResults(presentation, presentationState.scope, couplingFilters),
+  )
+  findingsPanel.renderCoupling(couplingResults, couplingFilters)
+  panels.renderCoupling(presentationState.lens === "coupling" ? couplingResults : undefined)
   const nextFindingsScopeSignature = JSON.stringify([...presentationState.scope.workspacePackages].toSorted())
   if (nextFindingsScopeSignature !== renderedFindingsScopeSignature) {
     const findings = performanceProfiler.measure("browser-findings", () => deriveReportFindings(presentation, presentationState.scope))
@@ -161,10 +186,60 @@ function applyPresentationState(nextPresentationState: ReportPresentationState):
       panels.announceUnavailableSelection()
     }
   }
+  if (presentationState.lens !== "coupling") {
+    clearCouplingCycle()
+  } else if (selectedCouplingCycle !== undefined) {
+    const currentCycle = couplingResults.cycles.find(({ id }) => id === selectedCouplingCycle?.id)
+    if (currentCycle === undefined) {
+      clearCouplingCycle()
+    } else {
+      selectedCouplingCycle = currentCycle
+      graph.setCouplingCycleFocus(currentCycle)
+      panels.showCouplingCycle(currentCycle)
+      findingsPanel.renderSelection(undefined, currentCycle.id)
+    }
+  }
+  controls.renderFocusLegend(
+    presentationState.lens === "coupling" && (selectedCouplingCycle !== undefined || currentNavigationState?.selectedNodeId !== undefined),
+  )
   elements.root.dataset.activeLens = activeReportLens(presentationState)
   elements.root.dataset.selectedLens = presentationState.lens
   elements.root.dataset.lensSettings = JSON.stringify(settings)
   elements.root.dataset.coverageFilters = JSON.stringify(presentationState.coverageFilters)
+}
+
+function activateNode(nodeId: string): void {
+  clearCouplingCycle()
+  navigation.activate(nodeId)
+}
+
+function activateCouplingCycle(cycle: CouplingCycle): void {
+  selectedCouplingCycle = cycle
+  navigation.clearSelection()
+  graph.setCouplingCycleFocus(cycle)
+  panels.showCouplingCycle(cycle)
+  findingsPanel.renderSelection(undefined, cycle.id)
+  controls.renderFocusLegend(true)
+}
+
+function clearCouplingCycle(): void {
+  if (selectedCouplingCycle === undefined) {
+    return
+  }
+  selectedCouplingCycle = undefined
+  graph.setCouplingCycleFocus(undefined)
+}
+
+function applyCouplingFilters(filters: CouplingFilterState): void {
+  const settings = reportLensSettings(presentationState)
+  applyPresentationState(
+    customizeReportLens(presentationState, {
+      ...settings,
+      runtimeDependencies: filters.runtimeDependencies,
+      typeOnlyDependencies: filters.typeOnlyDependencies,
+      dependencyDisplay: filters.showBackgroundDependencies ? "all" : "focused",
+    }),
+  )
 }
 
 function projectFileCountLabel(visibleCount: number, totalCount: number): string {

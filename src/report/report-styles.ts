@@ -53,6 +53,7 @@ header p { margin: 0; color: #8fa3b8; font-size: 12px; }
   background: #111821; box-shadow: 0 10px 28px rgba(0, 0, 0, .35);
 }
 #line-category-controls, #graph-content-controls { flex-wrap: wrap; }
+#line-category-controls[hidden] { display: none; }
 #graph-content-controls { max-width: 540px; }
 .graph-control-button {
   border: 1px solid #42556a; border-radius: 5px; padding: 6px 9px;
@@ -73,6 +74,13 @@ header p { margin: 0; color: #8fa3b8; font-size: 12px; }
 .coverage-legend { gap: 8px; color: #8fa3b8; font-size: 11px; }
 .coverage-legend-title { color: #8fa3b8; }
 .active-size-key { color: #8fa3b8; font-size: 11px; white-space: nowrap; }
+.focus-legend, .focus-legend span { display: flex; align-items: center; gap: 5px; }
+.focus-legend { gap: 10px; color: #8fa3b8; font-size: 10px; }
+.focus-legend[hidden] { display: flex; visibility: hidden; }
+.focus-swatch { display: inline-block; width: 11px; height: 11px; border: 2px solid; border-radius: 50%; }
+.selected-focus-swatch { border-color: #f5f9ff; }
+.dependency-focus-swatch { border-color: #46d7c6; }
+.consumer-focus-swatch { border-color: #ff9b71; border-style: dashed; }
 .coverage-legend-scale { gap: 5px; }
 .coverage-legend-gradient { display: inline-block; width: 48px; height: 7px; border-radius: 999px; }
 .coverage-legend-entry { gap: 4px; white-space: nowrap; }
@@ -154,6 +162,10 @@ main {
 }
 .diagnostic-result:hover, .diagnostic-result:focus-visible { border-color: #79b8ff; background: #162230; outline: none; }
 .diagnostic-result[aria-current="true"] { border-color: #79b8ff; background: #172638; }
+.coupling-section { margin-top: 16px; }
+.coupling-section h3 { margin: 0 0 8px; color: #d3dee9; font-size: 11px; }
+.coupling-section[hidden] { display: none; }
+.coupling-cycle-indicator { grid-column: 1 / -1; color: #c9a7f5; }
 .file-search { display: grid; gap: 6px; margin-bottom: 8px; color: #8fa3b8; font-size: 11px; }
 .file-search input {
   width: 100%; border: 1px solid #344456; border-radius: 5px; padding: 8px 9px;
@@ -169,7 +181,7 @@ main {
 .report-controls h2 { margin: 0; padding-right: 18px; border-right: 1px solid #25303b; white-space: nowrap; }
 #details h3 { margin: 16px 0 7px; font-size: 11px; color: #8fa3b8; }
 #selected-empty { color: #6f8295; line-height: 1.5; }
-#selected-details[hidden], #external-package-section[hidden], [data-project-file-detail][hidden], [data-dependency-detail][hidden], [data-directory-detail][hidden] { display: none; }
+#selected-details[hidden], #selected-cycle-details[hidden], #external-package-section[hidden], [data-project-file-detail][hidden], [data-dependency-detail][hidden], [data-directory-detail][hidden], [data-coupling-detail][hidden] { display: none; }
 .node-type { color: #c9a7f5; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .node-type { margin-bottom: 6px; }
 .detail-path { overflow-wrap: anywhere; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; line-height: 1.45; }
