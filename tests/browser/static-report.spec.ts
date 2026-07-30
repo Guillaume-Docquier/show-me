@@ -312,13 +312,8 @@ test("supports graph hover, selection, clearing, and side-panel navigation", asy
       await expect(graph).toHaveAttribute("data-camera-reset", "complete")
       const bounds = await graph.boundingBox()
       Assert.isDefined(bounds)
-      const serializedNodePositions = await graph.getAttribute("data-visible-node-positions")
-      Assert.isDefined(serializedNodePositions)
-      const nodePosition =
-        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- It's a test, if the cast is wrong, we'll know soon enough
-        (JSON.parse(serializedNodePositions) as Array<{ readonly id: string; readonly x: number; readonly y: number }>).find(
-          ({ id }) => id === report.longPathNodeId,
-        )
+      const nodePositions = await readJsonAttribute<readonly NodeCircleDiagnostic[]>(graph, "data-visible-node-positions")
+      const nodePosition = nodePositions.find(({ id }) => id === report.longPathNodeId)
       Assert.isDefined(nodePosition)
       const pointerX = bounds.x + nodePosition.x
       const pointerY = bounds.y + nodePosition.y
@@ -332,7 +327,8 @@ test("supports graph hover, selection, clearing, and side-panel navigation", asy
       await expect(page.locator("#selected-coverage")).toHaveText("Not available")
       await expect(page.locator("#tooltip")).toHaveCount(0)
 
-      await page.mouse.move(bounds.x + 2, bounds.y + 2)
+      const emptyGraphPoint = graphPointFarthestFromNodes(nodePositions, bounds.width, bounds.height)
+      await page.mouse.move(bounds.x + emptyGraphPoint.x, bounds.y + emptyGraphPoint.y)
       await expect(page.locator("html")).not.toHaveAttribute("data-hovered-node", report.longPathNodeId)
       await expect(page.locator("#selected-path")).toHaveText(report.selectedPath)
       return { pointerX, pointerY }
@@ -395,7 +391,12 @@ test("supports graph hover, selection, clearing, and side-panel navigation", asy
     })
 
     await test.step("Clear selection through the canvas and restore it through navigation history", async () => {
-      await page.locator("#graph").click({ position: { x: 2, y: 2 } })
+      const graph = page.locator("#graph")
+      const bounds = await graph.boundingBox()
+      Assert.isDefined(bounds)
+      const nodePositions = await readJsonAttribute<readonly NodeCircleDiagnostic[]>(graph, "data-visible-node-positions")
+      const emptyGraphPoint = graphPointFarthestFromNodes(nodePositions, bounds.width, bounds.height)
+      await page.mouse.click(bounds.x + emptyGraphPoint.x, bounds.y + emptyGraphPoint.y)
       await expect(page.locator("html")).not.toHaveAttribute("data-selected-node", /.+/u)
       await page.getByRole("button", { name: "Back to previous selection" }).click()
       await expect(page.locator("html")).toHaveAttribute("data-selected-node", report.longPathNodeId)
@@ -2301,10 +2302,7 @@ async function closeAdvancedControls(page: Page): Promise<void> {
 }
 
 async function zoomInUntilReportNodeLabelsAreVisible(page: Page, graph: Locator): Promise<void> {
-  for (let wheelEvent = 0; wheelEvent < 6; wheelEvent += 1) {
-    if ((await graph.getAttribute("data-report-node-label-visibility")) === "visible") {
-      break
-    }
+  while ((await graph.getAttribute("data-report-node-label-visibility")) === "hidden") {
     const previousRatio = (await readJsonAttribute<{ readonly ratio: number }>(graph, "data-camera-state")).ratio
     await page.mouse.wheel(0, -120)
     await expect
@@ -2468,17 +2466,14 @@ function graphPointFarthestFromNodes(
   width: number,
   height: number,
 ): { readonly x: number; readonly y: number } {
-  const [point] = [
-    { x: 1, y: 1 },
-    { x: width - 1, y: 1 },
-    { x: 1, y: height - 1 },
-    { x: width - 1, y: height - 1 },
-  ].toSorted((left, right) => {
-    const minimumClearance = (candidate: { readonly x: number; readonly y: number }): number =>
-      Math.min(...nodes.map((node) => Math.hypot(candidate.x - node.x, candidate.y - node.y) - node.radius))
-    return minimumClearance(right) - minimumClearance(left)
-  })
+  const viewportFractions = [0.1, 0.3, 0.5, 0.7, 0.9]
+  const minimumClearance = (candidate: { readonly x: number; readonly y: number }): number =>
+    Math.min(...nodes.map((node) => Math.hypot(candidate.x - node.x, candidate.y - node.y) - node.radius))
+  const [point] = viewportFractions
+    .flatMap((xFraction) => viewportFractions.map((yFraction) => ({ x: width * xFraction, y: height * yFraction })))
+    .toSorted((left, right) => minimumClearance(right) - minimumClearance(left))
   Assert.isDefined(point)
+  expect(minimumClearance(point)).toBeGreaterThan(0)
   return point
 }
 
