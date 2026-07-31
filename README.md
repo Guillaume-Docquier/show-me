@@ -113,7 +113,7 @@ The report lets you:
 - switch to the `Coverage` lens to find files with at least 100 physical code lines and at most 80% imported executable-line coverage by default. Change either inclusive threshold, include or exclude unavailable coverage independently, and inspect matching, known-coverage, and unavailable-coverage counts without removing non-matches from search;
 - switch to the `Coupling` lens to size files by visible direct fan-in plus fan-out while preserving coverage fills. Runtime and type-only controls update rankings, cycle groups, inspector metrics, node sizes, and graph focus together;
 - switch to the `Boundaries` lens to aggregate directed project-file dependencies by workspace package or top-level directory, then select a boundary or matrix cell to inspect the exact files and relationships it represents;
-- open `Advanced` to customize file sizing and color, dependency display, type-only relationships, structure edges, and external packages. A changed preset is labeled `Custom`, and selecting a named lens restores its defaults without changing workspace scope;
+- open `Advanced` to customize file sizing and color, dependency display, runtime and type-only relationships, structure edges, and external packages. Both dependency kinds can be hidden at once while structure edges remain visible. A changed preset is labeled `Custom`, and selecting a named lens restores its defaults without changing workspace scope;
 - search project-file and directory paths with exact result counts while keeping the selected item reachable;
 - expand directories independently from selecting them, with top-level directories expanded initially;
 - select and center files or directories from the graph, project tree, breadcrumbs, or relationship lists;

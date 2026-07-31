@@ -1115,8 +1115,32 @@ test("shows, distinguishes, filters, and deterministically restores type-only de
       expect(await graph.getAttribute("data-layout-signature")).not.toBe(initialLayoutSignature)
     })
 
-    await test.step("Restore type-only project relationships deterministically", async () => {
+    await test.step("Hide every dependency kind while retaining structure edges", async () => {
       const graph = page.locator("#graph")
+      const runtimeDependencies = page.getByRole("checkbox", { name: "Runtime dependencies" })
+      const typeOnlyDependencies = page.getByRole("checkbox", { name: "Type-only dependencies" })
+
+      await expect(runtimeDependencies).toBeEnabled()
+      await runtimeDependencies.uncheck()
+
+      await expect(runtimeDependencies).not.toBeChecked()
+      await expect(typeOnlyDependencies).not.toBeChecked()
+      await expect(runtimeDependencies).toBeEnabled()
+      await expect(typeOnlyDependencies).toBeEnabled()
+      await expect(page.getByRole("checkbox", { name: "Structure edges" })).toBeChecked()
+      await expect(page.locator("html")).toHaveAttribute("data-runtime-dependencies", "hidden")
+      await expect(page.locator("html")).toHaveAttribute("data-type-only-dependencies", "hidden")
+      await expect(graph).toHaveAttribute("data-visible-edge-count", "0")
+      await expect(graph).toHaveAttribute("data-rendered-dependency-edge-count", "0")
+      await expect(graph).toHaveAttribute("data-rendered-structure-edge-count", /^[1-9]\d*$/u)
+      await expect(page.locator("#selected-dependencies")).toHaveText("0")
+      await expect(page.locator("#runtime-dependency-edge-key")).toBeHidden()
+      await expect(page.locator("#type-only-dependency-edge-key")).toBeHidden()
+    })
+
+    await test.step("Restore both dependency kinds deterministically", async () => {
+      const graph = page.locator("#graph")
+      await page.getByRole("checkbox", { name: "Runtime dependencies" }).check()
       await page.getByRole("checkbox", { name: "Type-only dependencies" }).check()
       await expect(graph).toHaveAttribute("data-visible-edge-count", "16")
       await expect(page.locator("#selected-dependencies")).toHaveText("9")

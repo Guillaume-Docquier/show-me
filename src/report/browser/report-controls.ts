@@ -78,8 +78,6 @@ export class ReportControls {
     this.#elements.externalPackageToggle.checked = settings.externalPackages
     this.#elements.runtimeDependencyToggle.checked = settings.runtimeDependencies
     this.#elements.typeOnlyDependencyToggle.checked = settings.typeOnlyDependencies
-    this.#elements.runtimeDependencyToggle.disabled = settings.runtimeDependencies && !settings.typeOnlyDependencies
-    this.#elements.typeOnlyDependencyToggle.disabled = settings.typeOnlyDependencies && !settings.runtimeDependencies
     this.#elements.structureEdgesToggle.checked = settings.structureEdges
     this.#elements.dependencyDisplay.value = settings.dependencyDisplay
     this.#elements.projectFileColor.value = settings.projectFileColor
