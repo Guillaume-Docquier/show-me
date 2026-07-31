@@ -54,7 +54,7 @@ Exclude generated files while keeping the default test exclusions:
 show-me . --exclude "*.test.*" --exclude "*.spec.*" --exclude "*.generated.*"
 ```
 
-Show Me writes the report but does not open it automatically.
+Every invocation prints the installed Show Me version before any other output. Show Me writes the report but does not open it automatically.
 
 ## Command options
 

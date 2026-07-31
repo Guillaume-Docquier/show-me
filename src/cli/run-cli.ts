@@ -155,7 +155,7 @@ export async function runCli(arguments_: readonly string[], output: CliOutput, o
 
   const elapsedMilliseconds = Time.in(Timer.since(startedAt), UnitOfTime.MILLISECONDS)
   output.writeStandardOutput(`Report written to ${outputPath}\n`)
-  output.writeStandardOutput(`Completed in ${elapsedMilliseconds.toFixed(1)} ms.\n`)
+  output.writeStandardOutput(`Done in ${elapsedMilliseconds.toFixed(0)}ms using show-me v${SHOW_ME_VERSION}\n`)
   return 0
 }
 

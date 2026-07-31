@@ -81,7 +81,7 @@ Options:
       expect(html).toContain("index.ts")
       expect(captured.standardOutput.join("")).toContain(outputPath)
       expect(captured.standardOutput.join("")).toContain("No coverage file found")
-      expect(captured.standardOutput.join("")).toMatch(/Completed in \d+\.\d ms\./u)
+      expect(captured.standardOutput.join("")).toMatch(/Done in \d+ms using show-me v.+/u)
       expect(captured.standardError).toEqual([])
     })
   })
@@ -194,7 +194,7 @@ Options:
       // Assert
       expect(exitCode).toBe(1)
       expect(captured.standardOutput.join("")).not.toContain("Report written")
-      expect(captured.standardOutput.join("")).not.toContain("Completed in")
+      expect(captured.standardOutput.join("")).not.toContain("Done in")
       expect(captured.standardError.join("")).toContain(`Could not write report to ${outputDirectory}:`)
     })
   })
